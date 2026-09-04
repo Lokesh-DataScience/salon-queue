@@ -5,6 +5,9 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { healthRouter } from './routes/health.routes';
+import salonRouter from './routes/salon.routes';
+import queueRouter from './routes/queue.routes';
+import queueTicketRouter from './routes/ticket.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 export function createApp() {
@@ -23,9 +26,9 @@ export function createApp() {
   app.use('/api/health', healthRouter);
 
   // Future routers (Milestone 2+):
-  // app.use('/api/salons', salonRouter);
-  // app.use('/api/queues', queueRouter);
-  // app.use('/api/queue-tickets', queueTicketRouter);
+  app.use('/api/salons', salonRouter);
+  app.use('/api/queues', queueRouter);
+  app.use('/api/queue-tickets', queueTicketRouter);
   // app.use('/api/auth/barber', barberAuthRouter);
   // app.use('/api/barber', barberRouter);
 
