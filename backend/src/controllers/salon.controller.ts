@@ -1,3 +1,4 @@
+// backend/src/controllers/salon.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { nearbySalonsQuerySchema, salonIdParamSchema } from '../validators/salon.validators';
 import { findNearbySalons, getSalonById, getSalonQueueSnapshot } from '../services/salon.service';

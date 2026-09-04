@@ -1,3 +1,4 @@
+// backend/src/controllers/queue.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { salonIdParamSchema } from '../validators/salon.validators';
 import { joinQueueBodySchema, ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.validators';

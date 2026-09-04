@@ -1,3 +1,4 @@
+// backend/src/routes/salon.routes.ts
 import { Router } from 'express';
 import { getNearbySalons, getSalonDetails, getSalonQueue } from '../controllers/salon.controller';
 

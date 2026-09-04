@@ -1,3 +1,4 @@
+// backend/src/middleware/errorHandler.ts
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 

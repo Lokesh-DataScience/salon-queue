@@ -1,3 +1,4 @@
+// frontend/src/api/client.ts
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {

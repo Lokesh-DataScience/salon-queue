@@ -1,3 +1,4 @@
+// backend/src/routes/queue.routes.ts
 import { Router } from 'express';
 import { postJoinQueue } from '../controllers/queue.controller';
 
