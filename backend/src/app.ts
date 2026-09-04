@@ -8,6 +8,8 @@ import { healthRouter } from './routes/health.routes';
 import salonRouter from './routes/salon.routes';
 import queueRouter from './routes/queue.routes';
 import queueTicketRouter from './routes/ticket.routes';
+import barberAuthRouter from './routes/auth.routes';
+import barberRouter from './routes/barber.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 export function createApp() {
@@ -29,8 +31,8 @@ export function createApp() {
   app.use('/api/salons', salonRouter);
   app.use('/api/queues', queueRouter);
   app.use('/api/queue-tickets', queueTicketRouter);
-  // app.use('/api/auth/barber', barberAuthRouter);
-  // app.use('/api/barber', barberRouter);
+  app.use('/api/auth/barber', barberAuthRouter);
+  app.use('/api/barber', barberRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

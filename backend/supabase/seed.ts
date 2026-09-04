@@ -1,3 +1,5 @@
+// backend/supabase/seed.ts
+import bcrypt from 'bcrypt';
 import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 
@@ -69,12 +71,20 @@ const demoSalons = [
   },
 ];
 
-async function main() {
+const DEV_PASSWORD = 'testpass123';
+
+function slugify(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+async function seedSalons() {
   console.log('Seeding demo salons...');
+  const salonIdsByName = new Map<string, string>();
 
   for (const salon of demoSalons) {
-    // Upsert on `name` so re-running the seed doesn't create duplicates.
-    // (name isn't unique in the schema, so we check-then-insert instead.)
     const { data: existing, error: findError } = await supabase
       .from('salons')
       .select('id')
@@ -87,19 +97,79 @@ async function main() {
 
     if (existing) {
       console.log(`  - "${salon.name}" already exists, skipping.`);
+      salonIdsByName.set(salon.name, existing.id);
       continue;
     }
 
-    const { error: insertError } = await supabase.from('salons').insert(salon);
+    const { data: inserted, error: insertError } = await supabase
+      .from('salons')
+      .insert(salon)
+      .select('id')
+      .single();
 
     if (insertError) {
       throw new Error(`Failed inserting salon "${salon.name}": ${insertError.message}`);
     }
 
     console.log(`  + inserted "${salon.name}"`);
+    salonIdsByName.set(salon.name, inserted.id);
   }
 
   console.log(`Done. ${demoSalons.length} demo salons ensured.`);
+  return salonIdsByName;
+}
+
+async function seedBarbers(salonIdsByName: Map<string, string>) {
+  console.log('Seeding demo barber accounts...');
+  const passwordHash = await bcrypt.hash(DEV_PASSWORD, 10);
+  const credentials: { email: string; salon: string }[] = [];
+
+  for (const salon of demoSalons) {
+    const salonId = salonIdsByName.get(salon.name);
+    if (!salonId) continue; // shouldn't happen, but keeps this defensive
+
+    const email = `owner@${slugify(salon.name)}.test`;
+
+    const { data: existing, error: findError } = await supabase
+      .from('salon_staff')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (findError) {
+      throw new Error(`Failed checking for existing staff "${email}": ${findError.message}`);
+    }
+
+    if (existing) {
+      console.log(`  - "${email}" already exists, skipping.`);
+      credentials.push({ email, salon: salon.name });
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from('salon_staff').insert({
+      salon_id: salonId,
+      name: `${salon.name} Owner`,
+      email,
+      password_hash: passwordHash,
+      role: 'OWNER',
+    });
+
+    if (insertError) {
+      throw new Error(`Failed inserting staff "${email}": ${insertError.message}`);
+    }
+
+    console.log(`  + inserted "${email}"`);
+    credentials.push({ email, salon: salon.name });
+  }
+
+  console.log(`Done. ${credentials.length} demo barber accounts ensured.`);
+  console.log(`\nDev login credentials (password for all: "${DEV_PASSWORD}"):`);
+  credentials.forEach((c) => console.log(`  ${c.email}  →  ${c.salon}`));
+}
+
+async function main() {
+  const salonIdsByName = await seedSalons();
+  await seedBarbers(salonIdsByName);
 }
 
 main().catch((err) => {
