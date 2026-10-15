@@ -1,3 +1,4 @@
+// frontend/src/api/tickets.ts
 import { apiFetch } from './client';
 
 export function joinSalonQueue(salonId: string, name: string, phone: string) {

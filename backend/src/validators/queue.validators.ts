@@ -1,3 +1,4 @@
+// backend/src/validators/queue.validators.ts
 import { z } from 'zod';
 
 export const joinQueueBodySchema = z.object({

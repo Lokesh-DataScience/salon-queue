@@ -32,7 +32,14 @@ export async function getBarberQueueSnapshot(salonId: string) {
   if (queueError) throw queueError;
 
   if (!queue) {
-    return { queueStatus: 'ACTIVE' as const, currentToken: 0, called: null, serving: null, waiting: [] };
+    return {
+      salonId, // NEW
+      queueStatus: 'ACTIVE' as const,
+      currentToken: 0,
+      called: null,
+      serving: null,
+      waiting: [],
+    };
   }
 
   const { data: entries, error: entriesError } = await supabase
@@ -49,11 +56,9 @@ export async function getBarberQueueSnapshot(salonId: string) {
   const rows = (entries ?? []) as QueueEntryRow[];
 
   return {
+    salonId, // NEW
     queueStatus: queue.status as 'ACTIVE' | 'PAUSED' | 'CLOSED',
     currentToken: queue.current_token,
-    // Called and serving are mutually exclusive at any moment (NEXT
-    // refuses to run while one is CALLED-but-unstarted), so at most one
-    // of these two is ever non-null.
     called: rows.find((e) => e.status === 'CALLED') ?? null,
     serving: rows.find((e) => e.status === 'SERVING') ?? null,
     waiting: rows.filter((e) => e.status === 'WAITING'),

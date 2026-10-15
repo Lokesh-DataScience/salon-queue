@@ -1,4 +1,6 @@
+// backend/src/services/queue.service.ts
 import { supabase } from '../config/supabase';
+import { getIO } from '../sockets/io';
 
 export class QueueJoinError extends Error {
   constructor(public code: string, message: string) {
@@ -30,6 +32,7 @@ export async function joinQueue(salonId: string, name: string, phone: string) {
   const row = Array.isArray(data) ? data[0] : data;
   return {
     ticketId: row.entry_id,
+    salonId, // NEW — already known from the param, no extra query needed
     queueId: row.queue_id,
     tokenNumber: row.token_number,
     accessToken: row.access_token,
@@ -63,6 +66,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
 
   return {
     ticketId: entry.id,
+    salonId: entry.queues.salon_id, // NEW — was already fetched via the join, just wasn't returned
     tokenNumber: entry.token_number,
     status: entry.status,
     currentToken: entry.queues.current_token,
@@ -70,4 +74,53 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     estimatedWaitMinutes: (peopleAhead ?? 0) * (salon?.average_service_minutes ?? 15),
     queueStatus: entry.queues.status,
   };
+}
+
+// --- Milestone 4: real-time ---
+
+function todayISODate() {
+  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
+
+export async function getSanitizedQueueState(salonId: string) {
+  const { data: queue, error: queueErr } = await supabase
+    .from('queues')
+    .select('id, current_token, status')
+    .eq('salon_id', salonId)
+    .eq('date', todayISODate()) // FIXED — this filter was missing
+    .maybeSingle(); // also switched from .single() to .maybeSingle() so a
+                     // genuinely-missing today's queue doesn't throw, it
+                     // just returns null cleanly
+
+  if (queueErr || !queue) return null;
+
+  const { data: entries } = await supabase
+    .from('queue_entries')
+    .select('id, token_number, status')
+    .eq('queue_id', queue.id)
+    .in('status', ['WAITING', 'CALLED', 'SERVING'])
+    .order('token_number', { ascending: true });
+
+  const { data: salon } = await supabase
+    .from('salons')
+    .select('average_service_minutes')
+    .eq('id', salonId)
+    .single();
+
+  return {
+    salonId,
+    currentToken: queue.current_token,
+    queueStatus: queue.status,
+    averageServiceMinutes: salon?.average_service_minutes ?? 15,
+    entries: (entries ?? []).map((e) => ({
+      id: e.id,
+      tokenNumber: e.token_number,
+      status: e.status,
+    })),
+  };
+}
+export async function broadcastQueueUpdate(salonId: string) {
+  const state = await getSanitizedQueueState(salonId);
+  if (!state) return;
+  getIO().to(`salon:${salonId}`).emit('queue:updated', state);
 }

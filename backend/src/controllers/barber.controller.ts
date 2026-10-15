@@ -10,12 +10,9 @@ import {
   pauseQueue,
   resumeQueue,
 } from '../services/barber.service';
+import { broadcastQueueUpdate } from '../services/queue.service';
 import { AppError } from '../middleware/errorHandler';
 
-// req.staff is guaranteed present here because every route in
-// barber.routes.ts runs requireAuth first. salonId is ALWAYS read from
-// the verified JWT, never from params/body/query — this is the
-// ownership guarantee for the salon-level actions (next/pause/resume).
 function salonIdOf(req: Request): string {
   if (!req.staff) throw new AppError('Not authenticated.', 401);
   return req.staff.salonId;
@@ -31,7 +28,9 @@ export async function getQueue(req: Request, res: Response, next: NextFunction) 
 
 export async function postNext(req: Request, res: Response, next: NextFunction) {
   try {
-    const result = await callNext(salonIdOf(req));
+    const salonId = salonIdOf(req);
+    const result = await callNext(salonId);
+    await broadcastQueueUpdate(salonId); // NEW
     res.json({ result });
   } catch (err) {
     next(err);
@@ -40,8 +39,11 @@ export async function postNext(req: Request, res: Response, next: NextFunction) 
 
 export async function postStart(req: Request, res: Response, next: NextFunction) {
   try {
+    const salonId = salonIdOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
-    res.json({ entry: await startEntry(salonIdOf(req), entryId) });
+    const entry = await startEntry(salonId, entryId);
+    await broadcastQueueUpdate(salonId); // NEW
+    res.json({ entry });
   } catch (err) {
     next(err);
   }
@@ -49,8 +51,11 @@ export async function postStart(req: Request, res: Response, next: NextFunction)
 
 export async function postComplete(req: Request, res: Response, next: NextFunction) {
   try {
+    const salonId = salonIdOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
-    res.json({ entry: await completeEntry(salonIdOf(req), entryId) });
+    const entry = await completeEntry(salonId, entryId);
+    await broadcastQueueUpdate(salonId); // NEW
+    res.json({ entry });
   } catch (err) {
     next(err);
   }
@@ -58,8 +63,11 @@ export async function postComplete(req: Request, res: Response, next: NextFuncti
 
 export async function postSkip(req: Request, res: Response, next: NextFunction) {
   try {
+    const salonId = salonIdOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
-    res.json({ entry: await skipEntry(salonIdOf(req), entryId) });
+    const entry = await skipEntry(salonId, entryId);
+    await broadcastQueueUpdate(salonId); // NEW
+    res.json({ entry });
   } catch (err) {
     next(err);
   }
@@ -67,7 +75,10 @@ export async function postSkip(req: Request, res: Response, next: NextFunction) 
 
 export async function postPause(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ queue: await pauseQueue(salonIdOf(req)) });
+    const salonId = salonIdOf(req);
+    const queue = await pauseQueue(salonId);
+    await broadcastQueueUpdate(salonId); // NEW
+    res.json({ queue });
   } catch (err) {
     next(err);
   }
@@ -75,7 +86,10 @@ export async function postPause(req: Request, res: Response, next: NextFunction)
 
 export async function postResume(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json({ queue: await resumeQueue(salonIdOf(req)) });
+    const salonId = salonIdOf(req);
+    const queue = await resumeQueue(salonId);
+    await broadcastQueueUpdate(salonId); // NEW
+    res.json({ queue });
   } catch (err) {
     next(err);
   }

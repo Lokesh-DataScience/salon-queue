@@ -1,3 +1,4 @@
+// frontend/src/pages/SalonDetails.tsx
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { fetchSalon, fetchSalonQueue } from '../api/salons';

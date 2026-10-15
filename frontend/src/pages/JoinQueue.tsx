@@ -1,3 +1,4 @@
+// frontend/src/pages/JoinQueue.tsx
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { joinSalonQueue } from '../api/tickets';

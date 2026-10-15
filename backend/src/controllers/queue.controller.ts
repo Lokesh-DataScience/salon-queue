@@ -2,13 +2,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { salonIdParamSchema } from '../validators/salon.validators';
 import { joinQueueBodySchema, ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.validators';
-import { joinQueue, getTicketStatus, QueueJoinError } from '../services/queue.service';
+import { joinQueue, getTicketStatus, broadcastQueueUpdate, QueueJoinError } from '../services/queue.service';
 
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
     const { name, phone } = joinQueueBodySchema.parse(req.body);
     const ticket = await joinQueue(salonId, name, phone);
+    await broadcastQueueUpdate(salonId); // NEW
     res.status(201).json({ ticket });
   } catch (err) {
     if (err instanceof QueueJoinError) {
