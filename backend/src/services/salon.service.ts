@@ -1,4 +1,7 @@
+// backend/src/services/salon.service.ts
 import { supabase } from '../config/supabase';
+import { todayISODate } from '../utils/date';
+import { isWithinHours } from '../utils/hours';
 
 export async function findNearbySalons(lat: number, lng: number, radiusKm: number) {
   const { data, error } = await supabase.rpc('nearby_salons', {
@@ -10,14 +13,12 @@ export async function findNearbySalons(lat: number, lng: number, radiusKm: numbe
   return data;
 }
 
+
 export async function getSalonById(salonId: string) {
-  const { data, error } = await supabase
-    .from('salons')
-    .select('*')
-    .eq('id', salonId)
-    .single();
+  const { data, error } = await supabase.from('salons').select('*').eq('id', salonId).single();
   if (error) return null;
-  return data;
+  // "Open" means switched on AND inside today's opening hours.
+  return { ...data, is_open: data.is_open && isWithinHours(data.opening_time, data.closing_time) };
 }
 
 export async function getSalonQueueSnapshot(salonId: string) {
@@ -25,7 +26,7 @@ export async function getSalonQueueSnapshot(salonId: string) {
     .from('queues')
     .select('*')
     .eq('salon_id', salonId)
-    .eq('date', new Date().toISOString().slice(0, 10))
+    .eq('date', todayISODate())
     .maybeSingle();
 
   if (!queue) {

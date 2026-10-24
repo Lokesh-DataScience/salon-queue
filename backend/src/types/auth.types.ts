@@ -9,6 +9,11 @@ export interface JwtPayload {
   role: StaffRole;
 }
 
+export interface RefreshPayload extends JwtPayload {
+  jti: string;
+  exp: number;
+}
+
 // Augment Express's Request type so `req.staff` is typed everywhere
 // without needing `as` casts in every controller.
 declare global {

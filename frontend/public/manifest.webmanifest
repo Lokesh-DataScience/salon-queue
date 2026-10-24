@@ -1,0 +1,8 @@
+{
+  "name": "Salon Virtual Queue",
+  "short_name": "Salon Queue",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#111827"
+}

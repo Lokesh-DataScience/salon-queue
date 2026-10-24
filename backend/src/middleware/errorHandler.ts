@@ -15,10 +15,19 @@ export function notFoundHandler(_req: Request, res: Response) {
   res.status(404).json({ message: 'Not found.' });
 }
 
+// Name + code only. Never err.message / err.details / the object itself:
+// database errors can echo the offending row (names, phone numbers).
+function describeError(err: unknown): string {
+  const e = err as { name?: unknown; code?: unknown } | null;
+  const name = typeof e?.name === 'string' ? e.name : 'Error';
+  const code = typeof e?.code === 'string' || typeof e?.code === 'number' ? ` code=${e.code}` : '';
+  return `${name}${code}`;
+}
+
 // Deliberately typed with 4 args so Express recognizes it as an error handler.
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
@@ -36,8 +45,18 @@ export function errorHandler(
     return;
   }
 
-  // Never leak internal details (stack traces, DB errors) to the client.
-  // The full error still goes to server-side logs for debugging.
-  console.error('Unhandled error:', err);
+  // body-parser errors (malformed JSON, oversized body) are client mistakes, not 500s.
+  const type = (err as { type?: unknown } | null)?.type;
+  if (type === 'entity.parse.failed') {
+    res.status(400).json({ message: 'Invalid request.' });
+    return;
+  }
+  if (type === 'entity.too.large') {
+    res.status(413).json({ message: 'Request too large.' });
+    return;
+  }
+
+  // req.path excludes the query string, so ?accessToken=... never reaches the log.
+  console.error(`[error] ${req.method} ${req.path} ${describeError(err)}`);
   res.status(500).json({ message: 'Something went wrong. Please try again.' });
 }

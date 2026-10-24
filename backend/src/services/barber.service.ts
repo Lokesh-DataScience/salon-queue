@@ -1,10 +1,7 @@
 // backend/src/services/barber.service.ts
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
-
-function todayISODate() {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-}
+import { todayISODate } from '../utils/date';
 
 interface QueueEntryRow {
   id: string;
@@ -83,6 +80,8 @@ export async function callNext(salonId: string) {
   const result = Array.isArray(data) ? data[0] : data;
 
   if (!result?.called_entry_id) {
+    const didSomething = result && Object.values(result).some((v) => v != null);
+    if (didSomething) return { ...result, nothingWaiting: true };
     throw new AppError('No customers are waiting.', 409);
   }
 
@@ -94,7 +93,7 @@ export async function callNext(salonId: string) {
 async function loadOwnedEntry(salonId: string, entryId: string) {
   const { data, error } = await supabase
     .from('queue_entries')
-    .select('id, status, queue_id, queues!inner(salon_id)')
+    .select('id, status, queue_id, token_number, queues!inner(salon_id)')
     .eq('id', entryId)
     .single();
 
@@ -102,7 +101,7 @@ async function loadOwnedEntry(salonId: string, entryId: string) {
     throw new AppError('Queue entry not found.', 404);
   }
 
-  return data as unknown as { id: string; status: string; queue_id: string };
+  return data as unknown as { id: string; status: string; queue_id: string; token_number: number };
 }
 
 // ── START (CALLED → SERVING) ──────────────────────────────────────────────
@@ -171,7 +170,12 @@ export async function skipEntry(salonId: string, entryId: string) {
   if (error) throw error;
   if (!data) throw new AppError('This entry was already updated by another action.', 409);
 
-  return { id: entryId, status: 'SKIPPED' as const };
+    return {
+    id: entryId,
+    status: 'SKIPPED' as const,
+    tokenNumber: entry.token_number,
+    previousStatus: entry.status,
+  };
 }
 
 // ── PAUSE / RESUME ─────────────────────────────────────────────────────

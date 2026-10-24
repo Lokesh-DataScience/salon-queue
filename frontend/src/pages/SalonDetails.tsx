@@ -1,7 +1,8 @@
-// frontend/src/pages/SalonDetails.tsx
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { fetchSalon, fetchSalonQueue } from '../api/salons';
+import PageShell from '../components/PageShell';
+import ResumeTicketBanner from '../components/ResumeTicketBanner';
 
 export default function SalonDetails() {
   const { salonId } = useParams<{ salonId: string }>();
@@ -14,32 +15,60 @@ export default function SalonDetails() {
   const { data: queue } = useQuery({
     queryKey: ['salonQueue', salonId],
     queryFn: () => fetchSalonQueue(salonId!),
-    refetchInterval: 10000, // poll every 10s until Milestone 4 adds sockets
+    refetchInterval: 10000, // unchanged: see note below about polling
   });
 
-  if (isLoading) return <p className="p-6 text-gray-500">Loading salon...</p>;
-  if (error || !salon) return <p className="p-6 text-red-600">Salon not found.</p>;
+  if (isLoading) {
+    return (
+      <PageShell title="Loading salon">
+        <p role="status" className="text-gray-600">Loading salon...</p>
+      </PageShell>
+    );
+  }
+  if (error || !salon) {
+    return (
+      <PageShell title="Salon not found">
+        <p role="alert" className="text-red-700">We couldn't find this salon.</p>
+        <Link to="/salons" className="btn-secondary mt-6">Back to nearby salons</Link>
+      </PageShell>
+    );
+  }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h1 className="text-xl font-semibold">{salon.name}</h1>
-      <p className="text-sm text-gray-500">{salon.address}</p>
-      <p className={`text-sm mt-1 ${salon.is_open ? 'text-green-600' : 'text-red-600'}`}>
+    <PageShell title={salon.name}>
+      <Link to="/salons" className="mb-3 inline-block min-h-11 py-2 text-sm text-gray-600 underline">
+        ← Nearby salons
+      </Link>
+      <ResumeTicketBanner salonId={salonId} />
+      <h1 className="break-words text-xl font-semibold">{salon.name}</h1>
+      <p className="text-sm text-gray-600">{salon.address}</p>
+      <p className={`mt-1 text-sm font-medium ${salon.is_open ? 'text-green-700' : 'text-red-700'}`}>
+        <span aria-hidden="true">{salon.is_open ? '🟢 ' : '🔴 '}</span>
         {salon.is_open ? 'Open' : 'Closed'}
       </p>
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
-        <p className="text-sm text-gray-600">Current Token: <span className="font-medium">#{queue?.currentToken ?? '-'}</span></p>
-        <p className="text-sm text-gray-600">People Waiting: <span className="font-medium">{queue?.waitingCount ?? '-'}</span></p>
-        <p className="text-sm text-gray-600">Avg Service Time: {salon.average_service_minutes} min</p>
-      </div>
+      <dl className="card mt-4 space-y-2 text-sm text-gray-700">
+        <div className="flex justify-between gap-4">
+          <dt>Current token</dt>
+          <dd className="font-medium">#{queue?.currentToken ?? '-'}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt>People waiting</dt>
+          <dd className="font-medium">{queue?.waitingCount ?? '-'}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt>Average service time</dt>
+          <dd className="font-medium">{salon.average_service_minutes} min</dd>
+        </div>
+      </dl>
 
-      <Link
-        to={`/salons/${salonId}/join`}
-        className="mt-6 block text-center rounded-xl bg-black text-white py-3 font-medium"
-      >
-        Join Queue
-      </Link>
-    </div>
+      {salon.is_open ? (
+        <Link to={`/salons/${salonId}/join`} className="btn-primary mt-6">Join queue</Link>
+      ) : (
+        <p role="status" className="mt-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-900">
+          This salon is currently closed, so its queue isn't open.
+        </p>
+      )}
+    </PageShell>
   );
 }

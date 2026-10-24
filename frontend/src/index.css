@@ -5,5 +5,27 @@
 }
 
 body {
-  @apply bg-neutral-50 text-neutral-900;
+  @apply bg-neutral-50 text-neutral-900 antialiased;
+}
+
+/* One consistent, visible keyboard focus indicator everywhere. */
+:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-gray-200 bg-white p-4;
+  }
+  .btn-primary {
+    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-black px-5 py-3 text-base font-medium text-white hover:bg-gray-800 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-gray-400 bg-white px-5 py-3 text-base font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50;
+  }
+  /* text-base (16px) also stops iOS Safari from zooming in on focus. */
+  .field {
+    @apply min-h-12 w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-base;
+  }
 }

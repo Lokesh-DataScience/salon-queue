@@ -131,3 +131,57 @@ alter table salons enable row level security;
 alter table salon_staff enable row level security;
 alter table queues enable row level security;
 alter table queue_entries enable row level security;
+
+create table if not exists revoked_tokens (
+  jti         text primary key,
+  expires_at  timestamptz not null,
+  revoked_at  timestamptz not null default now()
+);
+create index if not exists revoked_tokens_expires_at_idx on revoked_tokens (expires_at);
+alter table revoked_tokens enable row level security;
+
+
+alter table queue_entries add column if not exists push_subscription jsonb;
+
+create index if not exists queue_entries_push_idx
+  on queue_entries (status) where push_subscription is not null;
+
+create or replace function cleanup_customer_data(p_retention_hours int)
+returns table (cancelled_stale int, anonymized int)
+language plpgsql
+as $$
+declare
+  v_cancelled int;
+  v_anon int;
+begin
+  -- 1. Entries stuck active on a past day's queue become CANCELLED.
+  update queue_entries e
+  set status = 'CANCELLED', cancelled_at = now()
+  from queues q
+  where e.queue_id = q.id
+    and q.date < current_date
+    and e.status in ('WAITING', 'CALLED', 'SERVING');
+  get diagnostics v_cancelled = row_count;
+
+  -- 2. Push subscriptions are useless once a ticket is finished, and the endpoint
+  --    is an identifier, so drop them immediately (no retention window).
+  update queue_entries
+  set push_subscription = null
+  where status in ('COMPLETED', 'SKIPPED', 'CANCELLED')
+    and push_subscription is not null;
+
+  -- 3. Null out personal data on finished entries past the window.
+  update queue_entries
+  set customer_name = null, customer_phone = null
+  where status in ('COMPLETED', 'SKIPPED', 'CANCELLED')
+    and (customer_name is not null or customer_phone is not null)
+    and coalesce(completed_at, skipped_at, cancelled_at)
+        < now() - make_interval(hours => p_retention_hours);
+  get diagnostics v_anon = row_count;
+
+  return query select v_cancelled, v_anon;
+end;
+$$;
+
+revoke all on function cleanup_customer_data(int) from public, anon, authenticated;
+grant execute on function cleanup_customer_data(int) to service_role;

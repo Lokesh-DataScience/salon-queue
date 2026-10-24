@@ -1,13 +1,13 @@
 // backend/src/services/auth.service.ts
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { env } from '../config/env';
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
-import type { JwtPayload, StaffRole } from '../types/auth.types';
+import type { JwtPayload, RefreshPayload, StaffRole } from '../types/auth.types';
 
-const ACCESS_TOKEN_TTL = '15m';
-const REFRESH_TOKEN_TTL = '7d';
+export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 interface SalonStaffRow {
   id: string;
@@ -25,25 +25,14 @@ export async function loginBarber(email: string, password: string) {
     .eq('email', email)
     .maybeSingle<SalonStaffRow>();
 
-  // Deliberately generic message for both "no such email" and "wrong
-  // password" — never reveal which one it was (avoids account enumeration).
-  if (error || !data) {
-    throw new AppError('Invalid email or password.', 401);
-  }
+  // Same message for "no such email" and "wrong password": no account enumeration.
+  if (error || !data) throw new AppError('Invalid email or password.', 401);
 
   const passwordMatches = await bcrypt.compare(password, data.password_hash);
-  if (!passwordMatches) {
-    throw new AppError('Invalid email or password.', 401);
-  }
-
-  const payload: JwtPayload = {
-    staffId: data.id,
-    salonId: data.salon_id,
-    role: data.role,
-  };
+  if (!passwordMatches) throw new AppError('Invalid email or password.', 401);
 
   return {
-    tokens: signTokens(payload),
+    tokens: signTokens({ staffId: data.id, salonId: data.salon_id, role: data.role }),
     staff: {
       id: data.id,
       name: data.name,
@@ -55,8 +44,12 @@ export async function loginBarber(email: string, password: string) {
 }
 
 export function signTokens(payload: JwtPayload) {
-  const accessToken = jwt.sign(payload, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
-  const refreshToken = jwt.sign(payload, env.JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_TTL });
+  const claims = { staffId: payload.staffId, salonId: payload.salonId, role: payload.role };
+  const accessToken = jwt.sign(claims, env.JWT_SECRET, { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS });
+  const refreshToken = jwt.sign(claims, env.JWT_REFRESH_SECRET, {
+    expiresIn: REFRESH_TOKEN_TTL_SECONDS,
+    jwtid: randomUUID(), // unique id so this one token can be revoked
+  });
   return { accessToken, refreshToken };
 }
 
@@ -64,21 +57,56 @@ export function verifyAccessToken(token: string): JwtPayload {
   return jwt.verify(token, env.JWT_SECRET) as JwtPayload;
 }
 
-export function verifyRefreshToken(token: string): JwtPayload {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as JwtPayload;
+export function verifyRefreshToken(token: string): RefreshPayload {
+  const payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as RefreshPayload;
+  if (typeof payload.jti !== 'string') throw new Error('missing jti'); // pre-6b tokens: re-login once
+  return payload;
 }
 
-// Refresh only re-signs the access token from the refresh token's claims.
-// We deliberately don't hit the DB here (MVP scope — see auth.controller.ts
-// comment), but that also means a staff row deleted/role-changed after
-// login won't be reflected until the refresh token itself expires (7d).
-// Acceptable for MVP; flagged for Milestone 6 hardening.
-export function refreshAccessToken(refreshToken: string) {
-  const payload = verifyRefreshToken(refreshToken);
-  const accessToken = jwt.sign(
-    { staffId: payload.staffId, salonId: payload.salonId, role: payload.role },
-    env.JWT_SECRET,
-    { expiresIn: ACCESS_TOKEN_TTL },
-  );
-  return accessToken;
+const SESSION_ENDED = 'Session expired. Please log in again.';
+
+// Rotation: every refresh token works exactly once.
+// 1. Signature and expiry are valid.
+// 2. The staff row still exists, so a deleted or role-changed account is picked up here.
+// 3. Atomically claim the jti. A replay or a simultaneous second request fails on the
+//    primary key. Only then are new tokens issued.
+export async function rotateRefreshToken(refreshToken: string) {
+  let payload: RefreshPayload;
+  try {
+    payload = verifyRefreshToken(refreshToken);
+  } catch {
+    throw new AppError(SESSION_ENDED, 401);
+  }
+
+  const { data: staff, error: staffError } = await supabase
+    .from('salon_staff')
+    .select('id, salon_id, role')
+    .eq('id', payload.staffId)
+    .maybeSingle();
+  if (staffError) throw staffError; // infrastructure problem: 500, not a forced logout
+  if (!staff) throw new AppError(SESSION_ENDED, 401);
+
+  const { error: claimError } = await supabase
+    .from('revoked_tokens')
+    .insert({ jti: payload.jti, expires_at: new Date(payload.exp * 1000).toISOString() });
+  if (claimError) {
+    if (claimError.code === '23505') throw new AppError(SESSION_ENDED, 401); // already used or revoked
+    throw claimError;
+  }
+
+  return signTokens({ staffId: staff.id, salonId: staff.salon_id, role: staff.role });
+}
+
+// Best effort: logout must always succeed for the user, even if this fails.
+export async function revokeRefreshToken(refreshToken: string | undefined) {
+  if (!refreshToken) return;
+  try {
+    const payload = verifyRefreshToken(refreshToken);
+    const { error } = await supabase
+      .from('revoked_tokens')
+      .insert({ jti: payload.jti, expires_at: new Date(payload.exp * 1000).toISOString() });
+    if (error && error.code !== '23505') console.error(`[auth] revoke failed: ${error.code ?? 'unknown'}`);
+  } catch {
+    // invalid or expired token: nothing to revoke
+  }
 }

@@ -1,6 +1,9 @@
 // backend/src/services/queue.service.ts
 import { supabase } from '../config/supabase';
 import { getIO } from '../sockets/io';
+import { AppError } from '../middleware/errorHandler';
+import { todayISODate } from '../utils/date';
+import { evaluateNotifications } from './queueNotifications.service';
 
 export class QueueJoinError extends Error {
   constructor(public code: string, message: string) {
@@ -73,14 +76,11 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     peopleAhead: peopleAhead ?? 0,
     estimatedWaitMinutes: (peopleAhead ?? 0) * (salon?.average_service_minutes ?? 15),
     queueStatus: entry.queues.status,
+    notificationsOn: !!entry.push_subscription, // a flag only, never the subscription itself
   };
 }
 
 // --- Milestone 4: real-time ---
-
-function todayISODate() {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-}
 
 export async function getSanitizedQueueState(salonId: string) {
   const { data: queue, error: queueErr } = await supabase
@@ -119,8 +119,71 @@ export async function getSanitizedQueueState(salonId: string) {
     })),
   };
 }
-export async function broadcastQueueUpdate(salonId: string) {
+
+export async function broadcastQueueUpdate(
+  salonId: string,
+  opts: { silentEntryId?: string } = {},
+) {
   const state = await getSanitizedQueueState(salonId);
   if (!state) return;
   getIO().to(`salon:${salonId}`).emit('queue:updated', state);
+  await evaluateNotifications(salonId, opts);
+}
+export async function leaveTicket(ticketId: string, accessToken: string) {
+  const { data: entry, error } = await supabase
+    .from('queue_entries')
+    .select('id, status, queues!inner(salon_id)')
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .maybeSingle();
+
+  if (error || !entry) return null; // wrong id and wrong token look identical
+
+  if (entry.status !== 'WAITING') {
+    throw new AppError(
+      "You can only leave the queue while you're waiting. If you've been called, please let the salon know.",
+      409,
+    );
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from('queue_entries')
+    .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() })
+    .eq('id', ticketId)
+    .eq('status', 'WAITING') // compare-and-swap: loses cleanly to a concurrent barber action
+    .select('id')
+    .maybeSingle();
+
+  if (updateError) throw updateError;
+  if (!updated) throw new AppError('This ticket was just updated. Please refresh.', 409);
+
+  return { salonId: (entry.queues as unknown as { salon_id: string }).salon_id };
+}
+
+const ACTIVE_STATUSES = ['WAITING', 'CALLED', 'SERVING'];
+
+// Same "wrong id and wrong token look identical" rule as the other ticket actions.
+export async function savePushSubscription(ticketId: string, accessToken: string, subscription: unknown) {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .update({ push_subscription: subscription })
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .in('status', ACTIVE_STATUSES) // nothing to notify about on a finished ticket
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+export async function removePushSubscription(ticketId: string, accessToken: string) {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .update({ push_subscription: null })
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
 }

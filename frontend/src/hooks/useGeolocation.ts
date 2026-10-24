@@ -1,3 +1,4 @@
+// frontend/src/hooks/useGeolocation.ts
 import { useState, useEffect } from 'react';
 
 export function useGeolocation() {

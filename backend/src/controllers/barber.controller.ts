@@ -12,6 +12,7 @@ import {
 } from '../services/barber.service';
 import { broadcastQueueUpdate } from '../services/queue.service';
 import { AppError } from '../middleware/errorHandler';
+import { NotificationService } from '../services/notification.service';
 
 function salonIdOf(req: Request): string {
   if (!req.staff) throw new AppError('Not authenticated.', 401);
@@ -67,6 +68,11 @@ export async function postSkip(req: Request, res: Response, next: NextFunction) 
     const { entryId } = entryIdParamSchema.parse(req.params);
     const entry = await skipEntry(salonId, entryId);
     await broadcastQueueUpdate(salonId); // NEW
+    if (entry.previousStatus === 'WAITING' || entry.previousStatus === 'CALLED') {
+      await NotificationService.notifyQueueCancelled({
+        entryId, salonId, tokenNumber: entry.tokenNumber,
+      });
+    }
     res.json({ entry });
   } catch (err) {
     next(err);

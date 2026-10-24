@@ -1,10 +1,12 @@
-// frontend/src/pages/BarberLogin.tsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { loginBarber } from '../api/barber';
+import PageShell from '../components/PageShell';
 
 export default function BarberLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const expired = (location.state as { expired?: boolean } | null)?.expired;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -25,39 +27,52 @@ export default function BarberLogin() {
   }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h1 className="text-xl font-semibold mb-1">Barber Login</h1>
-      <p className="text-sm text-gray-500 mb-4">Sign in to manage your salon's queue.</p>
+    <PageShell title="Salon staff sign in">
+      <h1 className="mb-1 text-xl font-semibold">Salon staff sign in</h1>
+      <p className="mb-4 text-sm text-gray-600">Sign in to manage your salon's queue.</p>
+      {expired && (
+        <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          Please sign in to continue.
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label htmlFor="email" className="mb-1 block text-sm font-medium">Email</label>
           <input
+            id="email"
             type="email"
-            className="w-full rounded-lg border border-gray-300 p-3"
+            autoComplete="username"
+            className="field"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            autoCapitalize="none" 
+            autoCorrect="off" 
+            spellCheck={false}
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Password</label>
+          <label htmlFor="password" className="mb-1 block text-sm font-medium">Password</label>
           <input
+            id="password"
             type="password"
-            className="w-full rounded-lg border border-gray-300 p-3"
+            autoComplete="current-password"
+            className="field"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-describedby={error ? 'login-error' : undefined}
             required
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-xl bg-black text-white py-3 font-medium disabled:opacity-50"
-        >
-          {submitting ? 'Signing in...' : 'Sign In'}
+        {error && (
+          <p id="login-error" role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={submitting} className="btn-primary">
+          {submitting ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
-    </div>
+    </PageShell>
   );
 }

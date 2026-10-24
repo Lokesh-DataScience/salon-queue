@@ -1,3 +1,4 @@
+// frontend/src/api/salons.ts
 import { apiFetch } from './client';
 
 export function fetchNearbySalons(lat: number, lng: number, radiusKm = 5) {

@@ -2,47 +2,76 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { fetchNearbySalons } from '../api/salons';
 import { useGeolocation } from '../hooks/useGeolocation';
+import PageShell from '../components/PageShell';
+import ResumeTicketBanner from '../components/ResumeTicketBanner';
 
 export default function SalonList() {
   const { coords, error: geoError, loading: geoLoading } = useGeolocation();
 
-  const { data: salons, isLoading, error } = useQuery({
+  const { data: salons, isLoading, isError, refetch } = useQuery({
     queryKey: ['nearbySalons', coords?.lat, coords?.lng],
     queryFn: () => fetchNearbySalons(coords!.lat, coords!.lng),
     enabled: !!coords,
   });
 
-  if (geoLoading) return <p className="p-6 text-gray-500">Finding your location...</p>;
-  if (geoError) return <p className="p-6 text-red-600">{geoError}</p>;
-  if (isLoading) return <p className="p-6 text-gray-500">Finding nearby salons...</p>;
-  if (error) return <p className="p-6 text-red-600">Unable to load salons. Please try again.</p>;
+  let body;
+  if (geoLoading) {
+    body = <p role="status" className="text-gray-600">Finding your location...</p>;
+  } else if (geoError) {
+    body = (
+      <div role="alert" className="card border-red-300 bg-red-50">
+        <p className="text-red-900">{geoError}</p>
+        <p className="mt-1 text-sm text-red-900">
+          To see salons near you, allow location access in your browser settings, then try again.
+        </p>
+        <button type="button" onClick={() => window.location.reload()} className="btn-secondary mt-3">
+          Try again
+        </button>
+      </div>
+    );
+  } else if (isLoading) {
+    body = <p role="status" className="text-gray-600">Finding nearby salons...</p>;
+  } else if (isError) {
+    body = (
+      <div role="alert" className="card border-red-300 bg-red-50">
+        <p className="text-red-900">Unable to load salons. Please try again.</p>
+        <button type="button" onClick={() => refetch()} className="btn-secondary mt-3">
+          Try again
+        </button>
+      </div>
+    );
+  } else if (!salons || salons.length === 0) {
+    body = <p className="text-gray-600">No salons found within 5 km.</p>;
+  } else {
+    body = (
+      <ul className="grid gap-3 md:grid-cols-2">
+        {salons.map((s: any) => (
+          <li key={s.id}>
+            <Link to={`/salons/${s.id}`} className="card block hover:border-gray-400">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="break-words font-medium">{s.name}</h2>
+                <span className={`shrink-0 text-sm font-medium ${s.is_open ? 'text-green-700' : 'text-red-700'}`}>
+                  <span aria-hidden="true">{s.is_open ? '🟢 ' : '🔴 '}</span>
+                  {s.is_open ? 'Open' : 'Closed'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">{s.distance_km.toFixed(1)} km away</p>
+              <p className="mt-1 text-sm text-gray-700">
+                <span aria-hidden="true">👥 </span>{s.queue_size} waiting ·{' '}
+                <span aria-hidden="true">⏱ </span>~{s.estimated_wait_minutes} min
+              </p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h1 className="text-xl font-semibold mb-4">Nearby Salons</h1>
-      <div className="space-y-3">
-        {salons?.map((s: any) => (
-          <Link
-            key={s.id}
-            to={`/salons/${s.id}`}
-            className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-          >
-            <div className="flex justify-between items-start">
-              <h2 className="font-medium">{s.name}</h2>
-              <span className={s.is_open ? 'text-green-600 text-sm' : 'text-red-600 text-sm'}>
-                {s.is_open ? '🟢 Open' : '🔴 Closed'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500">{s.distance_km.toFixed(1)} km away</p>
-            <p className="text-sm text-gray-600 mt-1">
-              👥 {s.queue_size} waiting · ⏱ ~{s.estimated_wait_minutes} min
-            </p>
-          </Link>
-        ))}
-        {salons?.length === 0 && (
-          <p className="text-gray-500 text-sm">No salons found within 5km.</p>
-        )}
-      </div>
-    </div>
+    <PageShell title="Nearby salons" width="wide">
+      <h1 className="mb-4 text-xl font-semibold">Nearby salons</h1>
+      <ResumeTicketBanner />
+      {body}
+    </PageShell>
   );
 }

@@ -2,37 +2,37 @@
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
 import { barberLoginBodySchema } from '../validators/auth.validators';
-import { loginBarber, refreshAccessToken, verifyRefreshToken } from '../services/auth.service';
+import {
+  loginBarber,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  REFRESH_TOKEN_TTL_SECONDS,
+} from '../services/auth.service';
 import { AppError } from '../middleware/errorHandler';
 
 const isProd = env.NODE_ENV === 'production';
 
-const ACCESS_COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: isProd,
-  maxAge: 15 * 60 * 1000, // 15m, mirrors ACCESS_TOKEN_TTL
-  path: '/',
-};
+// The refresh cookie is only ever sent to the auth endpoints, never with ordinary API calls.
+const REFRESH_PATH = '/api/auth/barber';
 
-const REFRESH_COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: isProd,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7d, mirrors REFRESH_TOKEN_TTL
-  path: '/',
-};
+const BASE = { httpOnly: true, sameSite: 'lax' as const, secure: isProd };
+const ACCESS_COOKIE_OPTS = { ...BASE, path: '/', maxAge: env.ACCESS_TOKEN_TTL_SECONDS * 1000 };
+const REFRESH_COOKIE_OPTS = { ...BASE, path: REFRESH_PATH, maxAge: REFRESH_TOKEN_TTL_SECONDS * 1000 };
+
+function setSessionCookies(res: Response, tokens: { accessToken: string; refreshToken: string }) {
+  res
+    .cookie('access_token', tokens.accessToken, ACCESS_COOKIE_OPTS)
+    .cookie('refresh_token', tokens.refreshToken, REFRESH_COOKIE_OPTS)
+    // Purge the old path "/" refresh cookie that pre-6b logins left behind.
+    .clearCookie('refresh_token', { path: '/' });
+}
 
 export async function postBarberLogin(req: Request, res: Response, next: NextFunction) {
   try {
     const { email, password } = barberLoginBodySchema.parse(req.body);
     const { tokens, staff } = await loginBarber(email, password);
-
-    res
-      .cookie('access_token', tokens.accessToken, ACCESS_COOKIE_OPTS)
-      .cookie('refresh_token', tokens.refreshToken, REFRESH_COOKIE_OPTS)
-      .status(200)
-      .json({ staff });
+    setSessionCookies(res, tokens);
+    res.status(200).json({ staff });
   } catch (err) {
     next(err);
   }
@@ -43,20 +43,21 @@ export async function postBarberRefresh(req: Request, res: Response, next: NextF
     const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken) throw new AppError('Not authenticated.', 401);
 
-    // Validate before re-signing so an expired/tampered refresh token
-    // never results in a fresh access token being issued.
-    verifyRefreshToken(refreshToken);
-    const accessToken = refreshAccessToken(refreshToken);
-
-    res.cookie('access_token', accessToken, ACCESS_COOKIE_OPTS).status(200).json({ ok: true });
-  } catch {
-    next(new AppError('Session expired. Please log in again.', 401));
+    const tokens = await rotateRefreshToken(refreshToken);
+    setSessionCookies(res, tokens);
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    // On failure we deliberately do NOT clear cookies. If two tabs refresh at once, the loser
+    // would otherwise wipe the winner's brand-new cookies.
+    next(err);
   }
 }
 
-export async function postBarberLogout(_req: Request, res: Response) {
+export async function postBarberLogout(req: Request, res: Response) {
+  await revokeRefreshToken(req.cookies?.refresh_token);
   res
     .clearCookie('access_token', { path: '/' })
+    .clearCookie('refresh_token', { path: REFRESH_PATH })
     .clearCookie('refresh_token', { path: '/' })
     .status(200)
     .json({ ok: true });
