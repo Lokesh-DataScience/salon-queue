@@ -2,6 +2,7 @@
 //   npm run db:create-salon -- --name "Style Studio" --phone 9876543210 \
 //     --address "Main Road, Korba" --lat 22.35 --lng 82.68 --email owner@example.com
 // Omit --password and a strong one is generated and printed once.
+import { env } from '../src/config/env';
 import { parseArgs } from 'node:util';
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
@@ -10,6 +11,7 @@ import { supabase } from '../src/config/supabase';
 
 const { values } = parseArgs({
   options: {
+    project: { type: 'string' },
     name: { type: 'string' },
     phone: { type: 'string' },
     address: { type: 'string' },
@@ -26,6 +28,7 @@ const { values } = parseArgs({
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use HH:mm, e.g. 09:00');
 const schema = z.object({
+  project: z.string().min(10),
   name: z.string().min(2).max(80),
   phone: z.string().regex(/^\+?[0-9]{7,15}$/, 'digits only, 7 to 15'),
   address: z.string().min(5).max(200),
@@ -46,6 +49,14 @@ async function main() {
     process.exit(1);
   }
   const p = parsed.data;
+    // Refuse to run against the wrong database. The project ref is the first part of the Supabase address.
+  const targetRef = new URL(env.SUPABASE_URL).hostname.split('.')[0];
+  if (targetRef !== p.project) {
+    console.error(`Refusing to run: this would write to project "${targetRef}", but you asked for "${p.project}".`);
+    console.error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for the right project, then try again.');
+    process.exit(1);
+  }
+  console.log(`Writing to project ${targetRef}...`);
   const password = p.password ?? randomBytes(9).toString('base64url');
 
   const { data: salon, error } = await supabase
