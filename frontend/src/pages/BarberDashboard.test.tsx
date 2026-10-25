@@ -22,13 +22,10 @@ vi.mock('../api/barber', () => ({
 
 const entry = (
   token: number,
-  name: string,
   status: BarberQueueEntry['status'] = 'WAITING',
 ): BarberQueueEntry => ({
   id: `entry-${token}`,
   token_number: token,
-  customer_name: name,
-  customer_phone: '9876543210',
   status,
   joined_at: '2026-01-01T00:00:00Z',
   called_at: null,
@@ -43,7 +40,7 @@ const snapshot = (overrides: Partial<BarberQueueSnapshot> = {}): BarberQueueSnap
   currentToken: 3,
   called: null,
   serving: null,
-  waiting: [entry(4, 'Ravi'), entry(5, 'Meena')],
+  waiting: [entry(4), entry(5)],
   ...overrides,
 });
 
@@ -63,8 +60,8 @@ describe('BarberDashboard', () => {
     renderDashboard();
 
     expect(await screen.findByText('Waiting (2)')).toBeInTheDocument();
-    expect(screen.getByText('Ravi')).toBeInTheDocument();
-    expect(screen.getByText('Meena')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip token 4' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skip token 5' })).toBeInTheDocument();
     await waitFor(() => expect(socket.emit).toHaveBeenCalledWith('join:salon', { salonId: 'salon-1' }));
   });
 
@@ -80,7 +77,7 @@ describe('BarberDashboard', () => {
   });
 
   it('disables Call Next and explains why while someone is called', async () => {
-    given({ called: entry(4, 'Ravi', 'CALLED'), waiting: [entry(5, 'Meena')] });
+    given({ called: entry(4, 'CALLED'), waiting: [entry(5)] });
     renderDashboard();
 
     await screen.findByText('Called — Next Up');
@@ -129,7 +126,7 @@ describe('BarberDashboard', () => {
     });
 
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
-    expect(screen.queryByText('Ravi')).not.toBeInTheDocument(); // customer names gone from the screen
+    expect(screen.queryByRole('button', { name: 'Skip token 4' })).not.toBeInTheDocument(); // queue data gone from the screen
   });
 
   it('logs out and leaves the dashboard', async () => {

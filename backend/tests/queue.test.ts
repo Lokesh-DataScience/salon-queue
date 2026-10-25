@@ -17,7 +17,7 @@ describe('Test 1: concurrent joins', () => {
   it('never hands out duplicate tokens', async () => {
     const salonId = await makeSalon(); // no queue exists yet: worst case
     const results = await Promise.all(
-      Array.from({ length: 10 }, (_, i) => joinQueue(salonId, `Person ${i}`, '9876543210')),
+      Array.from({ length: 10 }, (_, i) => joinQueue(salonId)),
     );
     const tokens = results.map((r) => r.tokenNumber).sort((a, b) => a - b);
     expect(tokens).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -27,7 +27,7 @@ describe('Test 1: concurrent joins', () => {
 describe('Test 2: NEXT pressed twice at once', () => {
   it('performs exactly one transition', async () => {
     const salonId = await makeSalon();
-    for (let i = 0; i < 3; i++) await joinQueue(salonId, `P${i}`, '9876543210');
+    for (let i = 0; i < 3; i++) await joinQueue(salonId);
 
     const outcomes = await Promise.allSettled([callNext(salonId), callNext(salonId)]);
     expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
@@ -44,8 +44,8 @@ describe('Test 2: NEXT pressed twice at once', () => {
 describe("Test 3: another ticket's secret token", () => {
   it('is denied', async () => {
     const salonId = await makeSalon();
-    const a = (await joinViaApi(salonId, 'Alice')).body.ticket;
-    const b = (await joinViaApi(salonId, 'Bob')).body.ticket;
+    const a = (await joinViaApi(salonId)).body.ticket;
+    const b = (await joinViaApi(salonId)).body.ticket;
 
     const own = await request(app).get(`/api/queue-tickets/${a.ticketId}`).query({ accessToken: a.accessToken });
     expect(own.status).toBe(200);
@@ -62,10 +62,10 @@ describe("Test 3: another ticket's secret token", () => {
 describe('Test 4: customer tries to change their queue position', () => {
   it('is rejected or ignored', async () => {
     const salonId = await makeSalon();
-    await joinViaApi(salonId, 'First');
+    await joinViaApi(salonId);
     const sneaky = await request(app)
       .post(`/api/queues/${salonId}/join`)
-      .send({ name: 'Mallory', phone: '9876543210', tokenNumber: 1, status: 'CALLED', position: 0 });
+      .send({ tokenNumber: 1, status: 'CALLED', position: 0 });
 
     expect([201, 400]).toContain(sneaky.status); // strict schema rejects, loose schema ignores
     if (sneaky.status === 201) {
@@ -82,22 +82,22 @@ describe('Test 4: customer tries to change their queue position', () => {
 describe('Pause blocks joining (Bug 1)', () => {
   it('refuses joins while paused, accepts them after resume', async () => {
     const salonId = await makeSalon();
-    await joinViaApi(salonId, 'Before');
+    await joinViaApi(salonId);
     await pauseQueue(salonId);
 
-    const blocked = await joinViaApi(salonId, 'During');
+    const blocked = await joinViaApi(salonId);
     expect(blocked.status).toBe(409);
     expect(blocked.body.message).toBe('Queue is paused.');
 
     await resumeQueue(salonId);
-    expect((await joinViaApi(salonId, 'After')).status).toBe(201);
+    expect((await joinViaApi(salonId)).status).toBe(201);
   });
 });
 
 describe('NEXT on the last customer (Bug 2)', () => {
   it('completes them and succeeds instead of erroring', async () => {
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Only One', '9876543210');
+    const t = await joinQueue(salonId);
     await callNext(salonId);
     await startEntry(salonId, t.ticketId);
 
@@ -109,7 +109,7 @@ describe('NEXT on the last customer (Bug 2)', () => {
 describe('Customer leave', () => {
   it('cancels a waiting ticket once, and refuses after being called', async () => {
     const salonId = await makeSalon();
-    const a = (await joinViaApi(salonId, 'Leaver')).body.ticket;
+    const a = (await joinViaApi(salonId)).body.ticket;
 
     const first = await request(app).post(`/api/queue-tickets/${a.ticketId}/leave`).send({ accessToken: a.accessToken });
     expect(first.status).toBe(200);
@@ -120,7 +120,7 @@ describe('Customer leave', () => {
     const again = await request(app).post(`/api/queue-tickets/${a.ticketId}/leave`).send({ accessToken: a.accessToken });
     expect(again.status).toBe(409);
 
-    const b = (await joinViaApi(salonId, 'Called')).body.ticket;
+    const b = (await joinViaApi(salonId)).body.ticket;
     await callNext(salonId);
     const late = await request(app).post(`/api/queue-tickets/${b.ticketId}/leave`).send({ accessToken: b.accessToken });
     expect(late.status).toBe(409);

@@ -24,11 +24,12 @@ beforeEach(() => {
 });
 
 describe('JoinQueue', () => {
-  it('shows a labelled form asking only for name and mobile number', () => {
+  it('shows one button and no personal fields', () => {
     renderJoin();
-    expect(screen.getByLabelText('Your name')).toBeInTheDocument();
-    expect(screen.getByLabelText('Your mobile number')).toBeInTheDocument();
-    expect(screen.getByText(/no account required/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Get my token' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Your mobile number')).not.toBeInTheDocument();
+    expect(screen.getByText(/no account, name or phone number needed/i)).toBeInTheDocument();
   });
 
   it('joins, saves only ticket identifiers, and moves to the tracking page', async () => {
@@ -41,31 +42,13 @@ describe('JoinQueue', () => {
     const user = userEvent.setup();
     renderJoin();
 
-    await user.type(screen.getByLabelText('Your name'), '  Asha ');
-    await user.type(screen.getByLabelText('Your mobile number'), '9876543210');
     await user.click(screen.getByRole('button', { name: 'Get my token' }));
 
-    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', 'Asha', '9876543210'); // trimmed
+    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1');
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument(); // navigated away
     const stored = localStorage.getItem('svq.tickets.v1')!;
     expect(getTickets()).toHaveLength(1);
-    expect(stored).not.toContain('Asha');
-    expect(stored).not.toContain('9876543210');
-  });
-
-  it('shows field-specific errors from the server', async () => {
-    vi.mocked(tickets.joinSalonQueue).mockRejectedValue(
-      new ApiError('Invalid request.', 400, { phone: ['Enter a valid mobile number'] }),
-    );
-    const user = userEvent.setup();
-    renderJoin();
-
-    await user.type(screen.getByLabelText('Your name'), 'Asha');
-    await user.type(screen.getByLabelText('Your mobile number'), '123');
-    await user.click(screen.getByRole('button', { name: 'Get my token' }));
-
-    expect(await screen.findByText('Enter a valid mobile number')).toBeInTheDocument();
-    expect(screen.getByLabelText('Your mobile number')).toHaveAttribute('aria-invalid', 'true');
+    expect(stored).not.toContain('customer');
   });
 
   it('shows a server message such as "Queue is paused."', async () => {
@@ -73,8 +56,6 @@ describe('JoinQueue', () => {
     const user = userEvent.setup();
     renderJoin();
 
-    await user.type(screen.getByLabelText('Your name'), 'Asha');
-    await user.type(screen.getByLabelText('Your mobile number'), '9876543210');
     await user.click(screen.getByRole('button', { name: 'Get my token' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Queue is paused.');
@@ -99,7 +80,7 @@ describe('JoinQueue', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Join for another person' }));
-    expect(screen.getByLabelText('Your name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Get my token' })).toBeInTheDocument();
   });
 
   it('ignores and cleans up a saved ticket the server says is finished', async () => {
@@ -107,14 +88,14 @@ describe('JoinQueue', () => {
     vi.mocked(tickets.fetchTicketStatus).mockResolvedValue({ status: 'COMPLETED' });
     renderJoin();
 
-    expect(await screen.findByLabelText('Your name')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Get my token' })).toBeInTheDocument();
     await waitFor(() => expect(getTickets()).toHaveLength(0));
   });
 
   it('does not warn about a ticket at a different salon', () => {
     seed('some-other-salon');
     renderJoin();
-    expect(screen.getByLabelText('Your name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Get my token' })).toBeInTheDocument();
     expect(tickets.fetchTicketStatus).not.toHaveBeenCalled();
   });
 });

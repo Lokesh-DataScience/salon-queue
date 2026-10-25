@@ -1,6 +1,6 @@
 // backend/tests/notifications.test.ts
 import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
-import { makeSalon, cleanupSalons } from './helpers';
+import { makeSalon, cleanupSalons, plantLegacyPersonalData } from './helpers';
 import { joinQueue } from '../src/services/queue.service';
 import { callNext, startEntry } from '../src/services/barber.service';
 import { evaluateNotifications } from '../src/services/queueNotifications.service';
@@ -21,8 +21,8 @@ beforeEach(() => {
 });
 
 // Mirrors what the join controller does.
-async function join(salonId: string, name: string, phone = '9876543210') {
-  const t = await joinQueue(salonId, name, phone);
+async function join(salonId: string) {
+  const t = await joinQueue(salonId);
   await evaluateNotifications(salonId, { silentEntryId: t.ticketId });
   return t;
 }
@@ -31,10 +31,10 @@ const both = (salonId: string) => Promise.all([evaluateNotifications(salonId), e
 describe('Notifications', () => {
   it('fires each stage once per ticket, even when evaluated concurrently', async () => {
     const salonId = await makeSalon();
-    const a = await join(salonId, 'A');
-    await join(salonId, 'B');
-    await join(salonId, 'C');
-    await join(salonId, 'D');
+    const a = await join(salonId);
+    await join(salonId);
+    await join(salonId);
+    await join(salonId);
     expect(sent).toHaveLength(0); // joining never fires instantly
 
     await callNext(salonId); // A called
@@ -59,8 +59,8 @@ describe('Privacy: logs', () => {
     const salonId = await makeSalon();
     const NAME = 'Zeta Unique Name';
     const PHONE = '9123456780';
-    await join(salonId, NAME, PHONE);
-    await join(salonId, 'Other', '9123456781');
+    await join(salonId);
+    await plantLegacyPersonalData((await join(salonId)).ticketId, NAME, PHONE);
     await callNext(salonId);
     await evaluateNotifications(salonId);
 

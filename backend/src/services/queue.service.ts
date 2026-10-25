@@ -17,12 +17,8 @@ const JOIN_ERROR_MESSAGES: Record<string, string> = {
   QUEUE_NOT_ACTIVE: 'Queue is paused.',
 };
 
-export async function joinQueue(salonId: string, name: string, phone: string) {
-  const { data, error } = await supabase.rpc('join_queue', {
-    p_salon_id: salonId,
-    p_customer_name: name,
-    p_customer_phone: phone,
-  });
+export async function joinQueue(salonId: string) {
+  const { data, error } = await supabase.rpc('join_queue', { p_salon_id: salonId });
 
   if (error) {
     const code = error.message?.split(':')[0]?.trim();

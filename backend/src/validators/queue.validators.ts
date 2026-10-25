@@ -1,17 +1,13 @@
 // backend/src/validators/queue.validators.ts
 import { z } from 'zod';
 
-const phoneSchema = z
-  .string()
-  .trim()
-  .transform((s) => s.replace(/[\s\-().]/g, '')) // accept "98765 43210", "+91 98765-43210", "(+91) ..."
-  .pipe(z.string().regex(/^\+?[0-9]{7,15}$/, 'Enter a valid mobile number'));
+// const phoneSchema = z
+//   .string()
+//   .trim()
+//   .transform((s) => s.replace(/[\s\-().]/g, '')) // accept "98765 43210", "+91 98765-43210", "(+91) ..."
+//   .pipe(z.string().regex(/^\+?[0-9]{7,15}$/, 'Enter a valid mobile number'));
 
-export const joinQueueBodySchema = z.object({
-  name: z.string().trim().min(1, 'Enter your name').max(80, 'Name is too long'),
-  phone: phoneSchema,
-});
-
+export const joinQueueBodySchema = z.object({});
 export const ticketParamSchema = z.object({
   ticketId: z.string().uuid(),
 });

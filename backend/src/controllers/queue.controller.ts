@@ -1,7 +1,7 @@
 // backend/src/controllers/queue.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { salonIdParamSchema } from '../validators/salon.validators';
-import { joinQueueBodySchema, ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.validators';
+import { ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.validators';
 import { joinQueue, getTicketStatus, broadcastQueueUpdate, QueueJoinError, leaveTicket } from '../services/queue.service';
 import { pushSubscriptionBodySchema } from '../validators/queue.validators';
 import { savePushSubscription, removePushSubscription } from '../services/queue.service';
@@ -9,8 +9,7 @@ import { savePushSubscription, removePushSubscription } from '../services/queue.
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
-    const { name, phone } = joinQueueBodySchema.parse(req.body);
-    const ticket = await joinQueue(salonId, name, phone);
+    const ticket = await joinQueue(salonId);
     await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
     res.status(201).json({ ticket });
   } catch (err) {

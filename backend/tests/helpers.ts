@@ -46,8 +46,17 @@ export async function cleanupSalons() {
   createdSalonIds.length = 0;
 }
 
-export function joinViaApi(salonId: string, name = 'Test Person', phone = '9876543210') {
-  return request(app).post(`/api/queues/${salonId}/join`).send({ name, phone });
+export function joinViaApi(salonId: string) {
+  return request(app).post(`/api/queues/${salonId}/join`).send({});
+}
+
+// Simulates a row created before anonymous joins, to prove nothing leaks it.
+export async function plantLegacyPersonalData(entryId: string, name: string, phone: string) {
+  const { error } = await supabase
+    .from('queue_entries')
+    .update({ customer_name: name, customer_phone: phone })
+    .eq('id', entryId);
+  if (error) throw new Error(`plantLegacyPersonalData failed: ${error.message}`);
 }
 
 export async function barberCookieFor(salonId: string): Promise<string> {

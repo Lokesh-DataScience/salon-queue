@@ -14,8 +14,8 @@ describe('Nearby salons', () => {
     const near = await makeSalon({ ...HOME, average_service_minutes: 10 });
     const mid = await makeSalon({ latitude: -45.0, longitude: 170.03 }); // about 2.4 km east
     const far = await makeSalon({ latitude: -45.0, longitude: 170.2 }); // about 16 km east
-    await joinViaApi(near, 'One');
-    await joinViaApi(near, 'Two');
+    await joinViaApi(near);
+    await joinViaApi(near);
 
     const res = await nearby(5);
     expect(res.status).toBe(200);
@@ -44,8 +44,8 @@ describe('Nearby salons', () => {
 
   it('counts only people still waiting, not the one already called', async () => {
     const salonId = await makeSalon({ ...HOME });
-    await joinViaApi(salonId, 'First');
-    await joinViaApi(salonId, 'Second');
+    await joinViaApi(salonId);
+    await joinViaApi(salonId);
     await callNext(salonId); // first is now CALLED
 
     const row = (await nearby(5)).body.salons.find((s: { id: string }) => s.id === salonId);

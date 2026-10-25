@@ -1,7 +1,7 @@
 // backend/tests/barber.test.ts
 import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import request from 'supertest';
-import { app, makeSalon, cleanupSalons, joinViaApi, barberCookieFor } from './helpers';
+import { app, makeSalon, cleanupSalons, joinViaApi, barberCookieFor, plantLegacyPersonalData } from './helpers';
 import { joinQueue, getSanitizedQueueState, leaveTicket } from '../src/services/queue.service';
 import { callNext, startEntry, completeEntry, skipEntry } from '../src/services/barber.service';
 import { supabase } from '../src/config/supabase';
@@ -23,7 +23,7 @@ const conflict = { statusCode: 409 };
 describe('State machine', () => {
   it('walks WAITING → CALLED → SERVING → COMPLETED and stamps each step', async () => {
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Walker', '9876543210');
+    const t = await joinQueue(salonId);
     expect((await row(t.ticketId)).status).toBe('WAITING');
 
     await callNext(salonId);
@@ -42,8 +42,8 @@ describe('State machine', () => {
 
   it('rejects invalid transitions with 409', async () => {
     const salonId = await makeSalon();
-    const a = await joinQueue(salonId, 'A', '9876543210');
-    await joinQueue(salonId, 'B', '9876543210');
+    const a = await joinQueue(salonId);
+    await joinQueue(salonId);
 
     await expect(completeEntry(salonId, a.ticketId)).rejects.toMatchObject(conflict); // WAITING
     await expect(startEntry(salonId, a.ticketId)).rejects.toMatchObject(conflict); // WAITING
@@ -61,9 +61,9 @@ describe('State machine', () => {
 
   it('skips from WAITING, CALLED and SERVING, and skipping a called customer unblocks NEXT', async () => {
     const salonId = await makeSalon();
-    const c1 = await joinQueue(salonId, 'C1', '9876543210');
-    const c2 = await joinQueue(salonId, 'C2', '9876543210');
-    const c3 = await joinQueue(salonId, 'C3', '9876543210');
+    const c1 = await joinQueue(salonId);
+    const c2 = await joinQueue(salonId);
+    const c3 = await joinQueue(salonId);
 
     await callNext(salonId); // C1 CALLED
     await skipEntry(salonId, c1.ticketId);
@@ -92,7 +92,7 @@ describe('State machine', () => {
 describe('Races between actors', () => {
   it('barber completes while another action skips the same customer: exactly one wins', async () => {
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Contested', '9876543210');
+    const t = await joinQueue(salonId);
     await callNext(salonId);
     await startEntry(salonId, t.ticketId); // SERVING
 
@@ -113,7 +113,7 @@ describe('Races between actors', () => {
   it('customer leaving while the barber calls NEXT never leaves a contradictory state', async () => {
     for (let i = 0; i < 3; i++) {
       const salonId = await makeSalon();
-      const t = await joinQueue(salonId, `Racer ${i}`, '9876543210');
+      const t = await joinQueue(salonId);
 
       const [leave] = await Promise.allSettled([
         leaveTicket(t.ticketId, t.accessToken),
@@ -132,7 +132,7 @@ describe('Ownership: a barber can only touch their own salon', () => {
   it("salon B's barber cannot act on salon A's customers, and the entry is left untouched", async () => {
     const salonA = await makeSalon();
     const salonB = await makeSalon();
-    const entryA = (await joinViaApi(salonA, 'Alice Aardvark')).body.ticket;
+    const entryA = (await joinViaApi(salonA)).body.ticket;
     const cookieB = await barberCookieFor(salonB);
 
     for (const action of ['start', 'complete', 'skip']) {
@@ -147,22 +147,23 @@ describe('Ownership: a barber can only touch their own salon', () => {
   it("a barber's dashboard shows only their own salon's customers", async () => {
     const salonA = await makeSalon();
     const salonB = await makeSalon();
-    await joinViaApi(salonA, 'Alice Aardvark');
-    await joinViaApi(salonB, 'Bobby Bandicoot');
+    await joinViaApi(salonA);
+    await joinViaApi(salonB);
     const cookieA = await barberCookieFor(salonA);
 
     const snap = await request(app).get('/api/barber/queue').set('Cookie', cookieA);
     expect(snap.status).toBe(200);
+    expect(snap.body.waiting).toHaveLength(1);
     const text = JSON.stringify(snap.body);
-    expect(text).toContain('Alice Aardvark'); // an authorized barber DOES see their own customers
-    expect(text).not.toContain('Bobby Bandicoot');
+    expect(text).not.toContain('customer_name');
+    expect(text).not.toContain('customer_phone');
   });
 
   it("pausing affects only the caller's own queue", async () => {
     const salonA = await makeSalon();
     const salonB = await makeSalon();
-    await joinViaApi(salonA, 'Alice');
-    await joinViaApi(salonB, 'Bob');
+    await joinViaApi(salonA);
+    await joinViaApi(salonB);
     const cookieB = await barberCookieFor(salonB);
 
     expect((await request(app).post('/api/barber/queue/pause').set('Cookie', cookieB)).status).toBe(200);
@@ -206,11 +207,13 @@ describe('Public surfaces never leak customer details', () => {
 
   it('the live broadcast carries only id, token and status', async () => {
     const salonId = await makeSalon();
+    const j = await joinViaApi(salonId);
     const NAME = 'Zephyr Quillfeather';
     const PHONE = '9123450099';
+    await plantLegacyPersonalData(j.body.ticket.ticketId, NAME, PHONE);
     const cookie = await barberCookieFor(salonId);
 
-    await joinViaApi(salonId, NAME, PHONE);
+    await joinViaApi(salonId);
     expect((await request(app).post('/api/barber/queue/next').set('Cookie', cookie)).status).toBe(200);
 
     const mine = emitted.filter((e) => e.room === `salon:${salonId}`);
@@ -232,10 +235,11 @@ describe('Public surfaces never leak customer details', () => {
 
   it('public HTTP responses never echo the name or phone', async () => {
     const salonId = await makeSalon();
+    const join = await joinViaApi(salonId);
     const NAME = 'Zephyr Quillfeather';
     const PHONE = '9123450098';
+    await plantLegacyPersonalData(join.body.ticket.ticketId, NAME, PHONE);
 
-    const join = await joinViaApi(salonId, NAME, PHONE);
     expect(join.status).toBe(201);
     const { ticketId, accessToken } = join.body.ticket;
 

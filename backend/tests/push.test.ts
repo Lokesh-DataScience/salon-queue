@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import * as webpush from 'web-push';
-import { app, makeSalon, cleanupSalons, joinViaApi } from './helpers';
+import { app, makeSalon, cleanupSalons, joinViaApi, plantLegacyPersonalData } from './helpers';
 import { joinQueue } from '../src/services/queue.service';
 import { callNext, skipEntry } from '../src/services/barber.service';
 import { evaluateNotifications } from '../src/services/queueNotifications.service';
@@ -43,7 +43,7 @@ beforeEach(() => {
 describe('Push subscription endpoint', () => {
   it('saves a subscription for the ticket owner', async () => {
     const salonId = await makeSalon();
-    const t = (await joinViaApi(salonId, 'Owner')).body.ticket;
+    const t = (await joinViaApi(salonId)).body.ticket;
     const res = await put(t.ticketId, { accessToken: t.accessToken, subscription: SUB });
     expect(res.status).toBe(200);
     expect(await readSub(t.ticketId)).toEqual(SUB);
@@ -51,8 +51,8 @@ describe('Push subscription endpoint', () => {
 
   it("refuses another ticket's token and a junk token, saving nothing", async () => {
     const salonId = await makeSalon();
-    const a = (await joinViaApi(salonId, 'A')).body.ticket;
-    const b = (await joinViaApi(salonId, 'B')).body.ticket;
+    const a = (await joinViaApi(salonId)).body.ticket;
+    const b = (await joinViaApi(salonId)).body.ticket;
 
     expect((await put(a.ticketId, { accessToken: b.accessToken, subscription: SUB })).status).toBe(404);
     expect((await put(a.ticketId, { accessToken: 'x'.repeat(40), subscription: SUB })).status).toBe(404);
@@ -61,7 +61,7 @@ describe('Push subscription endpoint', () => {
 
   it('refuses endpoints that are not real push services (SSRF)', async () => {
     const salonId = await makeSalon();
-    const t = (await joinViaApi(salonId, 'Attacker')).body.ticket;
+    const t = (await joinViaApi(salonId)).body.ticket;
     const bad = [
       'http://fcm.googleapis.com/fcm/send/x',
       'https://169.254.169.254/latest/meta-data',
@@ -80,7 +80,7 @@ describe('Push subscription endpoint', () => {
 
   it('accepts the major browsers\' push services', async () => {
     const salonId = await makeSalon();
-    const t = (await joinViaApi(salonId, 'Browsers')).body.ticket;
+    const t = (await joinViaApi(salonId)).body.ticket;
     for (const endpoint of [
       'https://updates.push.services.mozilla.com/wpush/v2/abc',
       'https://web.push.apple.com/abc',
@@ -93,7 +93,7 @@ describe('Push subscription endpoint', () => {
 
   it('can be removed, only by the owner', async () => {
     const salonId = await makeSalon();
-    const t = (await joinViaApi(salonId, 'Remover')).body.ticket;
+    const t = (await joinViaApi(salonId)).body.ticket;
     await put(t.ticketId, { accessToken: t.accessToken, subscription: SUB });
 
     const wrong = await request(app)
@@ -111,7 +111,7 @@ describe('Push subscription endpoint', () => {
 
   it('refuses a subscription for a ticket that is already finished', async () => {
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Done', '9876543210');
+    const t = await joinQueue(salonId);
     await skipEntry(salonId, t.ticketId);
     const res = await put(t.ticketId, { accessToken: t.accessToken, subscription: SUB });
     expect(res.status).toBe(404);
@@ -124,7 +124,7 @@ describe('Push subscription endpoint', () => {
   });
     it('ticket status reports whether notifications are on, without leaking the subscription', async () => {
     const salonId = await makeSalon();
-    const t = (await joinViaApi(salonId, 'Status')).body.ticket;
+    const t = (await joinViaApi(salonId)).body.ticket;
     const get = () => request(app).get(`/api/queue-tickets/${t.ticketId}`).query({ accessToken: t.accessToken });
 
     expect((await get()).body.ticket.notificationsOn).toBe(false);
@@ -140,7 +140,8 @@ describe('WebPushProvider', () => {
     const salonId = await makeSalon();
     const NAME = 'Zephyr Quillfeather';
     const PHONE = '9123450077';
-    const t = await joinQueue(salonId, NAME, PHONE);
+    const t = await joinQueue(salonId);
+    await plantLegacyPersonalData(t.ticketId, NAME, PHONE);
     await subscribeInDb(t.ticketId);
 
     await provider().send('TURN_NOW', { entryId: t.ticketId, salonId, tokenNumber: t.tokenNumber });
@@ -158,14 +159,14 @@ describe('WebPushProvider', () => {
 
   it('does nothing for a customer who never enabled notifications', async () => {
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Quiet', '9876543210');
+    const t = await joinQueue(salonId);
     await provider().send('TURN_NOW', { entryId: t.ticketId, salonId, tokenNumber: t.tokenNumber });
     expect(sendMock).not.toHaveBeenCalled();
   });
 
   it('forgets a subscription the browser reports as gone (410)', async () => {
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Gone', '9876543210');
+    const t = await joinQueue(salonId);
     await subscribeInDb(t.ticketId);
     sendMock.mockRejectedValue(Object.assign(new Error('gone'), { name: 'WebPushError', statusCode: 410 }));
 
@@ -178,7 +179,7 @@ describe('WebPushProvider', () => {
   it('a push failure never breaks the queue and never logs the endpoint', async () => {
     setNotificationProvider(provider());
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Fails', '9876543210');
+    const t = await joinQueue(salonId);
     await subscribeInDb(t.ticketId);
     sendMock.mockRejectedValue(
       Object.assign(new Error('boom'), { name: 'WebPushError', statusCode: 500, endpoint: SUB.endpoint }),
@@ -198,7 +199,7 @@ describe('WebPushProvider', () => {
   it('end to end: calling the customer pushes "It\'s your turn" exactly once', async () => {
     setNotificationProvider(provider());
     const salonId = await makeSalon();
-    const t = await joinQueue(salonId, 'Journey', '9876543210');
+    const t = await joinQueue(salonId);
     await evaluateNotifications(salonId, { silentEntryId: t.ticketId });
     await subscribeInDb(t.ticketId);
 
@@ -214,8 +215,8 @@ describe('WebPushProvider', () => {
 describe('Cleanup erases push subscriptions of finished tickets', () => {
   it('nulls them for finished entries and keeps active ones', async () => {
     const salonId = await makeSalon();
-    const finished = await joinQueue(salonId, 'Finished', '9876543210');
-    const active = await joinQueue(salonId, 'Active', '9876543210');
+    const finished = await joinQueue(salonId);
+    const active = await joinQueue(salonId);
     await subscribeInDb(finished.ticketId);
     await subscribeInDb(active.ticketId);
     await supabase

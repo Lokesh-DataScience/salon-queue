@@ -41,6 +41,16 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
       },
     }),
   );
+  // Dev only: Vite (5173) calls the API (4000) from a different origin.
+// In production the frontend is served by this same server, so no CORS is needed.
+  if (env.NODE_ENV !== 'production') {
+    app.use(
+      cors({
+        origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+        credentials: true, // the barber session is an HTTP-only cookie
+      }),
+    );
+  }
 
   // After CORS so a 429 still carries CORS headers (otherwise the browser shows an opaque network error).
   // Before body parsing so floods are rejected cheaply.

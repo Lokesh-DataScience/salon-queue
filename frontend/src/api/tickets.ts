@@ -1,10 +1,10 @@
 // frontend/src/api/tickets.ts
 import { apiFetch } from './client';
 
-export function joinSalonQueue(salonId: string, name: string, phone: string) {
+export function joinSalonQueue(salonId: string) {
   return apiFetch<{ ticket: any }>(`/api/queues/${salonId}/join`, {
     method: 'POST',
-    body: JSON.stringify({ name, phone }),
+    body: JSON.stringify({}),
   }).then((r) => r.ticket);
 }
 

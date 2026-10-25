@@ -36,7 +36,7 @@ describe('isWithinHours (India time)', () => {
 describe('Opening hours in the database', () => {
   it('refuses a join outside opening hours with the closed message', async () => {
     const salonId = await makeSalon(windowExcludingNow());
-    const res = await joinViaApi(salonId, 'Night Owl');
+    const res = await joinViaApi(salonId);
     expect(res.status).toBe(409);
     expect(res.body.message).toBe('Salon is currently closed.');
   });

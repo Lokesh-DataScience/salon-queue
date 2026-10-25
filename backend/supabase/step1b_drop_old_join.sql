@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.join_queue(uuid, text, text);

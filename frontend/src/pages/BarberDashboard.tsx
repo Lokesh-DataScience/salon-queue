@@ -35,7 +35,7 @@ export default function BarberDashboard() {
     // The API client emits this only after a silent refresh has failed.
   useEffect(() => {
     function onExpired() {
-      queryClient.clear(); // also drops cached customer names and phones from memory
+      queryClient.clear(); // drops cached queue data from memory
       navigate('/barber/login', { replace: true, state: { expired: true } });
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
@@ -44,7 +44,7 @@ export default function BarberDashboard() {
   // Join this salon's room once we know its id, and treat queue:updated as
   // a signal to re-fetch the FULL snapshot (with names/phones) rather than
   // trying to render off the sanitized broadcast payload directly — that
-  // payload intentionally excludes customer_name/customer_phone.
+  // payload intentionally excludes any customer details.
   useEffect(() => {
     if (!queue?.salonId) return;
     const salonId = queue.salonId;
@@ -141,10 +141,7 @@ export default function BarberDashboard() {
         <h2 className="mb-2 text-sm font-medium text-gray-600">Currently Serving</h2>
         {queue.serving ? (
           <>
-            <p className="text-4xl font-bold mb-1">#{queue.serving.token_number}</p>
-            <p className="mb-2 text-sm font-medium text-gray-600">
-              {queue.serving.customer_name} · {queue.serving.customer_phone}
-            </p>
+            <p className="text-4xl font-bold mb-3">#{queue.serving.token_number}</p>
             <div className="grid grid-cols-2 gap-3">
               <ActionButton
                 label="Complete"
@@ -170,10 +167,7 @@ export default function BarberDashboard() {
         <h2 className="mb-2 text-sm font-medium text-gray-600">Called — Next Up</h2>
         {queue.called ? (
           <>
-            <p className="text-3xl font-bold mb-1">#{queue.called.token_number}</p>
-            <p className="text-sm text-gray-600 mb-4">
-              {queue.called.customer_name} · {queue.called.customer_phone}
-            </p>
+            <p className="text-3xl font-bold mb-4">#{queue.called.token_number}</p>
             <div className="grid grid-cols-2 gap-3">
               <ActionButton
                 label="Start Service"
@@ -259,7 +253,6 @@ function WaitingRow({ entry, disabled, onSkip }: {
     <li className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
       <div className="min-w-0">
         <span className="font-semibold">#{entry.token_number}</span>{' '}
-        <span className="break-words text-sm text-gray-600">{entry.customer_name}</span>
       </div>
       <button
         type="button"

@@ -6,8 +6,8 @@ import { todayISODate } from '../utils/date';
 interface QueueEntryRow {
   id: string;
   token_number: number;
-  customer_name: string | null;
-  customer_phone: string | null;
+  // customer_name: string | null;
+  // customer_phone: string | null;
   status: string;
   joined_at: string;
   called_at: string | null;
@@ -42,7 +42,7 @@ export async function getBarberQueueSnapshot(salonId: string) {
   const { data: entries, error: entriesError } = await supabase
     .from('queue_entries')
     .select(
-      'id, token_number, customer_name, customer_phone, status, joined_at, called_at, started_at, completed_at, skipped_at',
+      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at',
     )
     .eq('queue_id', queue.id)
     .in('status', ['CALLED', 'SERVING', 'WAITING'])

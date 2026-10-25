@@ -12,8 +12,6 @@ export interface BarberStaff {
 export interface BarberQueueEntry {
   id: string;
   token_number: number;
-  customer_name: string | null;
-  customer_phone: string | null;
   status: 'CALLED' | 'SERVING' | 'WAITING';
   joined_at: string;
   called_at: string | null;
