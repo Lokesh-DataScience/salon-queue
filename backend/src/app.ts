@@ -81,8 +81,10 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     );
     // Any other page address (a refresh on /tickets/..., a tapped notification) gets the app.
     // API and websocket paths never do.
-    app.get(/^\/(?!api\/|socket\.io\/).*/, (_req, res) => {
+    app.get(/^\/(?!api\/|socket\.io\/).*/, (req, res) => {
       res.setHeader('Cache-Control', 'no-cache');
+      // Ticket links carry a secret token and the barber pages are private: keep both out of search engines.
+      if (/^\/(tickets|barber)(\/|$)/.test(req.path)) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       res.sendFile(path.join(clientDir, 'index.html'));
     });
   }
