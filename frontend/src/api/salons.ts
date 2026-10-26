@@ -16,3 +16,10 @@ export function fetchSalonQueue(salonId: string) {
     `/api/salons/${salonId}/queue`
   );
 }
+
+// Resolves the code printed in a salon's wall QR to the salon (id + name only).
+export function fetchSalonByCode(code: string) {
+  return apiFetch<{ salon: { id: string; name: string } }>(
+    `/api/salons/by-code/${encodeURIComponent(code)}`
+  ).then((r) => r.salon);
+}

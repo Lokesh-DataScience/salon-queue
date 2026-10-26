@@ -73,3 +73,13 @@ export function pauseQueue() {
 export function resumeQueue() {
   return apiFetch<{ queue: { status: string } }>('/api/barber/queue/resume', { method: 'POST' });
 }
+
+export interface BarberSalon {
+  id: string;
+  name: string;
+  qrCode: string;
+}
+
+export function fetchBarberSalon() {
+  return apiFetch<{ salon: BarberSalon }>('/api/barber/salon').then((r) => r.salon);
+}

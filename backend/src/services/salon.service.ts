@@ -17,8 +17,32 @@ export async function findNearbySalons(lat: number, lng: number, radiusKm: numbe
 export async function getSalonById(salonId: string) {
   const { data, error } = await supabase.from('salons').select('*').eq('id', salonId).single();
   if (error) return null;
+  // The QR code is only for the salon's own dashboard, so it never goes out on this public route.
+  const { qr_code: _qrCode, ...publicSalon } = data;
   // "Open" means switched on AND inside today's opening hours.
-  return { ...data, is_open: data.is_open && isWithinHours(data.opening_time, data.closing_time) };
+  return { ...publicSalon, is_open: data.is_open && isWithinHours(data.opening_time, data.closing_time) };
+}
+
+// What a scan of the wall QR needs: which salon, and its name. Nothing else.
+export async function getSalonByQrCode(code: string) {
+  const { data, error } = await supabase
+    .from('salons')
+    .select('id, name')
+    .eq('qr_code', code.toLowerCase())
+    .maybeSingle();
+  if (error || !data) return null;
+  return { id: data.id as string, name: data.name as string };
+}
+
+// For the barber dashboard. The caller passes the salon id from the verified session, never from the request.
+export async function getSalonQrForStaff(salonId: string) {
+  const { data, error } = await supabase
+    .from('salons')
+    .select('id, name, qr_code')
+    .eq('id', salonId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { id: data.id as string, name: data.name as string, qrCode: data.qr_code as string };
 }
 
 export async function getSalonQueueSnapshot(salonId: string) {

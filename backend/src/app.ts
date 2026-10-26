@@ -58,6 +58,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     const limits = createRateLimiters();
     app.use('/api', limits.global);
     app.get('/api/salons/nearby', limits.nearby);
+    app.get('/api/salons/by-code/:code', limits.nearby);
     app.post('/api/queues/:salonId/join', limits.join);
     app.use('/api/queue-tickets', limits.ticket);
     app.post('/api/auth/barber/login', limits.login);
@@ -102,4 +103,4 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
   app.use(errorHandler);
 
   return app;
-}
+}

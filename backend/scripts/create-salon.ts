@@ -71,7 +71,7 @@ async function main() {
       closing_time: p.closing,
       average_service_minutes: p.avg,
     })
-    .select('id')
+    .select('id, qr_code')
     .single();
   if (error || !salon) {
     console.error('Could not create salon:', error?.code ?? 'unknown');
@@ -92,7 +92,8 @@ async function main() {
   }
 
   console.log(`\nSalon created: ${p.name}\n  id:       ${salon.id}\n  login:    ${p.email}`);
+  console.log(`  qr path:  /q/${salon.qr_code}   (the barber prints the full QR from the dashboard)`);
   console.log(`  password: ${password}${p.password ? '' : '   <-- shown once, share it securely'}\n`);
 }
 
-void main();
+void main();

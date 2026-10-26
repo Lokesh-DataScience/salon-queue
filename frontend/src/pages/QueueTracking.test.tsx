@@ -124,7 +124,7 @@ describe('QueueTracking: finished and missing tickets', () => {
     renderTracking();
 
     expect(await screen.findByText(message)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Find a salon' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to home' })).toBeInTheDocument();
     await waitFor(() => expect(getTickets()).toHaveLength(0));
   });
 
@@ -167,4 +167,4 @@ describe('QueueTracking: leaving', () => {
     await screen.findByText("It's your turn");
     expect(screen.queryByRole('button', { name: 'Leave queue' })).not.toBeInTheDocument();
   });
-});
+});

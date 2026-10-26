@@ -6,6 +6,7 @@ import { socket } from '../lib/socket';
 import { ApiError } from '../api/client';
 import { saveTicket, removeTicket } from '../lib/activeTickets';
 import NotifyMe from '../components/NotifyMe';
+import { CUSTOMER_DISCOVERY } from '../lib/features';
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -134,7 +135,9 @@ export default function QueueTracking() {
         <p role="alert" className="text-red-700">
           We couldn't find this queue ticket. It may have expired, or the link is incomplete.
         </p>
-        <Link to="/" className="btn-secondary mt-6">Find a salon</Link>
+        <Link to="/" className="btn-secondary mt-6">
+          {CUSTOMER_DISCOVERY ? 'Find a salon' : 'Back to home'}
+        </Link>
       </div>
     );
   }
@@ -155,7 +158,7 @@ export default function QueueTracking() {
           to="/"
           className="mt-6 inline-block rounded-xl border border-gray-300 px-5 py-3 text-base font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
         >
-          Find a salon
+          {CUSTOMER_DISCOVERY ? 'Find a salon' : 'Back to home'}
         </Link>
       </div>
     );

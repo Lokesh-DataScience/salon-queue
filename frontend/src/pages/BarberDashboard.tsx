@@ -1,7 +1,7 @@
 // frontend/src/pages/BarberDashboard.tsx
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
   fetchBarberQueue,
@@ -125,9 +125,14 @@ export default function BarberDashboard() {
             Queue {isPaused ? 'Paused' : 'Active'} — Current Token #{queue.currentToken}
           </p>
         </div>
-        <button onClick={handleLogout} className="min-h-11 shrink-0 px-3 text-sm text-gray-600 underline" type="button">
-          Log out
-        </button>
+        <div className="flex shrink-0 items-center">
+          <Link to="/barber/qr" className="inline-flex min-h-11 items-center px-3 text-sm text-gray-600 underline">
+            Print salon QR
+          </Link>
+          <button onClick={handleLogout} className="min-h-11 px-3 text-sm text-gray-600 underline" type="button">
+            Log out
+          </button>
+        </div>
       </div>
 
       {actionError && (
@@ -265,4 +270,4 @@ function WaitingRow({ entry, disabled, onSkip }: {
       </button>
     </li>
   );
-}
+}

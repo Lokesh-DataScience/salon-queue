@@ -10,11 +10,13 @@ import {
   postPause,
   postResume,
 } from '../controllers/barber.controller';
+import { getBarberSalon } from '../controllers/barberSalon.controller';
 
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in barber
 
+router.get('/salon', getBarberSalon);
 router.get('/queue', getQueue);
 router.post('/queue/next', postNext);
 router.post('/queue/:entryId/start', postStart);

@@ -1,6 +1,9 @@
 // frontend/src/App.tsx
-import { Routes, Route, Link } from 'react-router-dom';
-import PageShell from './components/PageShell';import HomePage from './pages/HomePage';
+import { Routes, Route, Link, Navigate } from 'react-router-dom';
+import PageShell from './components/PageShell';
+import HomePage from './pages/HomePage';
+import ScanHome from './pages/ScanHome';
+import ScanLanding from './pages/ScanLanding';
 import HealthPage from './pages/HealthPage';
 import SalonList from './pages/SalonList';
 import SalonDetails from './pages/SalonDetails';
@@ -8,6 +11,9 @@ import JoinQueue from './pages/JoinQueue';
 import QueueTracking from './pages/QueueTracking';
 import BarberLogin from './pages/BarberLogin';
 import BarberDashboard from './pages/BarberDashboard';
+import BarberQr from './pages/BarberQr';
+import { CUSTOMER_DISCOVERY } from './lib/features';
+
 function NotFound() {
   return (
     <PageShell title="Page not found">
@@ -17,17 +23,30 @@ function NotFound() {
     </PageShell>
   );
 }
+
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      {CUSTOMER_DISCOVERY ? (
+        <>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/salons" element={<SalonList />} />
+          <Route path="/salons/:salonId" element={<SalonDetails />} />
+          <Route path="/salons/:salonId/join" element={<JoinQueue />} />
+        </>
+      ) : (
+        <>
+          <Route path="/" element={<ScanHome />} />
+          {/* Hidden, not deleted: the pages are still in the code, just not reachable. */}
+          <Route path="/salons/*" element={<Navigate to="/" replace />} />
+        </>
+      )}
+      <Route path="/q/:code" element={<ScanLanding />} />
       <Route path="/health" element={<HealthPage />} />
-      <Route path="/salons" element={<SalonList />} />
-      <Route path="/salons/:salonId" element={<SalonDetails />} />
-      <Route path="/salons/:salonId/join" element={<JoinQueue />} />
       <Route path="/tickets/:ticketId" element={<QueueTracking />} />
       <Route path="/barber/login" element={<BarberLogin />} />
       <Route path="/barber/dashboard" element={<BarberDashboard />} />
+      <Route path="/barber/qr" element={<BarberQr />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -9,3 +9,8 @@ export const nearbySalonsQuerySchema = z.object({
 export const salonIdParamSchema = z.object({
   salonId: z.string().uuid(),
 });
+
+// The short code printed in a salon's wall QR. Letters and digits only, so nothing odd reaches the query.
+export const salonCodeParamSchema = z.object({
+  code: z.string().regex(/^[a-zA-Z0-9]{8,32}$/),
+});
