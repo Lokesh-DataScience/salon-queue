@@ -1,8 +1,7 @@
 // frontend/src/pages/BarberDashboard.tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import {
   fetchBarberQueue,
   callNextCustomer,
@@ -12,7 +11,6 @@ import {
   pauseQueue,
   resumeQueue,
   logoutBarber,
-  type BarberQueueEntry,
 } from '../api/barber';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
@@ -32,19 +30,19 @@ export default function BarberDashboard() {
   function refetch() {
     return queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
   }
-    // The API client emits this only after a silent refresh has failed.
+
+  // The API client emits this only after a silent refresh has failed.
   useEffect(() => {
     function onExpired() {
-      queryClient.clear(); // drops cached queue data from memory
+      queryClient.clear();
       navigate('/barber/login', { replace: true, state: { expired: true } });
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, [navigate, queryClient]);
-  // Join this salon's room once we know its id, and treat queue:updated as
-  // a signal to re-fetch the FULL snapshot (with names/phones) rather than
-  // trying to render off the sanitized broadcast payload directly — that
-  // payload intentionally excludes any customer details.
+
+  // queue:updated is only a signal to re-fetch the full snapshot; the broadcast
+  // payload is sanitized and deliberately carries no customer details.
   useEffect(() => {
     if (!queue?.salonId) return;
     const salonId = queue.salonId;
@@ -69,15 +67,35 @@ export default function BarberDashboard() {
     setActionError(null);
     return action()
       .then(() => refetch())
-      .catch((err: any) => setActionError(err.message));
+      .catch((err: any) => {
+        setActionError(err.message);
+        return refetch(); // re-sync so the button reflects what really happened
+      });
   }
 
-  const nextMutation = useMutation({ mutationFn: () => runAction(callNextCustomer) });
-  const startMutation = useMutation({ mutationFn: (id: string) => runAction(() => startEntry(id)) });
-  const completeMutation = useMutation({ mutationFn: (id: string) => runAction(() => completeEntry(id)) });
+  // ── The one primary action ─────────────────────────────────────────────
+  // The server still enforces every transition; this only picks which call to make.
+  const primaryMutation = useMutation({
+    mutationFn: () =>
+      runAction(async () => {
+        if (!queue) return;
+        if (queue.serving) {
+          await completeEntry(queue.serving.id); // SERVING → COMPLETED
+        } else if (queue.called) {
+          await startEntry(queue.called.id); // CALLED → SERVING
+        } else if (queue.queueStatus === 'PAUSED') {
+          await resumeQueue();
+        } else {
+          // Idle: call the next customer and start them in one tap.
+          // If start fails, the customer stays CALLED and the button becomes "Start #N".
+          const { result } = await callNextCustomer();
+          const calledId = (result as { called_entry_id?: string | null } | null)?.called_entry_id;
+          if (calledId) await startEntry(calledId);
+        }
+      }),
+  });
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
   const pauseMutation = useMutation({ mutationFn: () => runAction(pauseQueue) });
-  const resumeMutation = useMutation({ mutationFn: () => runAction(resumeQueue) });
 
   async function handleLogout() {
     await logoutBarber().catch(() => {});
@@ -85,7 +103,7 @@ export default function BarberDashboard() {
     navigate('/barber/login');
   }
 
-  if (isLoading) return <p role="status" className="p-6 text-gray-600">Loading queue...</p>
+  if (isLoading) return <p role="status" className="p-6 text-gray-600">Loading queue...</p>;
 
   if (error || !queue) {
     return (
@@ -102,19 +120,37 @@ export default function BarberDashboard() {
   }
 
   const isPaused = queue.queueStatus === 'PAUSED';
-  const anyMutating =
-    nextMutation.isPending ||
-    startMutation.isPending ||
-    completeMutation.isPending ||
-    skipMutation.isPending ||
-    pauseMutation.isPending ||
-    resumeMutation.isPending;
+  const busy = primaryMutation.isPending || skipMutation.isPending || pauseMutation.isPending;
+  const nextWaiting = queue.waiting[0] ?? null;
+  const active = queue.serving ?? queue.called; // whoever is at the chair / being called
 
-  const nextHint = queue.called
-    ? 'Start or skip the called customer first.'
-    : isPaused
-      ? 'Resume the queue to call the next customer.'
-      : '';
+  // What the one button says and does right now.
+  let label: string;
+  let color = 'bg-black';
+  let disabled = busy;
+  if (queue.serving) {
+    label = `COMPLETE #${queue.serving.token_number}`;
+    color = 'bg-green-700';
+  } else if (queue.called) {
+    label = `START #${queue.called.token_number}`;
+  } else if (isPaused) {
+    label = 'RESUME QUEUE';
+    color = 'bg-amber-700';
+  } else if (nextWaiting) {
+    label = `START NEXT #${nextWaiting.token_number}`;
+  } else {
+    label = 'NO ONE WAITING';
+    disabled = true;
+  }
+  if (primaryMutation.isPending) label = 'Working...';
+
+  const statusLine = queue.serving
+    ? 'Serving'
+    : queue.called
+      ? 'Called — waiting to start'
+      : isPaused
+        ? 'Queue paused'
+        : 'Idle';
 
   return (
     <main className="mx-auto w-full max-w-md md:max-w-2xl p-4 pb-24">
@@ -141,80 +177,47 @@ export default function BarberDashboard() {
         </p>
       )}
 
-      {/* Currently Serving */}
-      <section className="rounded-xl border border-gray-200 bg-white p-4 mb-4">
-        <h2 className="mb-2 text-sm font-medium text-gray-600">Currently Serving</h2>
-        {queue.serving ? (
-          <>
-            <p className="text-4xl font-bold mb-3">#{queue.serving.token_number}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <ActionButton
-                label="Complete"
-                color="bg-green-700"
-                disabled={anyMutating}
-                onClick={() => completeMutation.mutate(queue.serving!.id)}
-              />
-              <ActionButton
-                label="Skip"
-                color="bg-red-700"
-                disabled={anyMutating}
-                onClick={() => skipMutation.mutate(queue.serving!.id)}
-              />
-            </div>
-          </>
-        ) : (
-          <p className="text-gray-600">No one being served right now.</p>
-        )}
+      <section aria-label="Current customer" className="rounded-xl border border-gray-200 bg-white p-6 mb-4 text-center">
+        <p className="text-sm font-medium text-gray-600">{statusLine}</p>
+        <p className="my-2 text-6xl font-bold">{active ? `#${active.token_number}` : '—'}</p>
       </section>
-
-      {/* Called / Next Up */}
-      <section className="rounded-xl border border-gray-200 bg-white p-4 mb-4">
-        <h2 className="mb-2 text-sm font-medium text-gray-600">Called — Next Up</h2>
-        {queue.called ? (
-          <>
-            <p className="text-3xl font-bold mb-4">#{queue.called.token_number}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <ActionButton
-                label="Start Service"
-                color="bg-black"
-                disabled={anyMutating}
-                onClick={() => startMutation.mutate(queue.called!.id)}
-              />
-              <ActionButton
-                label="Skip"
-                color="bg-red-600"
-                disabled={anyMutating}
-                onClick={() => skipMutation.mutate(queue.called!.id)}
-              />
-            </div>
-          </>
-        ) : (
-          <p className="text-gray-600">No one called yet.</p>
-        )}
-      </section>
-
-      {/* Call Next */}
-      <button
-        type="button"
-        onClick={() => nextMutation.mutate()}
-        disabled={anyMutating || !!queue.called || isPaused}
-        aria-describedby="next-hint"
-        className="min-h-14 w-full rounded-xl bg-black py-4 text-lg font-semibold text-white disabled:opacity-40"
-      >
-        {nextMutation.isPending ? 'Calling...' : 'CALL NEXT CUSTOMER'}
-      </button>
-      <p id="next-hint" className="mb-3 mt-1 min-h-5 text-sm text-gray-600">{nextHint}</p>
 
       <button
         type="button"
-        onClick={() => (isPaused ? resumeMutation.mutate() : pauseMutation.mutate())}
-        disabled={anyMutating}
-        className="mb-6 min-h-14 w-full rounded-xl border border-gray-500 bg-white py-4 text-lg font-semibold disabled:opacity-40"
+        onClick={() => primaryMutation.mutate()}
+        disabled={disabled}
+        className={`${color} mb-3 min-h-20 w-full rounded-2xl py-5 text-xl font-semibold text-white disabled:opacity-40`}
       >
-        {isPaused ? 'RESUME QUEUE' : 'PAUSE QUEUE'}
+        {label}
       </button>
 
-      {/* Waiting list */}
+      {/* Rare actions stay out of the way. Skip is here so a no-show can never block the queue. */}
+      <details className="mb-6 rounded-xl border border-gray-200 bg-white p-3">
+        <summary className="min-h-11 cursor-pointer py-2 text-sm text-gray-600">More actions</summary>
+        <div className="mt-2 grid gap-3">
+          {active && (
+            <button
+              type="button"
+              onClick={() => skipMutation.mutate(active.id)}
+              disabled={busy}
+              className="min-h-12 rounded-xl border border-red-300 px-4 text-base font-medium text-red-700 disabled:opacity-40"
+            >
+              {`Skip #${active.token_number}`}
+            </button>
+          )}
+          {!isPaused && (
+            <button
+              type="button"
+              onClick={() => pauseMutation.mutate()}
+              disabled={busy}
+              className="min-h-12 rounded-xl border border-gray-500 px-4 text-base font-medium disabled:opacity-40"
+            >
+              Pause queue
+            </button>
+          )}
+        </div>
+      </details>
+
       <section>
         <h2 className="mb-2 text-sm font-medium text-gray-600">Waiting ({queue.waiting.length})</h2>
         {queue.waiting.length === 0 ? (
@@ -222,12 +225,9 @@ export default function BarberDashboard() {
         ) : (
           <ul className="space-y-2">
             {queue.waiting.map((entry) => (
-              <WaitingRow
-                key={entry.id}
-                entry={entry}
-                disabled={anyMutating}
-                onSkip={() => skipMutation.mutate(entry.id)}
-              />
+              <li key={entry.id} className="rounded-lg border border-gray-200 bg-white p-3 font-semibold">
+                #{entry.token_number}
+              </li>
             ))}
           </ul>
         )}
@@ -235,39 +235,3 @@ export default function BarberDashboard() {
     </main>
   );
 }
-
-function ActionButton({ label, color, disabled, onClick }: {
-  label: string; color: string; disabled: boolean; onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`${color} min-h-12 rounded-xl px-3 py-3 text-base font-medium text-white disabled:opacity-40`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function WaitingRow({ entry, disabled, onSkip }: {
-  entry: BarberQueueEntry; disabled: boolean; onSkip: () => void;
-}) {
-  return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
-      <div className="min-w-0">
-        <span className="font-semibold">#{entry.token_number}</span>{' '}
-      </div>
-      <button
-        type="button"
-        onClick={onSkip}
-        disabled={disabled}
-        aria-label={`Skip token ${entry.token_number}`}
-        className="min-h-11 shrink-0 rounded-lg border border-red-300 px-4 text-sm font-medium text-red-700 disabled:opacity-40"
-      >
-        Skip
-      </button>
-    </li>
-  );
-}

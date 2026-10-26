@@ -29,6 +29,13 @@ export interface BarberQueueSnapshot {
   waiting: BarberQueueEntry[];
 }
 
+export interface CallNextResult {
+  completed_entry_id?: string | null;
+  called_entry_id?: string | null;
+  called_token_number?: number | null;
+  nothingWaiting?: boolean;
+}
+
 export function loginBarber(email: string, password: string) {
   return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/login', {
     method: 'POST',
@@ -43,9 +50,9 @@ export function logoutBarber() {
 export function fetchBarberQueue() {
   return apiFetch<BarberQueueSnapshot>('/api/barber/queue');
 }
-
+ 
 export function callNextCustomer() {
-  return apiFetch<{ result: unknown }>('/api/barber/queue/next', { method: 'POST' });
+  return apiFetch<{ result: CallNextResult }>('/api/barber/queue/next', { method: 'POST' });
 }
 
 export function startEntry(entryId: string) {

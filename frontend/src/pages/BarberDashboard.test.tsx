@@ -47,73 +47,100 @@ const snapshot = (overrides: Partial<BarberQueueSnapshot> = {}): BarberQueueSnap
 const given = (overrides: Partial<BarberQueueSnapshot> = {}) =>
   vi.mocked(barber.fetchBarberQueue).mockResolvedValue(snapshot(overrides));
 const renderDashboard = () => renderPage(<BarberDashboard />, { path: '/barber/dashboard', route: '/barber/dashboard' });
-const callNextButton = () => screen.getByRole('button', { name: /call next customer/i });
 
 beforeEach(() => {
   resetSocket();
   Object.values(barber).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockReset());
 });
 
-describe('BarberDashboard', () => {
-  it('lists the waiting customers and joins the salon room', async () => {
+describe('BarberDashboard (one-button)', () => {
+  it('lists waiting customers read-only and joins the salon room', async () => {
     given();
     renderDashboard();
 
     expect(await screen.findByText('Waiting (2)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip token 4' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Skip token 5' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /skip token/i })).not.toBeInTheDocument();
     await waitFor(() => expect(socket.emit).toHaveBeenCalledWith('join:salon', { salonId: 'salon-1' }));
   });
 
-  it('calls the next customer', async () => {
+  it('idle: one tap calls the next customer and starts them', async () => {
     given();
-    vi.mocked(barber.callNextCustomer).mockResolvedValue({ result: {} });
+    vi.mocked(barber.callNextCustomer).mockResolvedValue({
+      result: { called_entry_id: 'entry-4', called_token_number: 4 },
+    });
+    vi.mocked(barber.startEntry).mockResolvedValue({ entry: { id: 'entry-4', status: 'SERVING' } });
     const user = userEvent.setup();
     renderDashboard();
 
-    await screen.findByText('Waiting (2)');
-    await user.click(callNextButton());
+    await user.click(await screen.findByRole('button', { name: 'START NEXT #4' }));
     expect(barber.callNextCustomer).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(barber.startEntry).toHaveBeenCalledWith('entry-4'));
   });
 
-  it('disables Call Next and explains why while someone is called', async () => {
+  it('idle: if start fails after the call, shows the error and does not complete anyone', async () => {
+    given();
+    vi.mocked(barber.callNextCustomer).mockResolvedValue({ result: { called_entry_id: 'entry-4' } });
+    vi.mocked(barber.startEntry).mockRejectedValue(new Error('Could not start.'));
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'START NEXT #4' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not start.');
+    expect(barber.completeEntry).not.toHaveBeenCalled();
+  });
+
+  it('called: the button becomes START and starts that customer', async () => {
     given({ called: entry(4, 'CALLED'), waiting: [entry(5)] });
+    vi.mocked(barber.startEntry).mockResolvedValue({ entry: { id: 'entry-4', status: 'SERVING' } });
+    const user = userEvent.setup();
     renderDashboard();
 
-    await screen.findByText('Called — Next Up');
-    expect(callNextButton()).toBeDisabled();
-    expect(screen.getByText('Start or skip the called customer first.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start Service' })).toBeEnabled();
+    await user.click(await screen.findByRole('button', { name: 'START #4' }));
+    expect(barber.startEntry).toHaveBeenCalledWith('entry-4');
+    expect(barber.callNextCustomer).not.toHaveBeenCalled();
   });
 
-  it('shows RESUME and disables Call Next while paused', async () => {
+  it('serving: the button becomes COMPLETE and completes that customer', async () => {
+    given({ serving: entry(4, 'SERVING'), waiting: [entry(5)] });
+    vi.mocked(barber.completeEntry).mockResolvedValue({ entry: { id: 'entry-4', status: 'COMPLETED' } });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'COMPLETE #4' }));
+    expect(barber.completeEntry).toHaveBeenCalledWith('entry-4');
+    expect(barber.callNextCustomer).not.toHaveBeenCalled();
+  });
+
+  it('paused and idle: the one button resumes the queue', async () => {
     given({ queueStatus: 'PAUSED' });
+    vi.mocked(barber.resumeQueue).mockResolvedValue({ queue: { status: 'ACTIVE' } });
+    const user = userEvent.setup();
     renderDashboard();
 
-    expect(await screen.findByRole('button', { name: 'RESUME QUEUE' })).toBeInTheDocument();
-    expect(callNextButton()).toBeDisabled();
-    expect(screen.getByText('Resume the queue to call the next customer.')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'RESUME QUEUE' }));
+    expect(barber.resumeQueue).toHaveBeenCalledTimes(1);
+    expect(barber.callNextCustomer).not.toHaveBeenCalled();
   });
 
-  it('skips a specific waiting customer', async () => {
-    given();
+  it('empty queue: the button is disabled', async () => {
+    given({ waiting: [] });
+    renderDashboard();
+
+    expect(await screen.findByRole('button', { name: 'NO ONE WAITING' })).toBeDisabled();
+  });
+
+  it('keeps skip and pause under "More actions"', async () => {
+    given({ called: entry(4, 'CALLED'), waiting: [entry(5)] });
     vi.mocked(barber.skipEntry).mockResolvedValue({ entry: { id: 'entry-4', status: 'SKIPPED' } });
+    vi.mocked(barber.pauseQueue).mockResolvedValue({ queue: { status: 'PAUSED' } });
     const user = userEvent.setup();
     renderDashboard();
 
-    await user.click(await screen.findByRole('button', { name: 'Skip token 4' }));
+    await user.click(await screen.findByText('More actions'));
+    await user.click(screen.getByRole('button', { name: 'Skip #4' }));
     expect(barber.skipEntry).toHaveBeenCalledWith('entry-4');
-  });
-
-  it('announces a failed action', async () => {
-    given();
-    vi.mocked(barber.callNextCustomer).mockRejectedValue(new Error('A customer is already being called.'));
-    const user = userEvent.setup();
-    renderDashboard();
-
-    await screen.findByText('Waiting (2)');
-    await user.click(callNextButton());
-    expect(await screen.findByRole('alert')).toHaveTextContent('A customer is already being called.');
+    await user.click(screen.getByRole('button', { name: 'Pause queue' }));
+    expect(barber.pauseQueue).toHaveBeenCalledTimes(1);
   });
 
   it('sends the barber to login when the session has expired', async () => {
@@ -126,7 +153,7 @@ describe('BarberDashboard', () => {
     });
 
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Skip token 4' })).not.toBeInTheDocument(); // queue data gone from the screen
+    expect(screen.queryByText('Waiting (2)')).not.toBeInTheDocument();
   });
 
   it('logs out and leaves the dashboard', async () => {
