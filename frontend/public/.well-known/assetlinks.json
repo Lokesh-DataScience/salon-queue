@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.onrender.salonqueue.twa",
+        "sha256_cert_fingerprints": ["63:43:03:8D:8A:E7:4D:D4:B2:18:83:27:F7:32:1C:C2:8A:DA:BD:08:1C:47:2A:34:A4:96:D9:B8:95:A6:E7:CC"]
+      }
+    }]
