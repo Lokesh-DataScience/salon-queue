@@ -1,9 +1,10 @@
 // backend/src/controllers/auth.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
-import { barberLoginBodySchema } from '../validators/auth.validators';
+import { barberLoginBodySchema, registerSalonBodySchema } from '../validators/auth.validators';
 import {
   loginBarber,
+  registerSalon,
   rotateRefreshToken,
   revokeRefreshToken,
   REFRESH_TOKEN_TTL_SECONDS,
@@ -61,4 +62,15 @@ export async function postBarberLogout(req: Request, res: Response) {
     .clearCookie('refresh_token', { path: '/' })
     .status(200)
     .json({ ok: true });
+}
+
+export async function postBarberRegister(req: Request, res: Response, next: NextFunction) {
+  try {
+    const body = registerSalonBodySchema.parse(req.body);
+    const { tokens, staff } = await registerSalon(body);
+    setSessionCookies(res, tokens); // signed in straight away
+    res.status(201).json({ staff });
+  } catch (err) {
+    next(err);
+  }
 }

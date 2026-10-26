@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { loginBarber } from '../api/barber';
 import PageShell from '../components/PageShell';
 
@@ -73,6 +73,9 @@ export default function BarberLogin() {
           {submitting ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
+      <p className="mt-4 text-center text-sm text-gray-600">
+        New salon? <Link to="/barber/register" className="underline">Register your salon</Link>
+      </p>
     </PageShell>
   );
 }

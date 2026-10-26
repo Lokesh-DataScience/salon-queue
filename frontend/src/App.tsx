@@ -12,6 +12,7 @@ import QueueTracking from './pages/QueueTracking';
 import BarberLogin from './pages/BarberLogin';
 import BarberDashboard from './pages/BarberDashboard';
 import BarberQr from './pages/BarberQr';
+import BarberRegister from './pages/BarberRegister';
 import { CUSTOMER_DISCOVERY } from './lib/features';
 
 function NotFound() {
@@ -45,6 +46,7 @@ function App() {
       <Route path="/health" element={<HealthPage />} />
       <Route path="/tickets/:ticketId" element={<QueueTracking />} />
       <Route path="/barber/login" element={<BarberLogin />} />
+      <Route path="/barber/register" element={<BarberRegister />} />
       <Route path="/barber/dashboard" element={<BarberDashboard />} />
       <Route path="/barber/qr" element={<BarberQr />} />
       <Route path="*" element={<NotFound />} />

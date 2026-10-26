@@ -1,12 +1,13 @@
 // frontend/src/pages/BarberQr.tsx
 // The salon's wall poster: one QR, printed and stuck up like a UPI QR. Scanning it gives the customer a token.
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { fetchBarberSalon } from '../api/barber';
 import PageShell from '../components/PageShell';
 
 export default function BarberQr() {
+  const welcome = (useLocation().state as { welcome?: boolean } | null)?.welcome;
   const { data: salon, isLoading, error } = useQuery({
     queryKey: ['barberSalon'],
     queryFn: fetchBarberSalon,
@@ -36,6 +37,12 @@ export default function BarberQr() {
           ← Back to dashboard
         </Link>
       </div>
+      {welcome && (
+        <p role="status" className="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-900 print:hidden">
+          Your salon is registered. Print this QR code and put it where customers can see it. Then open your
+          dashboard to start serving.
+        </p>
+      )}
 
       <section
         aria-label="Printable salon QR poster"

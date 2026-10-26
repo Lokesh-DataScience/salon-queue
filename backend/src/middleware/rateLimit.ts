@@ -46,5 +46,11 @@ export function createRateLimiters() {
       limit: 120,
       message: 'Too many requests. Please wait a moment and try again.',
     }),
+        // Counts every attempt, successful or not: nobody legitimately registers more than a few salons an hour.
+    register: limiter({
+      windowMs: 60 * 60_000,
+      limit: 5,
+      message: 'Too many sign-up attempts from this network. Please try again later.',
+    }),
   };
 }

@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 import type { JwtPayload, RefreshPayload, StaffRole } from '../types/auth.types';
+import type { RegisterSalonBody } from '../validators/auth.validators';
 
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -109,4 +110,42 @@ export async function revokeRefreshToken(refreshToken: string | undefined) {
   } catch {
     // invalid or expired token: nothing to revoke
   }
+}
+
+export async function registerSalon(input: RegisterSalonBody) {
+  const passwordHash = await bcrypt.hash(input.password, 12);
+
+  const { data, error } = await supabase.rpc('register_salon', {
+    p_name: input.salonName,
+    p_phone: input.phone,
+    p_address: input.address,
+    p_latitude: input.latitude,
+    p_longitude: input.longitude,
+    p_opening: input.openingTime,
+    p_closing: input.closingTime,
+    p_avg: input.averageServiceMinutes,
+    p_owner_name: input.ownerName,
+    p_email: input.email,
+    p_password_hash: passwordHash,
+  });
+
+  if (error) {
+    if (error.message?.includes('EMAIL_TAKEN')) {
+      throw new AppError('An account with this email already exists. Try signing in instead.', 409);
+    }
+    throw error;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error('register_salon returned no row');
+
+  return {
+    tokens: signTokens({ staffId: row.o_staff_id, salonId: row.o_salon_id, role: 'OWNER' }),
+    staff: {
+      id: row.o_staff_id as string,
+      name: input.ownerName,
+      email: input.email,
+      role: 'OWNER' as const,
+      salonId: row.o_salon_id as string,
+    },
+  };
 }

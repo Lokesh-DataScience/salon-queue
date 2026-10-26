@@ -62,6 +62,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.post('/api/queues/:salonId/join', limits.join);
     app.use('/api/queue-tickets', limits.ticket);
     app.post('/api/auth/barber/login', limits.login);
+    app.post('/api/auth/barber/register', limits.register);
   }
 
   app.use(express.json({ limit: '10kb' })); // every body here is tiny
@@ -103,4 +104,4 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
   app.use(errorHandler);
 
   return app;
-}
+}

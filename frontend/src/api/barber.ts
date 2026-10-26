@@ -36,6 +36,26 @@ export interface CallNextResult {
   nothingWaiting?: boolean;
 }
 
+export interface BarberSalon {
+  id: string;
+  name: string;
+  qrCode: string;
+}
+
+export interface RegisterSalonInput {
+  salonName: string;
+  phone: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  ownerName: string;
+  email: string;
+  password: string;
+  openingTime: string;
+  closingTime: string;
+  averageServiceMinutes: number;
+}
+
 export function loginBarber(email: string, password: string) {
   return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/login', {
     method: 'POST',
@@ -81,12 +101,13 @@ export function resumeQueue() {
   return apiFetch<{ queue: { status: string } }>('/api/barber/queue/resume', { method: 'POST' });
 }
 
-export interface BarberSalon {
-  id: string;
-  name: string;
-  qrCode: string;
-}
-
 export function fetchBarberSalon() {
   return apiFetch<{ salon: BarberSalon }>('/api/barber/salon').then((r) => r.salon);
+}
+
+export function registerSalon(input: RegisterSalonInput) {
+  return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
