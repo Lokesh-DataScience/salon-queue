@@ -1,8 +1,17 @@
 {
+  "id": "/",
   "name": "Salon Virtual Queue",
   "short_name": "Salon Queue",
-  "start_url": "/",
+  "description": "Run your salon queue from your phone.",
+  "start_url": "/barber/dashboard",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#111827"
+  "orientation": "portrait",
+  "background_color": "#FACC15",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

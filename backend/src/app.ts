@@ -80,6 +80,10 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
   app.use('/api/barber', barberRouter);
   if (clientDir) {
     app.use(
+      '/.well-known',
+      express.static(path.join(clientDir, '.well-known'), { dotfiles: 'allow', index: false }),
+    );
+    app.use(
       express.static(clientDir, {
         index: false, // the page itself is served by the fallback below, with its own caching rule
         setHeaders(res, filePath) {
