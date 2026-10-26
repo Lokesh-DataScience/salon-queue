@@ -103,19 +103,29 @@ export default function BarberDashboard() {
     navigate('/barber/login');
   }
 
-  if (isLoading) return <p role="status" className="p-6 text-gray-600">Loading queue...</p>;
+  if (isLoading) {
+    return (
+      <main className="mx-auto w-full max-w-md p-4 md:max-w-2xl">
+        <div className="animate-pulse space-y-4" aria-hidden="true">
+          <div className="h-8 w-40 rounded bg-gray-200" />
+          <div className="h-44 rounded-2xl bg-gray-200" />
+          <div className="h-20 rounded-2xl bg-gray-200" />
+        </div>
+        <p role="status" className="mt-4 text-center text-gray-600">Loading queue...</p>
+      </main>
+    );
+  }
 
   if (error || !queue) {
     return (
-      <div className="max-w-md mx-auto p-6 text-center">
-        <p role="alert" className="text-red-700 mb-4">Not signed in, or your session expired.</p>
-        <button
-          onClick={() => navigate('/barber/login')}
-          className="rounded-xl bg-black text-white py-3 px-6 font-medium"
-        >
-          Go to Login
-        </button>
-      </div>
+      <main className="mx-auto max-w-md p-6">
+        <div className="card p-6 text-center">
+          <p role="alert" className="mb-4 text-red-700">Not signed in, or your session expired.</p>
+          <button onClick={() => navigate('/barber/login')} className="btn-primary">
+            Go to Login
+          </button>
+        </div>
+      </main>
     );
   }
 
@@ -126,16 +136,16 @@ export default function BarberDashboard() {
 
   // What the one button says and does right now.
   let label: string;
-  let color = 'bg-black';
+  let color = 'bg-black hover:bg-gray-800';
   let disabled = busy;
   if (queue.serving) {
     label = `COMPLETE #${queue.serving.token_number}`;
-    color = 'bg-green-700';
+    color = 'bg-green-700 hover:bg-green-800';
   } else if (queue.called) {
     label = `START #${queue.called.token_number}`;
   } else if (isPaused) {
     label = 'RESUME QUEUE';
-    color = 'bg-amber-700';
+    color = 'bg-amber-700 hover:bg-amber-800';
   } else if (nextWaiting) {
     label = `START NEXT #${nextWaiting.token_number}`;
   } else {
@@ -145,93 +155,136 @@ export default function BarberDashboard() {
   if (primaryMutation.isPending) label = 'Working...';
 
   const statusLine = queue.serving
-    ? 'Serving'
+    ? 'Serving now'
     : queue.called
       ? 'Called — waiting to start'
       : isPaused
-        ? 'Queue paused'
-        : 'Idle';
+        ? 'On a break'
+        : 'Ready';
+
+  const cardTone = queue.serving
+    ? 'border-green-400 bg-green-50'
+    : queue.called
+      ? 'border-amber-400 bg-amber-50'
+      : 'border-gray-200 bg-white';
 
   return (
-    <main className="mx-auto w-full max-w-md md:max-w-2xl p-4 pb-24">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-semibold">Barber Dashboard</h1>
-          <p className={`text-sm ${isPaused ? 'text-amber-700' : 'text-green-700'}`}>
-            Queue {isPaused ? 'Paused' : 'Active'} — Current Token #{queue.currentToken}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center">
-          <Link to="/barber/qr" className="inline-flex min-h-11 items-center px-3 text-sm text-gray-600 underline">
+    <>
+      <main className="mx-auto w-full max-w-md p-4 pb-36 md:max-w-2xl">
+        <header className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Salon queue</h1>
+            <p className="text-sm text-gray-600">Current token #{queue.currentToken}</p>
+          </div>
+          <span
+            className={`pill shrink-0 ${
+              isPaused ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-green-300 bg-green-50 text-green-900'
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 rounded-full ${isPaused ? 'bg-amber-600' : 'bg-green-600'}`}
+            />
+            {isPaused ? 'Queue paused' : 'Queue active'}
+          </span>
+        </header>
+
+        <nav aria-label="Account" className="mb-4 flex gap-2">
+          <Link
+            to="/barber/qr"
+            className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
             Print salon QR
           </Link>
-          <button onClick={handleLogout} className="min-h-11 px-3 text-sm text-gray-600 underline" type="button">
+          <button
+            onClick={handleLogout}
+            className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            type="button"
+          >
             Log out
+          </button>
+        </nav>
+
+        {actionError && (
+          <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            {actionError}
+          </p>
+        )}
+
+        <section
+          aria-label="Current customer"
+          className={`mb-4 rounded-2xl border-2 p-6 text-center ${cardTone}`}
+        >
+          <p className="text-sm font-medium uppercase tracking-wide text-gray-700">{statusLine}</p>
+          <p className="my-2 text-7xl font-bold tabular-nums">{active ? `#${active.token_number}` : '—'}</p>
+          {!active && nextWaiting && !isPaused && (
+            <p className="text-sm text-gray-600">Next up: #{nextWaiting.token_number}</p>
+          )}
+        </section>
+
+        {/* Rare actions stay out of the way. Skip is here so a no-show can never block the queue. */}
+        <details className="mb-6 rounded-xl border border-gray-200 bg-white px-3">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-gray-700">More actions</summary>
+          <div className="grid gap-3 pb-3">
+            {active && (
+              <button
+                type="button"
+                onClick={() => skipMutation.mutate(active.id)}
+                disabled={busy}
+                className="min-h-12 rounded-xl border border-red-300 px-4 text-base font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+              >
+                {`Skip #${active.token_number}`}
+              </button>
+            )}
+            {!isPaused && (
+              <button
+                type="button"
+                onClick={() => pauseMutation.mutate()}
+                disabled={busy}
+                className="min-h-12 rounded-xl border border-gray-500 px-4 text-base font-medium hover:bg-gray-50 disabled:opacity-40"
+              >
+                Pause queue
+              </button>
+            )}
+          </div>
+        </details>
+
+        <section>
+          <h2 className="mb-2 text-sm font-medium text-gray-700">Waiting ({queue.waiting.length})</h2>
+          {queue.waiting.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-center text-gray-600">
+              No one waiting.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {queue.waiting.map((entry, i) => (
+                <li
+                  key={entry.id}
+                  className="flex flex-col items-center rounded-xl border border-gray-200 bg-white py-3 text-xl font-semibold tabular-nums"
+                >
+                  #{entry.token_number}
+                  {i === 0 && <span className="text-xs font-medium text-gray-600">Next</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+
+      {/* The one big button sits at the bottom of the screen, within thumb reach. */}
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        <div className="mx-auto max-w-md md:max-w-2xl">
+          <button
+            type="button"
+            onClick={() => primaryMutation.mutate()}
+            disabled={disabled}
+            aria-busy={primaryMutation.isPending}
+            className={`${color} min-h-20 w-full rounded-2xl py-5 text-xl font-semibold text-white disabled:bg-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-200`}
+          >
+            {label}
           </button>
         </div>
       </div>
-
-      {actionError && (
-        <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-          {actionError}
-        </p>
-      )}
-
-      <section aria-label="Current customer" className="rounded-xl border border-gray-200 bg-white p-6 mb-4 text-center">
-        <p className="text-sm font-medium text-gray-600">{statusLine}</p>
-        <p className="my-2 text-6xl font-bold">{active ? `#${active.token_number}` : '—'}</p>
-      </section>
-
-      <button
-        type="button"
-        onClick={() => primaryMutation.mutate()}
-        disabled={disabled}
-        className={`${color} mb-3 min-h-20 w-full rounded-2xl py-5 text-xl font-semibold text-white disabled:opacity-40`}
-      >
-        {label}
-      </button>
-
-      {/* Rare actions stay out of the way. Skip is here so a no-show can never block the queue. */}
-      <details className="mb-6 rounded-xl border border-gray-200 bg-white p-3">
-        <summary className="min-h-11 cursor-pointer py-2 text-sm text-gray-600">More actions</summary>
-        <div className="mt-2 grid gap-3">
-          {active && (
-            <button
-              type="button"
-              onClick={() => skipMutation.mutate(active.id)}
-              disabled={busy}
-              className="min-h-12 rounded-xl border border-red-300 px-4 text-base font-medium text-red-700 disabled:opacity-40"
-            >
-              {`Skip #${active.token_number}`}
-            </button>
-          )}
-          {!isPaused && (
-            <button
-              type="button"
-              onClick={() => pauseMutation.mutate()}
-              disabled={busy}
-              className="min-h-12 rounded-xl border border-gray-500 px-4 text-base font-medium disabled:opacity-40"
-            >
-              Pause queue
-            </button>
-          )}
-        </div>
-      </details>
-
-      <section>
-        <h2 className="mb-2 text-sm font-medium text-gray-600">Waiting ({queue.waiting.length})</h2>
-        {queue.waiting.length === 0 ? (
-          <p className="text-gray-600">No one waiting.</p>
-        ) : (
-          <ul className="space-y-2">
-            {queue.waiting.map((entry) => (
-              <li key={entry.id} className="rounded-lg border border-gray-200 bg-white p-3 font-semibold">
-                #{entry.token_number}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+    </>
   );
 }

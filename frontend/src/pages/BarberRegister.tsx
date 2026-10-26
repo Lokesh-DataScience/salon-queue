@@ -1,8 +1,10 @@
+// frontend/src/pages/BarberRegister.tsx
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerSalon } from '../api/barber';
 import { ApiError } from '../api/client';
 import PageShell from '../components/PageShell';
+import BrandMark from '../components/BrandMark';
 
 type FieldErrors = Record<string, string[] | undefined>;
 
@@ -97,37 +99,46 @@ export default function BarberRegister() {
 
   return (
     <PageShell title="Register your salon">
-      <h1 className="mb-1 text-xl font-semibold">Register your salon</h1>
-      <p className="mb-4 text-sm text-gray-600">
+      <BrandMark />
+      <h1 className="mb-1 text-2xl font-semibold">Register your salon</h1>
+      <p className="mb-5 text-sm text-gray-600">
         Set up your queue in a minute. You'll get a QR code to print and stick up. Customers never need an account.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {input('salonName', 'Salon name', { autoComplete: 'organization' })}
-        {input('phone', 'Salon phone number', { type: 'tel', inputMode: 'tel', autoComplete: 'tel' })}
-        {input('address', 'Address', { autoComplete: 'street-address' })}
+        <section className="card space-y-4 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600">Your salon</h2>
+          {input('salonName', 'Salon name', { autoComplete: 'organization' })}
+          {input('phone', 'Salon phone number', { type: 'tel', inputMode: 'tel', autoComplete: 'tel' })}
+          {input('address', 'Address', { autoComplete: 'street-address' })}
+        </section>
 
-        <fieldset className="space-y-3 rounded-lg border border-gray-300 p-3">
-          <legend className="px-1 text-sm font-medium">Salon location</legend>
-          <button type="button" onClick={useMyLocation} disabled={locating} className="btn-secondary">
-            {locating ? 'Finding your location...' : 'Use my current location'}
-          </button>
-          <p className="text-xs text-gray-600">Best done while you are at the salon.</p>
-          {input('latitude', 'Latitude', { inputMode: 'decimal' })}
-          {input('longitude', 'Longitude', { inputMode: 'decimal' })}
-        </fieldset>
+        <section className="card space-y-4 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600">Location and hours</h2>
+          <fieldset className="space-y-3 rounded-lg border border-gray-300 p-3">
+            <legend className="px-1 text-sm font-medium">Salon location</legend>
+            <button type="button" onClick={useMyLocation} disabled={locating} className="btn-secondary">
+              {locating ? 'Finding your location...' : 'Use my current location'}
+            </button>
+            <p className="text-xs text-gray-600">Best done while you are at the salon.</p>
+            {input('latitude', 'Latitude', { inputMode: 'decimal' })}
+            {input('longitude', 'Longitude', { inputMode: 'decimal' })}
+          </fieldset>
 
-        <div className="grid grid-cols-2 gap-3">
-          {input('openingTime', 'Opens', { type: 'time' })}
-          {input('closingTime', 'Closes', { type: 'time' })}
-        </div>
-        {input('averageServiceMinutes', 'Average minutes per customer', { type: 'number', inputMode: 'numeric', min: 1, max: 240 })}
+          <div className="grid grid-cols-2 gap-3">
+            {input('openingTime', 'Opens', { type: 'time' })}
+            {input('closingTime', 'Closes', { type: 'time' })}
+          </div>
+          {input('averageServiceMinutes', 'Average minutes per customer', { type: 'number', inputMode: 'numeric', min: 1, max: 240 })}
+        </section>
 
-        <hr className="border-gray-200" />
-        {input('ownerName', 'Your name', { autoComplete: 'name' })}
-        {input('email', 'Email (you will sign in with this)', {
-          type: 'email', autoComplete: 'username', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false,
-        })}
-        {input('password', 'Password (at least 10 characters)', { type: 'password', autoComplete: 'new-password', minLength: 10 })}
+        <section className="card space-y-4 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600">Your sign-in</h2>
+          {input('ownerName', 'Your name', { autoComplete: 'name' })}
+          {input('email', 'Email (you will sign in with this)', {
+            type: 'email', autoComplete: 'username', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false,
+          })}
+          {input('password', 'Password (at least 10 characters)', { type: 'password', autoComplete: 'new-password', minLength: 10 })}
+        </section>
 
         {error && (
           <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
@@ -136,9 +147,9 @@ export default function BarberRegister() {
           {submitting ? 'Creating your salon...' : 'Register salon'}
         </button>
       </form>
-      <p className="mt-4 text-center text-sm text-gray-600">
+      <p className="mt-5 text-center text-sm text-gray-600">
         Already registered?{' '}
-        <Link to="/barber/login" className="underline">Sign in</Link>
+        <Link to="/barber/login" className="font-medium text-gray-900 underline">Sign in</Link>
       </p>
     </PageShell>
   );

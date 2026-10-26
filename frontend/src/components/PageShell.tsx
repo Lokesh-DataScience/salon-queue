@@ -1,3 +1,4 @@
+// frontend/src/components/PageShell.tsx
 import { useEffect, type ReactNode } from 'react';
 
 type Props = { title?: string; width?: 'narrow' | 'wide'; children: ReactNode };

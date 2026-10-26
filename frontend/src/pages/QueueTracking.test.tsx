@@ -1,3 +1,4 @@
+// frontend/src/pages/queueTracking.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -167,4 +168,4 @@ describe('QueueTracking: leaving', () => {
     await screen.findByText("It's your turn");
     expect(screen.queryByRole('button', { name: 'Leave queue' })).not.toBeInTheDocument();
   });
-});
+});

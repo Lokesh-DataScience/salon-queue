@@ -8,10 +8,22 @@ body {
   @apply bg-neutral-50 text-neutral-900 antialiased;
 }
 
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* One consistent, visible keyboard focus indicator everywhere. */
 :focus-visible {
   outline: 2px solid #111827;
   outline-offset: 2px;
+}
+
+@layer base {
+  button,
+  a,
+  summary {
+    touch-action: manipulation;
+  }
 }
 
 @layer components {
@@ -24,8 +36,24 @@ body {
   .btn-secondary {
     @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-gray-400 bg-white px-5 py-3 text-base font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50;
   }
+  .btn-danger {
+    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-red-700 px-5 py-3 text-base font-medium text-white hover:bg-red-800 disabled:opacity-50;
+  }
   /* text-base (16px) also stops iOS Safari from zooming in on focus. */
   .field {
-    @apply min-h-12 w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-base;
+    @apply min-h-12 w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-base aria-[invalid=true]:border-red-600;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
