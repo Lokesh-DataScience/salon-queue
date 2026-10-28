@@ -11,6 +11,7 @@ import {
   pauseQueue,
   resumeQueue,
   logoutBarber,
+  addWalkIn,
 } from '../api/barber';
 import { redeemCode } from '../api/offers';
 import { socket } from '../lib/socket';
@@ -104,7 +105,27 @@ export default function BarberDashboard() {
   });
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
   const pauseMutation = useMutation({ mutationFn: () => runAction(pauseQueue) });
-
+  const [walkInMsg, setWalkInMsg] = useState<string | null>(null);
+    useEffect(() => {
+      if (!walkInMsg) return;
+      const t = setTimeout(() => setWalkInMsg(null), 6000);
+      return () => clearTimeout(t);
+    }, [walkInMsg]);
+    const walkInMutation = useMutation({
+      mutationFn: addWalkIn,
+      onMutate: () => {
+        setActionError(null);
+        setWalkInMsg(null);
+      },
+      onSuccess: (r) => {
+        setWalkInMsg(`Token #${r.entry.tokenNumber} added to the queue.`);
+        refetch();
+      },
+      onError: (err: any) => {
+        setActionError(err.message);
+        refetch();
+      },
+  });
   async function handleLogout() {
     await logoutBarber().catch(() => {});
     queryClient.clear();
@@ -138,7 +159,7 @@ export default function BarberDashboard() {
   }
 
   const isPaused = queue.queueStatus === 'PAUSED';
-  const busy = primaryMutation.isPending || skipMutation.isPending || pauseMutation.isPending;
+  const busy = primaryMutation.isPending || skipMutation.isPending || pauseMutation.isPending || walkInMutation.isPending;
   const nextWaiting = queue.waiting[0] ?? null;
   const active = queue.serving ?? queue.called; // whoever is at the chair / being called
 
@@ -292,7 +313,26 @@ export default function BarberDashboard() {
           )}
         </section>
         <section>
-          <h2 className="mb-2 text-sm font-medium text-gray-700">Waiting ({queue.waiting.length})</h2>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-medium text-gray-700">Waiting ({queue.waiting.length})</h2>
+              <button
+                type="button"
+                onClick={() => walkInMutation.mutate()}
+                disabled={busy || isPaused}
+                aria-busy={walkInMutation.isPending}
+                className="min-h-12 rounded-xl border-2 border-black bg-white px-5 text-lg font-semibold hover:bg-gray-50 disabled:border-gray-300 disabled:text-gray-500"
+              >
+                {walkInMutation.isPending ? 'Adding...' : '+1 Add walk-in'}
+              </button>
+            </div>
+            {isPaused && (
+              <p className="mb-2 text-sm text-gray-600">Resume the queue to add a walk-in.</p>
+            )}
+            {walkInMsg && (
+              <p role="status" className="mb-3 rounded-lg border border-green-300 bg-green-50 p-3 text-base font-medium text-green-900">
+                {walkInMsg}
+              </p>
+            )}
           {queue.waiting.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-300 p-4 text-center text-gray-600">
               No one waiting.

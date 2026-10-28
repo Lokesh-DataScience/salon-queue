@@ -12,6 +12,7 @@ vi.mock('../lib/socket', () => import('../test/fakeSocket'));
 vi.mock('../api/barber', () => ({
   fetchBarberQueue: vi.fn(),
   callNextCustomer: vi.fn(),
+  addWalkIn: vi.fn(),
   startEntry: vi.fn(),
   completeEntry: vi.fn(),
   skipEntry: vi.fn(),

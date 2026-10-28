@@ -9,6 +9,7 @@ import {
   skipEntry,
   pauseQueue,
   resumeQueue,
+  addWalkIn,
 } from '../services/barber.service';
 import { broadcastQueueUpdate } from '../services/queue.service';
 import { AppError } from '../middleware/errorHandler';
@@ -96,6 +97,17 @@ export async function postResume(req: Request, res: Response, next: NextFunction
     const queue = await resumeQueue(salonId);
     await broadcastQueueUpdate(salonId); // NEW
     res.json({ queue });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postWalkIn(req: Request, res: Response, next: NextFunction) {
+  try {
+    const salonId = salonIdOf(req); // always from the verified session, never the body
+    const entry = await addWalkIn(salonId);
+    await broadcastQueueUpdate(salonId); // customers' "people ahead" updates live
+    res.status(201).json({ entry });
   } catch (err) {
     next(err);
   }

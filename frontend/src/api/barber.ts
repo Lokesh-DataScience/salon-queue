@@ -111,3 +111,9 @@ export function registerSalon(input: RegisterSalonInput) {
     body: JSON.stringify(input),
   });
 }
+
+export function addWalkIn() {
+  return apiFetch<{ entry: { id: string; tokenNumber: number } }>('/api/barber/queue/walk-in', {
+    method: 'POST',
+  });
+}

@@ -13,6 +13,7 @@ vi.mock('../lib/socket', () => import('../test/fakeSocket'));
 vi.mock('../api/barber', () => ({
   fetchBarberQueue: vi.fn(),
   callNextCustomer: vi.fn(),
+  addWalkIn: vi.fn(),
   startEntry: vi.fn(),
   completeEntry: vi.fn(),
   skipEntry: vi.fn(),
@@ -166,5 +167,33 @@ describe('BarberDashboard (one-button)', () => {
     await user.click(await screen.findByRole('button', { name: 'Log out' }));
     expect(barber.logoutBarber).toHaveBeenCalled();
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
+  });
+  it('+1 adds a walk-in and confirms the token number', async () => {
+    given();
+    vi.mocked(barber.addWalkIn).mockResolvedValue({ entry: { id: 'entry-6', tokenNumber: 6 } });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: /add walk-in/i }));
+    expect(barber.addWalkIn).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Token #6 added/)).toBeInTheDocument();
+  });
+
+  it('+1 shows the server error and keeps the queue usable', async () => {
+    given();
+    vi.mocked(barber.addWalkIn).mockRejectedValue(new Error('The salon is closed right now, so no one can be added.'));
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: /add walk-in/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('closed right now');
+  });
+
+  it('+1 is disabled while the queue is paused', async () => {
+    given({ queueStatus: 'PAUSED' });
+    renderDashboard();
+
+    expect(await screen.findByRole('button', { name: /add walk-in/i })).toBeDisabled();
+    expect(screen.getByText('Resume the queue to add a walk-in.')).toBeInTheDocument();
   });
 });

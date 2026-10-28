@@ -193,3 +193,26 @@ async function setQueueStatus(salonId: string, status: 'ACTIVE' | 'PAUSED') {
 
 export const pauseQueue = (salonId: string) => setQueueStatus(salonId, 'PAUSED');
 export const resumeQueue = (salonId: string) => setQueueStatus(salonId, 'ACTIVE');
+
+// ── WALK-IN (+1) ──────────────────────────────────────────────────────────
+// For customers with no smartphone: the barber adds them to the end of today's queue.
+export async function addWalkIn(salonId: string) {
+  const { data, error } = await supabase.rpc('add_walk_in', { p_salon_id: salonId });
+
+  if (error) {
+    const msg = error.message ?? '';
+    if (msg.includes('SALON_NOT_FOUND')) throw new AppError('Salon not found.', 404);
+    if (msg.includes('SALON_CLOSED')) {
+      throw new AppError('The salon is closed right now, so no one can be added.', 409);
+    }
+    if (msg.includes('QUEUE_NOT_ACTIVE')) {
+      throw new AppError('The queue is paused. Resume it to add a walk-in.', 409);
+    }
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.entry_id) throw new AppError('Could not add the walk-in. Please try again.', 500);
+
+  return { id: row.entry_id as string, tokenNumber: row.token_number as number };
+}
