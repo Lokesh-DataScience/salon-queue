@@ -5,6 +5,17 @@ import { todayISODate } from '../utils/date';
 
 const MAX_OFFERS = 10;
 
+export async function setExpectedCustomers(salonId: string, value: number | null) {
+  const { data, error } = await supabase
+    .from('salons')
+    .update({ expected_daily_customers: value })
+    .eq('id', salonId) // from the JWT, never the request
+    .select('expected_daily_customers')
+    .single();
+  if (error) throw error;
+  return { expectedCustomers: data.expected_daily_customers as number | null };
+}
+
 export async function listOffers(salonId: string) {
   const { data: offers, error } = await supabase
     .from('salon_offers')
@@ -27,6 +38,12 @@ export async function listOffers(salonId: string) {
   for (const r of redeemed ?? []) {
     if (r.offer_id) counts.set(r.offer_id, (counts.get(r.offer_id) ?? 0) + 1);
   }
+  const { data: salonRow, error: sErr } = await supabase
+    .from('salons')
+    .select('expected_daily_customers')
+    .eq('id', salonId)
+    .single();
+  if (sErr) throw sErr;
 
   return {
     offers: (offers ?? []).map((o) => ({
@@ -37,6 +54,7 @@ export async function listOffers(salonId: string) {
       redeemedToday: counts.get(o.id) ?? 0,
     })),
     totalRedeemedToday: (redeemed ?? []).length,
+    expectedCustomers: salonRow.expected_daily_customers as number | null,
   };
 }
 

@@ -11,7 +11,7 @@ import {
   postResume,
 } from '../controllers/barber.controller';
 import { getBarberSalon } from '../controllers/barberSalon.controller';
-import { getOffers, postOffer, patchOffer, removeOffer, postRedeem } from '../controllers/offers.controller';
+import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
 
 const router = Router();
 
@@ -28,6 +28,7 @@ router.post('/queue/resume', postResume);
 router.get('/offers', getOffers);
 router.post('/offers', postOffer);
 router.post('/offers/redeem', postRedeem);
+router.patch('/offers/expected', patchExpected);
 router.patch('/offers/:offerId', patchOffer);
 router.delete('/offers/:offerId', removeOffer);
 

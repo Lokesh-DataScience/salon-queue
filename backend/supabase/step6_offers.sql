@@ -90,18 +90,22 @@ BEGIN
   -- ── Hidden prize draw (runs under the queue lock, so two joins can never take the same prize) ──
   IF EXISTS (SELECT 1 FROM salon_offers o WHERE o.salon_id = p_salon_id AND o.active AND o.deleted_at IS NULL) THEN
 
-    SELECT q.prize_expected INTO v_expected FROM queues q WHERE q.id = v_queue_id;
+        -- the owner's own number wins; otherwise estimate from history (never below 15)
+    SELECT s.expected_daily_customers INTO v_expected FROM salons s WHERE s.id = p_salon_id;
     IF v_expected IS NULL THEN
-      SELECT round(avg(t.c))::int INTO v_expected FROM (
-        SELECT count(*) AS c
-        FROM queue_entries e JOIN queues q2 ON q2.id = e.queue_id
-        WHERE q2.salon_id = p_salon_id
-          AND q2.date < CURRENT_DATE AND q2.date >= CURRENT_DATE - 7
-          AND e.status <> 'CANCELLED'
-        GROUP BY q2.id
-      ) t;
-      v_expected := greatest(coalesce(v_expected, 15), 5);
-      UPDATE queues q SET prize_expected = v_expected WHERE q.id = v_queue_id;
+      SELECT q.prize_expected INTO v_expected FROM queues q WHERE q.id = v_queue_id;
+      IF v_expected IS NULL THEN
+        SELECT round(avg(t.c))::int INTO v_expected FROM (
+          SELECT count(*) AS c
+          FROM queue_entries e JOIN queues q2 ON q2.id = e.queue_id
+          WHERE q2.salon_id = p_salon_id
+            AND q2.date < CURRENT_DATE AND q2.date >= CURRENT_DATE - 7
+            AND e.status <> 'CANCELLED'
+          GROUP BY q2.id
+        ) t;
+        v_expected := greatest(coalesce(v_expected, 15), 15);
+        UPDATE queues q SET prize_expected = v_expected WHERE q.id = v_queue_id;
+      END IF;
     END IF;
 
     -- today's stock for any active offer that has none yet (new offers start the same day)

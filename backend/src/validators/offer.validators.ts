@@ -5,6 +5,9 @@ export const offerBodySchema = z.object({
   name: z.string().trim().min(2, 'Give the offer a name').max(40),
   dailyCount: z.number().int().min(1).max(50),
 });
+export const expectedBodySchema = z.object({
+  expectedCustomers: z.number().int().min(1).max(500).nullable(), // null = estimate automatically
+});
 
 export const offerPatchSchema = z
   .object({

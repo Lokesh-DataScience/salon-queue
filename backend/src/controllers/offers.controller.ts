@@ -3,11 +3,19 @@ import type { Request, Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
 import {
   offerBodySchema,
+  expectedBodySchema,
   offerPatchSchema,
   offerIdParamSchema,
   redeemBodySchema,
 } from '../validators/offer.validators';
-import { listOffers, createOffer, updateOffer, deleteOffer, redeemPrize } from '../services/offers.service';
+import {setExpectedCustomers, listOffers, createOffer, updateOffer, deleteOffer, redeemPrize } from '../services/offers.service';
+
+export async function patchExpected(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { expectedCustomers } = expectedBodySchema.parse(req.body);
+    res.json(await setExpectedCustomers(salonIdOf(req), expectedCustomers));
+  } catch (err) { next(err); }
+}
 
 function salonIdOf(req: Request): string {
   if (!req.staff) throw new AppError('Not authenticated.', 401);

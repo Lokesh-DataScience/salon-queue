@@ -10,7 +10,16 @@ export interface Offer {
 }
 
 export function fetchOffers() {
-  return apiFetch<{ offers: Offer[]; totalRedeemedToday: number }>('/api/barber/offers');
+  return apiFetch<{ offers: Offer[]; totalRedeemedToday: number; expectedCustomers: number | null }>(
+    '/api/barber/offers',
+  );
+}
+
+export function setExpectedCustomers(expectedCustomers: number | null) {
+  return apiFetch<{ expectedCustomers: number | null }>('/api/barber/offers/expected', {
+    method: 'PATCH',
+    body: JSON.stringify({ expectedCustomers }),
+  });
 }
 
 export function createOffer(input: { name: string; dailyCount: number }) {

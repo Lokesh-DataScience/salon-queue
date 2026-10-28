@@ -143,26 +143,58 @@ describe('Reveal, redeem and secrecy', () => {
     expect(cross.status).toBe(404);
   });
   it('a quiet salon is still paced over at least 15 customers, so prizes are not handed to the first scans', async () => {
-  const salonId = await makeSalon();
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const { data: past } = await supabase
-    .from('queues')
-    .insert({ salon_id: salonId, date: yesterday, current_token: 0, next_token: 3, status: 'ACTIVE' })
-    .select('id')
-    .single();
-  await supabase.from('queue_entries').insert(
-    [1, 2].map((n) => ({
-      queue_id: past!.id,
-      token_number: n,
-      status: 'COMPLETED',
-      access_token: crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, ''),
-    })),
-  );
+    const salonId = await makeSalon();
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const { data: past } = await supabase
+      .from('queues')
+      .insert({ salon_id: salonId, date: yesterday, current_token: 0, next_token: 3, status: 'ACTIVE' })
+      .select('id')
+      .single();
+    await supabase.from('queue_entries').insert(
+      [1, 2].map((n) => ({
+        queue_id: past!.id,
+        token_number: n,
+        status: 'COMPLETED',
+        access_token: crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, ''),
+      })),
+    );
 
-  await addOffer(salonId, 'Head massage', 5);
-  const t = await joinQueue(salonId);
+    await addOffer(salonId, 'Head massage', 5);
+    const t = await joinQueue(salonId);
 
-  const { data: q } = await supabase.from('queues').select('prize_expected').eq('id', t.queueId).single();
-  expect(q!.prize_expected).toBeGreaterThanOrEqual(15);
+    const { data: q } = await supabase.from('queues').select('prize_expected').eq('id', t.queueId).single();
+    expect(q!.prize_expected).toBeGreaterThanOrEqual(15);
+  });
 });
+describe('Expected customers setting', () => {
+  it('is saved per salon, validated, and can be cleared', async () => {
+    const salonA = await makeSalon();
+    const salonB = await makeSalon();
+    const cookieA = await barberCookieFor(salonA);
+    const cookieB = await barberCookieFor(salonB);
+    const set = (ck: string, v: unknown) =>
+      request(app).patch('/api/barber/offers/expected').set('Cookie', ck).send({ expectedCustomers: v });
+
+    expect((await set(cookieA, 25)).body.expectedCustomers).toBe(25);
+    for (const bad of [0, 501, 2.5, 'ten']) expect((await set(cookieA, bad)).status).toBe(400);
+
+    const a = await request(app).get('/api/barber/offers').set('Cookie', cookieA);
+    const b = await request(app).get('/api/barber/offers').set('Cookie', cookieB);
+    expect(a.body.expectedCustomers).toBe(25);
+    expect(b.body.expectedCustomers).toBeNull(); // another salon is untouched
+
+    expect((await set(cookieA, null)).body.expectedCustomers).toBeNull();
+    expect((await request(app).patch('/api/barber/offers/expected').send({ expectedCustomers: 5 })).status).toBe(401);
+  });
+
+  it("drives the pacing: expecting 1 customer with 3 prizes makes the first scan win", async () => {
+    const salonId = await makeSalon();
+    const cookie = await barberCookieFor(salonId);
+    await request(app).patch('/api/barber/offers/expected').set('Cookie', cookie).send({ expectedCustomers: 1 });
+    await addOffer(salonId, 'Head massage', 3);
+
+    const t = await joinQueue(salonId);
+    const { data } = await supabase.from('queue_entries').select('offer_id').eq('id', t.ticketId).single();
+    expect(data!.offer_id).not.toBeNull(); // with the default 15 this would be only a 1-in-5 chance
+  });
 });

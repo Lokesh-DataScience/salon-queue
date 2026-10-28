@@ -9,6 +9,7 @@ import type { Offer } from '../api/offers';
 
 vi.mock('../api/offers', () => ({
   fetchOffers: vi.fn(),
+  setExpectedCustomers: vi.fn(),
   createOffer: vi.fn(),
   updateOffer: vi.fn(),
   deleteOffer: vi.fn(),
@@ -131,5 +132,36 @@ describe('BarberOffers', () => {
     expect(offers.deleteOffer).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
     expect(offers.deleteOffer).toHaveBeenCalledWith('o1');
+  });
+  it('shows the saved expected customers and saves a new number', async () => {
+    vi.mocked(offers.fetchOffers).mockResolvedValue({ offers: [], totalRedeemedToday: 0, expectedCustomers: 20 });
+    vi.mocked(offers.setExpectedCustomers).mockResolvedValue({ expectedCustomers: 30 });
+    const user = userEvent.setup();
+    renderOffers();
+
+    const input = await screen.findByLabelText(/how many customers do you get/i);
+    expect(input).toHaveValue('20');
+    await user.clear(input);
+    await user.type(input, '30');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(offers.setExpectedCustomers).toHaveBeenCalledWith(30);
+    });
+
+    it('an empty box clears the setting, and a bad number is refused before the server', async () => {
+    vi.mocked(offers.fetchOffers).mockResolvedValue({ offers: [], totalRedeemedToday: 0, expectedCustomers: 20 });
+    vi.mocked(offers.setExpectedCustomers).mockResolvedValue({ expectedCustomers: null });
+    const user = userEvent.setup();
+    renderOffers();
+
+    const input = await screen.findByLabelText(/how many customers do you get/i);
+    await user.clear(input);
+    await user.type(input, '0');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/1 to 500/);
+    expect(offers.setExpectedCustomers).not.toHaveBeenCalled();
+
+    await user.clear(input);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(offers.setExpectedCustomers).toHaveBeenCalledWith(null);
   });
 });

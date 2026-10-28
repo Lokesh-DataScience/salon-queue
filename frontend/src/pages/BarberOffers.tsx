@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchOffers, createOffer, updateOffer, deleteOffer, type Offer } from '../api/offers';
+import {setExpectedCustomers, fetchOffers, createOffer, updateOffer, deleteOffer, type Offer } from '../api/offers';
 import { ApiError, SESSION_EXPIRED_EVENT } from '../api/client';
 
 const KEY = ['barberOffers'];
@@ -22,7 +22,32 @@ export default function BarberOffers() {
     queryFn: fetchOffers,
     retry: (n, err) => !(err instanceof ApiError && err.status === 401) && n < 2,
   });
-
+  const [expected, setExpected] = useState('');
+  const [expectedMsg, setExpectedMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    if (data) setExpected(data.expectedCustomers == null ? '' : String(data.expectedCustomers));}, [data?.expectedCustomers]);
+  const saveExpected = useMutation({
+    mutationFn: (value: number | null) => setExpectedCustomers(value),
+    onSuccess: (r) => {
+        setExpectedMsg({
+        ok: true,
+        text: r.expectedCustomers == null ? 'Saved. The app will estimate for you.' : 'Saved.',
+        });
+        refresh();
+    },
+    onError: (e: unknown) =>
+        setExpectedMsg({ ok: false, text: e instanceof Error ? e.message : 'Could not save.' }),
+  });
+  function submitExpected(e: React.FormEvent) {
+    e.preventDefault();
+    setExpectedMsg(null);
+    if (expected.trim() === '') return saveExpected.mutate(null);
+    const n = Number(expected);
+    if (!Number.isInteger(n) || n < 1 || n > 500) {
+        return setExpectedMsg({ ok: false, text: 'Enter a number from 1 to 500, or leave it empty.' });
+    }
+    saveExpected.mutate(n);
+  }
   useEffect(() => {
     function onExpired() {
       queryClient.clear();
@@ -106,7 +131,33 @@ export default function BarberOffers() {
           {add.isPending ? 'Adding...' : 'Add offer'}
         </button>
       </form>
-
+      <form onSubmit={submitExpected} className="card mb-6 grid gap-3" noValidate>
+        <h2 className="text-base font-semibold">Customers per day</h2>
+        <div>
+            <label htmlFor="expected-customers" className="mb-1 block text-sm font-medium">
+            About how many customers do you get in a day?
+            </label>
+            <input
+            id="expected-customers"
+            className="field"
+            inputMode="numeric"
+            value={expected}
+            placeholder="Leave empty to let the app estimate"
+            onChange={(e) => { setExpected(e.target.value.replace(/\D/g, '').slice(0, 3)); setExpectedMsg(null); }}
+            />
+            <p className="mt-1 text-sm text-gray-600">
+            Rewards are spread over this many customers, so they last through the day instead of going to the first few.
+            </p>
+        </div>
+        {expectedMsg && (
+            <p role={expectedMsg.ok ? 'status' : 'alert'} className={`text-sm ${expectedMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
+            {expectedMsg.text}
+            </p>
+        )}
+        <button type="submit" className="btn-secondary" disabled={saveExpected.isPending}>
+            {saveExpected.isPending ? 'Saving...' : 'Save'}
+        </button>
+        </form>
       <section aria-label="Your offers">
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-sm font-medium text-gray-700">Your offers ({data.offers.length})</h2>
