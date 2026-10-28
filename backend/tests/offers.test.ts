@@ -142,4 +142,27 @@ describe('Reveal, redeem and secrecy', () => {
     const cross = await request(app).get(`/api/queue-tickets/${a.ticketId}`).set('X-Ticket-Token', b.accessToken);
     expect(cross.status).toBe(404);
   });
+  it('a quiet salon is still paced over at least 15 customers, so prizes are not handed to the first scans', async () => {
+  const salonId = await makeSalon();
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const { data: past } = await supabase
+    .from('queues')
+    .insert({ salon_id: salonId, date: yesterday, current_token: 0, next_token: 3, status: 'ACTIVE' })
+    .select('id')
+    .single();
+  await supabase.from('queue_entries').insert(
+    [1, 2].map((n) => ({
+      queue_id: past!.id,
+      token_number: n,
+      status: 'COMPLETED',
+      access_token: crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, ''),
+    })),
+  );
+
+  await addOffer(salonId, 'Head massage', 5);
+  const t = await joinQueue(salonId);
+
+  const { data: q } = await supabase.from('queues').select('prize_expected').eq('id', t.queueId).single();
+  expect(q!.prize_expected).toBeGreaterThanOrEqual(15);
+});
 });
