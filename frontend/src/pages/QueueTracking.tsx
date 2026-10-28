@@ -21,6 +21,45 @@ type SanitizedQueueState = {
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
 
+function PrizeCard({ prize, status }: { prize: { name: string; code: string; redeemed: boolean }; status: string }) {
+  const [revealed, setRevealed] = useState(false);
+  const served = status === 'SERVING' || status === 'COMPLETED';
+
+  if (prize.redeemed) {
+    return (
+      <section aria-label="Your reward" className="card mt-4 text-center">
+        <p className="text-sm text-gray-600">Reward claimed</p>
+        <p className="text-lg font-semibold">🎁 {prize.name}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Your reward" className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-center">
+      {!revealed ? (
+        <>
+          <p className="text-lg font-semibold text-amber-900">🎁 You have a surprise reward!</p>
+          <button type="button" className="btn-primary mt-3" onClick={() => setRevealed(true)}>
+            Tap to reveal
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-medium text-amber-900">You won</p>
+          <p className="text-2xl font-bold text-amber-950">🎉 {prize.name}</p>
+          <p className="mt-3 text-sm text-amber-900">Your code</p>
+          <p className="text-4xl font-extrabold tracking-[0.3em] tabular-nums">{prize.code}</p>
+          <p className="mt-3 text-sm text-amber-900">
+            {served
+              ? 'Show this code to the barber now.'
+              : 'Show this code to the barber once your service starts. It is valid today only.'}
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function QueueTracking() {
   const { ticketId } = useParams<{ ticketId: string }>();
   const [searchParams] = useSearchParams();
@@ -131,7 +170,6 @@ export default function QueueTracking() {
   useEffect(() => {
     if (error instanceof ApiError && error.status === 404 && ticketId) removeTicket(ticketId);
   }, [error, ticketId]);
-
   const homeLabel = CUSTOMER_DISCOVERY ? 'Find a salon' : 'Back to home';
 
   // ── Loading ────────────────────────────────────────────────────────────
@@ -177,6 +215,9 @@ export default function QueueTracking() {
           <span aria-hidden="true" className="mb-2 block text-4xl">{icon}</span>
           <p className="text-5xl font-bold tabular-nums text-gray-500">#{ticket.tokenNumber}</p>
           <p className="mt-4 text-gray-800" role="status">{message}</p>
+          {ticket.status === 'COMPLETED' && ticket.prize && (
+            <PrizeCard prize={ticket.prize} status={ticket.status} />
+          )}
           <Link to="/" className="btn-secondary mt-6">{homeLabel}</Link>
         </div>
       </PageShell>
@@ -242,6 +283,7 @@ export default function QueueTracking() {
           <p className="text-sm text-gray-700">Estimated wait: ~{ticket.estimatedWaitMinutes} min</p>
         </div>
       </section>
+      {ticket.prize && <PrizeCard prize={ticket.prize} status={ticket.status} />}
 
       {ticket.status === 'WAITING' && (
         <NotifyMe ticketId={ticket.ticketId} accessToken={accessToken} enabled={!!ticket.notificationsOn} />

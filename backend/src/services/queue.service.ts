@@ -62,6 +62,15 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     .select('average_service_minutes')
     .eq('id', entry.queues.salon_id)
     .single();
+    let prize: { name: string; code: string; redeemed: boolean } | null = null;
+  if (entry.offer_id && !['CANCELLED', 'SKIPPED'].includes(entry.status)) {
+    const { data: offer } = await supabase
+      .from('salon_offers')
+      .select('name')
+      .eq('id', entry.offer_id)
+      .maybeSingle();
+    prize = { name: offer?.name ?? 'Reward', code: entry.prize_code, redeemed: !!entry.prize_redeemed_at };
+  }
 
   return {
     ticketId: entry.id,
@@ -73,6 +82,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     estimatedWaitMinutes: (peopleAhead ?? 0) * (salon?.average_service_minutes ?? 15),
     queueStatus: entry.queues.status,
     notificationsOn: !!entry.push_subscription, // a flag only, never the subscription itself
+    prize,
   };
 }
 

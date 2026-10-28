@@ -12,6 +12,7 @@ import {
   resumeQueue,
   logoutBarber,
 } from '../api/barber';
+import { redeemCode } from '../api/offers';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 
@@ -21,6 +22,13 @@ export default function BarberDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const redeem = useMutation({
+    mutationFn: () => redeemCode(redeemInput),
+    onSuccess: (r) => { setRedeemMsg({ ok: true, text: `Redeemed: ${r.prizeName}. Give it to the customer.` }); setRedeemInput(''); },
+    onError: (e: any) => setRedeemMsg({ ok: false, text: e.message ?? 'Could not redeem.' }),
+  });
 
   const { data: queue, isLoading, error } = useQuery({
     queryKey: QUEUE_KEY,
@@ -191,6 +199,11 @@ export default function BarberDashboard() {
 
         <nav aria-label="Account" className="mb-4 flex gap-2">
           <Link
+            to="/barber/offers"
+            className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50">
+            Offers
+          </Link>
+          <Link
             to="/barber/qr"
             className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
           >
@@ -248,7 +261,36 @@ export default function BarberDashboard() {
             )}
           </div>
         </details>
-
+        <section aria-label="Redeem a reward" className="mb-6 rounded-xl border border-gray-200 bg-white p-3">
+          <label htmlFor="redeem-code" className="mb-1 block text-sm font-medium text-gray-700">
+            Customer showed a reward code?
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="redeem-code"
+              className="field uppercase tracking-widest"
+              value={redeemInput}
+              maxLength={7}
+              autoCapitalize="characters"
+              autoComplete="off"
+              placeholder="ABC234"
+              onChange={(e) => { setRedeemInput(e.target.value); setRedeemMsg(null); }}
+            />
+            <button
+              type="button"
+              className="btn-primary !w-auto"
+              disabled={redeem.isPending || redeemInput.replace(/[\s-]/g, '').length < 6}
+              onClick={() => redeem.mutate()}
+            >
+              Redeem
+            </button>
+          </div>
+          {redeemMsg && (
+            <p role="status" className={`mt-2 text-sm ${redeemMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
+              {redeemMsg.text}
+            </p>
+          )}
+        </section>
         <section>
           <h2 className="mb-2 text-sm font-medium text-gray-700">Waiting ({queue.waiting.length})</h2>
           {queue.waiting.length === 0 ? (

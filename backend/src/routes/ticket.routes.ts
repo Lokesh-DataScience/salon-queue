@@ -1,3 +1,4 @@
+// backend/src/routes/ticket.routes.ts
 import { Router } from 'express';
 import { getTicket, postLeaveTicket, putPushSubscription, deletePushSubscription } from '../controllers/queue.controller';
 

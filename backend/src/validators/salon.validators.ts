@@ -1,3 +1,4 @@
+// backend/src/validators/salon.validators.ts
 import { z } from 'zod';
 
 export const nearbySalonsQuerySchema = z.object({

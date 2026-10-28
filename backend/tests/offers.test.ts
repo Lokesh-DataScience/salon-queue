@@ -1,0 +1,145 @@
+// backend/tests/offers.test.ts
+import { describe, it, expect, afterAll } from 'vitest';
+import request from 'supertest';
+import { app, makeSalon, cleanupSalons, joinViaApi, barberCookieFor } from './helpers';
+import { joinQueue } from '../src/services/queue.service';
+import { callNext, startEntry } from '../src/services/barber.service';
+import { supabase } from '../src/config/supabase';
+
+afterAll(cleanupSalons);
+
+async function addOffer(salonId: string, name: string, dailyCount: number) {
+  const cookie = await barberCookieFor(salonId);
+  const res = await request(app).post('/api/barber/offers').set('Cookie', cookie).send({ name, dailyCount });
+  expect(res.status).toBe(201);
+  return { cookie, offer: res.body.offer };
+}
+
+async function ticket(id: string, token: string) {
+  const res = await request(app).get(`/api/queue-tickets/${id}`).set('X-Ticket-Token', token);
+  expect(res.status).toBe(200);
+  return res.body.ticket;
+}
+
+describe('Offers CRUD and ownership', () => {
+  it('creates, lists, edits and soft-deletes only the barber\'s own offers', async () => {
+    const salonA = await makeSalon();
+    const salonB = await makeSalon();
+    const a = await addOffer(salonA, 'Head massage', 5);
+    const cookieB = await barberCookieFor(salonB);
+
+    const listB = await request(app).get('/api/barber/offers').set('Cookie', cookieB);
+    expect(listB.body.offers).toHaveLength(0);
+
+    for (const call of [
+      request(app).patch(`/api/barber/offers/${a.offer.id}`).set('Cookie', cookieB).send({ active: false }),
+      request(app).delete(`/api/barber/offers/${a.offer.id}`).set('Cookie', cookieB),
+    ]) expect((await call).status).toBe(404);
+
+    const edit = await request(app)
+      .patch(`/api/barber/offers/${a.offer.id}`).set('Cookie', a.cookie).send({ dailyCount: 3 });
+    expect(edit.body.offer.dailyCount).toBe(3);
+
+    expect((await request(app).delete(`/api/barber/offers/${a.offer.id}`).set('Cookie', a.cookie)).status).toBe(200);
+    const listA = await request(app).get('/api/barber/offers').set('Cookie', a.cookie);
+    expect(listA.body.offers).toHaveLength(0);
+  });
+
+  it('validates input and refuses unauthenticated callers', async () => {
+    const salonId = await makeSalon();
+    const cookie = await barberCookieFor(salonId);
+    for (const body of [{ name: 'x', dailyCount: 5 }, { name: 'Scrub', dailyCount: 0 }, { name: 'Scrub', dailyCount: 51 }]) {
+      expect((await request(app).post('/api/barber/offers').set('Cookie', cookie).send(body)).status).toBe(400);
+    }
+    expect((await request(app).get('/api/barber/offers')).status).toBe(401);
+    expect((await request(app).post('/api/barber/offers/redeem').send({ code: 'ABC234' })).status).toBe(401);
+  });
+});
+
+describe('Prize draw', () => {
+  it('never awards more than the daily count, even with simultaneous joins', async () => {
+    const salonId = await makeSalon();
+    await addOffer(salonId, 'Scrub', 2);
+    const results = await Promise.all(Array.from({ length: 20 }, () => joinQueue(salonId)));
+
+    const { data } = await supabase
+      .from('queue_entries').select('offer_id, prize_code').eq('queue_id', results[0].queueId);
+    const winners = (data ?? []).filter((e) => e.offer_id);
+    expect(winners.length).toBeLessThanOrEqual(2);
+    expect(new Set(winners.map((w) => w.prize_code)).size).toBe(winners.length);
+    expect(new Set(results.map((r) => r.tokenNumber)).size).toBe(20); // tokens still unique
+  });
+
+  it('a salon with no offers never draws', async () => {
+    const salonId = await makeSalon();
+    const t = await joinQueue(salonId);
+    const { data } = await supabase.from('queue_entries').select('offer_id, prize_code').eq('id', t.ticketId).single();
+    expect(data!.offer_id).toBeNull();
+    expect(data!.prize_code).toBeNull();
+  });
+
+  it('a switched-off offer is never awarded', async () => {
+    const salonId = await makeSalon();
+    const { cookie, offer } = await addOffer(salonId, 'Scrub', 50);
+    await request(app).patch(`/api/barber/offers/${offer.id}`).set('Cookie', cookie).send({ active: false });
+    const t = await joinQueue(salonId);
+    const { data } = await supabase.from('queue_entries').select('offer_id').eq('id', t.ticketId).single();
+    expect(data!.offer_id).toBeNull();
+  });
+});
+
+describe('Reveal, redeem and secrecy', () => {
+  // dailyCount 50 makes the chance 1.0 for the first customers, so the winner is certain.
+  it('winner sees the prize on their own ticket; barber redeems once, only after service, only for their salon', async () => {
+    const salonId = await makeSalon();
+    const other = await makeSalon();
+    const { cookie } = await addOffer(salonId, 'Head massage', 50);
+    const t = (await joinViaApi(salonId)).body.ticket;
+
+    const mine = await ticket(t.ticketId, t.accessToken);
+    expect(mine.prize).toMatchObject({ name: 'Head massage', redeemed: false });
+    expect(mine.prize.code).toMatch(/^[A-Z0-9]{6}$/);
+    const code = mine.prize.code;
+
+    const redeem = (c: string, ck = cookie) =>
+      request(app).post('/api/barber/offers/redeem').set('Cookie', ck).send({ code: c });
+
+    expect((await redeem(code)).status).toBe(409); // still WAITING
+    await callNext(salonId);
+    await startEntry(salonId, t.ticketId);
+
+    expect((await redeem(code, await barberCookieFor(other))).status).toBe(404); // someone else's salon
+    const ok = await redeem(code.toLowerCase()); // case-insensitive
+    expect(ok.status).toBe(200);
+    expect(ok.body.prizeName).toBe('Head massage');
+    expect((await redeem(code)).status).toBe(409); // single use
+    expect((await redeem('ZZZZZZ')).status).toBe(404);
+
+    const list = await request(app).get('/api/barber/offers').set('Cookie', cookie);
+    expect(list.body.totalRedeemedToday).toBe(1);
+  });
+
+  it('the barber snapshot and the live broadcast never reveal who won', async () => {
+    const salonId = await makeSalon();
+    const { cookie } = await addOffer(salonId, 'Scrub', 50);
+    const t = (await joinViaApi(salonId)).body.ticket;
+    const code = (await ticket(t.ticketId, t.accessToken)).prize.code;
+
+    const snap = await request(app).get('/api/barber/queue').set('Cookie', cookie);
+    const text = JSON.stringify(snap.body);
+    expect(text).not.toContain(code);
+    expect(text).not.toMatch(/offer_id|prize/);
+
+    const status = await request(app).get(`/api/salons/${salonId}/queue`);
+    expect(JSON.stringify(status.body)).not.toContain(code);
+  });
+
+  it("another customer's token cannot read the prize", async () => {
+    const salonId = await makeSalon();
+    await addOffer(salonId, 'Scrub', 50);
+    const a = (await joinViaApi(salonId)).body.ticket;
+    const b = (await joinViaApi(salonId)).body.ticket;
+    const cross = await request(app).get(`/api/queue-tickets/${a.ticketId}`).set('X-Ticket-Token', b.accessToken);
+    expect(cross.status).toBe(404);
+  });
+});
