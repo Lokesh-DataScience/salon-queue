@@ -1,6 +1,6 @@
 // frontend/src/pages/BarberOffers.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BarberOffers from './BarberOffers';
 import { renderPage } from '../test/utils';
@@ -25,8 +25,12 @@ const offer = (over: Partial<Offer> = {}): Offer => ({
   ...over,
 });
 
-const given = (list: Offer[] = [offer()], total = 2) =>
-  vi.mocked(offers.fetchOffers).mockResolvedValue({ offers: list, totalRedeemedToday: total });
+const given = (list: Offer[] = [offer()], total = 2, expectedCustomers: number | null = null) =>
+  vi.mocked(offers.fetchOffers).mockResolvedValue({
+    offers: list,
+    totalRedeemedToday: total,
+    expectedCustomers,
+  });
 const renderOffers = () => renderPage(<BarberOffers />, { path: '/barber/offers', route: '/barber/offers' });
 
 beforeEach(() => {
@@ -118,9 +122,10 @@ describe('BarberOffers', () => {
     const input = screen.getByLabelText(/per day \(from tomorrow\)/i);
     await user.clear(input);
     await user.type(input, '3');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const list = screen.getByRole('region', { name: 'Your offers' });
+    await user.click(within(list).getByRole('button', { name: 'Save' }));
     expect(offers.updateOffer).toHaveBeenCalledWith('o1', { dailyCount: 3 });
-  });
+    });
 
   it('asks for confirmation before deleting', async () => {
     given();
