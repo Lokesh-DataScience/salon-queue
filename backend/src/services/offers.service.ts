@@ -82,16 +82,28 @@ export async function updateOffer(
   offerId: string,
   patch: { name?: string; dailyCount?: number; active?: boolean },
 ) {
+  // A new daily count also resets today's remaining prizes, atomically, in the database.
+  if (patch.dailyCount !== undefined) {
+    const { data: ok, error } = await supabase.rpc('set_offer_daily_count', {
+      p_salon_id: salonId, // from the JWT, never the request
+      p_offer_id: offerId,
+      p_daily_count: patch.dailyCount,
+    });
+    if (error) throw error;
+    if (!ok) throw new AppError('Offer not found.', 404);
+  }
+
   const update: Record<string, unknown> = {};
   if (patch.name !== undefined) update.name = patch.name;
-  if (patch.dailyCount !== undefined) update.daily_count = patch.dailyCount;
   if (patch.active !== undefined) update.active = patch.active;
 
-  const { data, error } = await supabase
-    .from('salon_offers')
-    .update(update)
+  const query = Object.keys(update).length
+    ? supabase.from('salon_offers').update(update)
+    : supabase.from('salon_offers').select('id');
+
+  const { data, error } = await (query as any)
     .eq('id', offerId)
-    .eq('salon_id', salonId) // ownership: the salon comes from the JWT, never the request
+    .eq('salon_id', salonId)
     .is('deleted_at', null)
     .select('id, name, daily_count, active')
     .maybeSingle();

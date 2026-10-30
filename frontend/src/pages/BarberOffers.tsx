@@ -187,7 +187,7 @@ export default function BarberOffers() {
                 {editingId === o.id ? (
                   <div className="mt-3 flex items-end gap-2">
                     <div className="flex-1">
-                      <label htmlFor={`edit-${o.id}`} className="mb-1 block text-sm font-medium">Per day (from tomorrow)</label>
+                      <label htmlFor={`edit-${o.id}`} className="mb-1 block text-sm font-medium">Per day</label>
                       <input id={`edit-${o.id}`} className="field" inputMode="numeric" value={editCount}
                         onChange={(e) => setEditCount(e.target.value.replace(/\D/g, '').slice(0, 2))} />
                     </div>

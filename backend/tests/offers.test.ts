@@ -198,3 +198,42 @@ describe('Expected customers setting', () => {
     expect(data!.offer_id).not.toBeNull(); // with the default 15 this would be only a 1-in-5 chance
   });
 });
+describe('Editing the daily count applies immediately', () => {
+  it("resets today's remaining prizes to the new number minus what was already won", async () => {
+    const salonId = await makeSalon();
+    const cookie = await barberCookieFor(salonId);
+    // expecting 1 customer with 3 prizes: the first scan wins for certain
+    await request(app).patch('/api/barber/offers/expected').set('Cookie', cookie).send({ expectedCustomers: 1 });
+    const { offer } = await addOffer(salonId, 'Head massage', 3);
+
+    const t = await joinQueue(salonId); // wins 1, leaving 2
+    const remaining = async () => {
+      const { data } = await supabase
+        .from('offer_daily_stock').select('remaining').eq('queue_id', t.queueId).eq('offer_id', offer.id).single();
+      return data!.remaining;
+    };
+    expect(await remaining()).toBe(2);
+
+    const edit = (n: number) =>
+      request(app).patch(`/api/barber/offers/${offer.id}`).set('Cookie', cookie).send({ dailyCount: n });
+
+    expect((await edit(10)).status).toBe(200);
+    expect(await remaining()).toBe(9);   // 10 total, 1 already won
+
+    expect((await edit(1)).status).toBe(200);
+    expect(await remaining()).toBe(0);   // never negative, and the prize already won is not taken back
+
+    const { data: won } = await supabase.from('queue_entries').select('offer_id').eq('id', t.ticketId).single();
+    expect(won!.offer_id).toBe(offer.id);
+  });
+
+  it("another salon's barber cannot change the count", async () => {
+    const salonA = await makeSalon();
+    const salonB = await makeSalon();
+    const { offer } = await addOffer(salonA, 'Scrub', 2);
+    const cookieB = await barberCookieFor(salonB);
+    const res = await request(app)
+      .patch(`/api/barber/offers/${offer.id}`).set('Cookie', cookieB).send({ dailyCount: 50 });
+    expect(res.status).toBe(404);
+  });
+});

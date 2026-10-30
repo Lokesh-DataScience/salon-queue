@@ -119,7 +119,7 @@ describe('BarberOffers', () => {
     renderOffers();
 
     await user.click(await screen.findByRole('button', { name: 'Edit' }));
-    const input = screen.getByLabelText(/per day \(from tomorrow\)/i);
+    const input = screen.getByLabelText(/^per day$/i);
     await user.clear(input);
     await user.type(input, '3');
     const list = screen.getByRole('region', { name: 'Your offers' });
