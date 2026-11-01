@@ -3,7 +3,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import { app, makeSalon, cleanupSalons, joinViaApi, barberCookieFor } from './helpers';
 import { joinQueue } from '../src/services/queue.service';
-import { callNext, startEntry } from '../src/services/barber.service';
+import { callNext, startEntry, addWalkIn } from '../src/services/barber.service';
 import { supabase } from '../src/config/supabase';
 
 afterAll(cleanupSalons);
@@ -19,6 +19,23 @@ async function ticket(id: string, token: string) {
   const res = await request(app).get(`/api/queue-tickets/${id}`).set('X-Ticket-Token', token);
   expect(res.status).toBe(200);
   return res.body.ticket;
+}
+
+async function entriesOf(queueId: string) {
+  const { data } = await supabase
+    .from('queue_entries')
+    .select('token_number, is_walk_in, offer_id, prize_code')
+    .eq('queue_id', queueId)
+    .order('token_number');
+  return data!;
+}
+
+async function setup(expected: number, prizes: number) {
+  const salonId = await makeSalon();
+  const cookie = await barberCookieFor(salonId);
+  await request(app).patch('/api/barber/offers/expected').set('Cookie', cookie).send({ expectedCustomers: expected });
+  await addOffer(salonId, 'Head massage', prizes);
+  return salonId;
 }
 
 describe('Offers CRUD and ownership', () => {
@@ -198,3 +215,50 @@ describe('Expected customers setting', () => {
     expect(data!.offer_id).not.toBeNull(); // with the default 15 this would be only a 1-in-5 chance
   });
 });
+
+describe('Reward campaign spec: QR customers only', () => {
+  it('Test A: 5 prizes, 5 expected QR customers, scanned simultaneously: all 5 win once, with distinct codes', async () => {
+    const salonId = await setup(5, 5);
+    const r = await Promise.all(Array.from({ length: 5 }, () => joinQueue(salonId)));
+    const rows = await entriesOf(r[0].queueId);
+    expect(rows.map((e) => e.token_number)).toEqual([1, 2, 3, 4, 5]);
+    expect(rows.every((e) => e.offer_id)).toBe(true);
+    expect(new Set(rows.map((e) => e.prize_code)).size).toBe(5);
+  }, 120_000);
+
+  it('Test B: walk-ins between QR scans never win and never use up the odds; scanner #8 gets the 5th prize', async () => {
+    const salonId = await setup(5, 5);
+    const first = await joinQueue(salonId);   // #1 QR
+    await joinQueue(salonId);                 // #2 QR
+    await addWalkIn(salonId);                 // #3 walk-in
+    await joinQueue(salonId);                 // #4 QR
+    await addWalkIn(salonId);                 // #5 walk-in
+    await joinQueue(salonId);                 // #6 QR
+    await addWalkIn(salonId);                 // #7 walk-in
+    await joinQueue(salonId);                 // #8 QR
+
+    const rows = await entriesOf(first.queueId);
+    expect(rows.map((e) => e.token_number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]); // queue numbering unchanged
+    expect(rows.filter((e) => !e.is_walk_in).map((e) => e.token_number)).toEqual([1, 2, 4, 6, 8]);
+    expect(rows.filter((e) => !e.is_walk_in).every((e) => e.offer_id)).toBe(true);
+    expect(rows.filter((e) => e.is_walk_in).every((e) => !e.offer_id)).toBe(true);
+  }, 120_000);
+
+  it('Test C: 5 prizes, 20 expected QR customers: exactly 5 win, each at most once', async () => {
+    const salonId = await setup(20, 5);
+    const r = await Promise.all(Array.from({ length: 20 }, () => joinQueue(salonId)));
+    const rows = await entriesOf(r[0].queueId);
+    const winners = rows.filter((e) => e.offer_id);
+    expect(winners).toHaveLength(5);
+    expect(new Set(winners.map((e) => e.prize_code)).size).toBe(5);
+  }, 120_000);
+
+  it('after the expected QR count is reached, later scanners are not eligible', async () => {
+    const salonId = await setup(2, 5);
+    const r = await Promise.all(Array.from({ length: 4 }, () => joinQueue(salonId)));
+    const rows = await entriesOf(r[0].queueId);
+    expect(rows.filter((e) => e.offer_id)).toHaveLength(2); // only the first 2 scanners
+    expect(rows[2].offer_id).toBeNull();
+    expect(rows[3].offer_id).toBeNull();
+  }, 120_000);
+}); 

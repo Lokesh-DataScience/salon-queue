@@ -3,13 +3,14 @@ import { Request, Response, NextFunction } from 'express';
 import { salonIdParamSchema } from '../validators/salon.validators';
 import { ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.validators';
 import { joinQueue, getTicketStatus, broadcastQueueUpdate, QueueJoinError, leaveTicket } from '../services/queue.service';
-import { pushSubscriptionBodySchema } from '../validators/queue.validators';
+import { pushSubscriptionBodySchema, joinQueueBodySchema } from '../validators/queue.validators';
 import { savePushSubscription, removePushSubscription } from '../services/queue.service';
 
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
-    const ticket = await joinQueue(salonId);
+    const { clientKey } = joinQueueBodySchema.parse(req.body ?? {});
+    const ticket = await joinQueue(salonId, clientKey);
     await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
     res.status(201).json({ ticket });
   } catch (err) {

@@ -36,7 +36,7 @@ describe('ScanLanding (wall QR)', () => {
 
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
     expect(salons.fetchSalonByCode).toHaveBeenCalledWith('87bcee043619');
-    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1');
+    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', expect.any(String));
     const stored = getTickets('salon-1');
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ ticketId: 't-new', tokenNumber: 9, salonId: 'salon-1' });

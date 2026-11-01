@@ -7,7 +7,9 @@ import { z } from 'zod';
 //   .transform((s) => s.replace(/[\s\-().]/g, '')) // accept "98765 43210", "+91 98765-43210", "(+91) ..."
 //   .pipe(z.string().regex(/^\+?[0-9]{7,15}$/, 'Enter a valid mobile number'));
 
-export const joinQueueBodySchema = z.object({});
+export const joinQueueBodySchema = z.object({
+  clientKey: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/, 'Invalid request key.').optional(),
+});
 export const ticketParamSchema = z.object({
   ticketId: z.string().uuid(),
 });

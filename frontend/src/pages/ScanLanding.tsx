@@ -7,6 +7,7 @@ import { fetchSalonByCode } from '../api/salons';
 import { fetchTicketStatus, joinSalonQueue } from '../api/tickets';
 import { ApiError } from '../api/client';
 import { getTickets, removeTicket, saveTicket } from '../lib/activeTickets';
+import { clearJoinKey, getJoinKey } from '../lib/joinKey';
 import PageShell from '../components/PageShell';
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
@@ -18,14 +19,22 @@ type View =
 const ticketUrl = (ticketId: string, accessToken: string) =>
   `/tickets/${ticketId}?accessToken=${accessToken}`;
 
+// Two tabs (or a reload) scanning the same salon take turns, so the second one finds the first one's ticket.
+async function withSalonLock<T>(salonId: string, fn: () => Promise<T>): Promise<T> {
+  const locks = (navigator as unknown as { locks?: { request: <R>(name: string, cb: () => Promise<R>) => Promise<R> } }).locks;
+  return locks?.request ? locks.request(`join:${salonId}`, fn) : fn();
+}
+
 export default function ScanLanding() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [view, setView] = useState<View>({ kind: 'working' });
   // React StrictMode runs effects twice in development. This makes sure a scan can never take two tokens.
   const started = useRef(false);
+  // A second tap on "Try again" while a request is in flight does nothing.
+  const running = useRef(false);
 
-  const run = useCallback(async () => {
+  const runOnce = useCallback(async () => {
     setView({ kind: 'working' });
     let salonName: string | undefined;
     try {
@@ -33,29 +42,33 @@ export default function ScanLanding() {
       salonName = salon.name;
       setView({ kind: 'working', salonName });
 
-      // Scanning again must never hand out a second token: go back to the ticket this phone already holds.
-      for (const stored of getTickets(salon.id)) {
-        try {
-          const t = await fetchTicketStatus(stored.ticketId, stored.accessToken);
-          if (t && !FINISHED.includes(t.status)) {
-            navigate(ticketUrl(stored.ticketId, stored.accessToken), { replace: true });
-            return;
+      await withSalonLock(salon.id, async () => {
+        // Scanning again must never hand out a second token: go back to the ticket this phone already holds.
+        for (const stored of getTickets(salon.id)) {
+          try {
+            const t = await fetchTicketStatus(stored.ticketId, stored.accessToken);
+            if (t && !FINISHED.includes(t.status)) {
+              navigate(ticketUrl(stored.ticketId, stored.accessToken), { replace: true });
+              return;
+            }
+            removeTicket(stored.ticketId);
+          } catch (err) {
+            if (err instanceof ApiError && err.status === 404) removeTicket(stored.ticketId);
+            // Any other failure (e.g. offline): we can't prove the ticket is dead, so keep it and try the next one.
           }
-          removeTicket(stored.ticketId);
-        } catch (err) {
-          if (err instanceof ApiError && err.status === 404) removeTicket(stored.ticketId);
-          // Any other failure (e.g. offline): we can't prove the ticket is dead, so keep it and try the next one.
         }
-      }
 
-      const ticket = await joinSalonQueue(salon.id);
-      saveTicket({
-        ticketId: ticket.ticketId,
-        accessToken: ticket.accessToken,
-        salonId: ticket.salonId ?? salon.id,
-        tokenNumber: ticket.tokenNumber,
+        // The same key for every attempt of this scan, so the server never creates a second ticket for it.
+        const ticket = await joinSalonQueue(salon.id, getJoinKey(salon.id));
+        saveTicket({
+          ticketId: ticket.ticketId,
+          accessToken: ticket.accessToken,
+          salonId: ticket.salonId ?? salon.id,
+          tokenNumber: ticket.tokenNumber,
+        });
+        clearJoinKey(salon.id);
+        navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
       });
-      navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
     } catch (err) {
       if (!salonName && err instanceof ApiError && err.status === 404) {
         setView({
@@ -78,6 +91,16 @@ export default function ScanLanding() {
       });
     }
   }, [code, navigate]);
+
+  const run = useCallback(async () => {
+    if (running.current) return;
+    running.current = true;
+    try {
+      await runOnce();
+    } finally {
+      running.current = false;
+    }
+  }, [runOnce]);
 
   useEffect(() => {
     if (started.current) return;
