@@ -28,29 +28,45 @@ function PrizeCard({ prize, status }: { prize: { name: string; code: string; red
 
   if (prize.redeemed) {
     return (
-      <section aria-label="Your reward" className="card mt-4 text-center">
-        <p className="text-sm text-gray-600">Reward claimed</p>
-        <p className="text-lg font-semibold">🎁 {prize.name}</p>
+      <section
+        aria-label="Your reward"
+        className="mt-4 rounded-2xl border-2 border-dashed border-ink/50 bg-white p-4 text-center"
+      >
+        <p className="text-sm font-medium text-gray-600">Reward claimed</p>
+        <p className="text-lg font-bold text-ink">🎁 {prize.name}</p>
       </section>
     );
   }
 
   return (
-    <section aria-label="Your reward" className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-center">
+    <section
+      aria-label="Your reward"
+      className="relative mt-4 overflow-hidden rounded-2xl border-2 border-ink bg-brand-soft p-5 text-center shadow-[0_5px_0_0_var(--color-ink)]"
+    >
+      {/* Ticket-style notches */}
+      <span aria-hidden="true" className="absolute -left-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full border-2 border-ink bg-paper" />
+      <span aria-hidden="true" className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full border-2 border-ink bg-paper" />
+
       {!revealed ? (
         <>
-          <p className="text-lg font-semibold text-amber-900">🎁 You have a surprise reward!</p>
-          <button type="button" className="btn-primary mt-3" onClick={() => setRevealed(true)}>
+          <p aria-hidden="true" className="text-5xl leading-none">🎁</p>
+          <p className="mt-2 text-xl font-extrabold text-ink">🎁 You have a surprise reward!</p>
+          <button type="button" className="btn-primary mt-4" onClick={() => setRevealed(true)}>
             Tap to reveal
           </button>
         </>
       ) : (
         <>
-          <p className="text-sm font-medium text-amber-900">You won</p>
-          <p className="text-2xl font-bold text-amber-950">🎉 {prize.name}</p>
-          <p className="mt-3 text-sm text-amber-900">Your code</p>
-          <p className="text-4xl font-extrabold tracking-[0.3em] tabular-nums">{prize.code}</p>
-          <p className="mt-3 text-sm text-amber-900">
+          <p className="text-sm font-bold uppercase tracking-widest text-ink">You won</p>
+          <p className="mt-1 text-2xl font-extrabold text-ink">🎉 {prize.name}</p>
+
+          <div aria-hidden="true" className="mx-auto my-4 border-t-2 border-dashed border-ink/40" />
+
+          <p className="text-sm font-medium text-ink">Your code</p>
+          <p className="mx-auto mt-1 inline-block rounded-xl bg-ink px-5 py-3 text-4xl font-extrabold tracking-[0.3em] tabular-nums text-brand">
+            {prize.code}
+          </p>
+          <p className="mt-4 text-sm text-ink">
             {served
               ? 'Show this code to the barber now.'
               : 'Show this code to the barber once your service starts. It is valid today only.'}
@@ -243,9 +259,10 @@ export default function QueueTracking() {
   return (
     <PageShell title="Your queue ticket">
       {/* Token */}
-      <section aria-label="Your token" className="rounded-3xl bg-gray-900 px-6 py-8 text-center text-white">
-        <p className="text-sm font-medium uppercase tracking-widest text-gray-300">Your token</p>
-        <p className="my-1 text-7xl font-extrabold tabular-nums">#{ticket.tokenNumber}</p>
+      <section aria-label="Your token" className="rounded-3xl border-2 border-ink bg-brand px-6 py-8 text-center text-ink shadow-[0_6px_0_0_var(--color-ink)]">
+        <p className="text-sm font-bold uppercase tracking-widest">Your token</p>
+        <p className="my-1 text-8xl font-extrabold tabular-nums">#{ticket.tokenNumber}</p>
+        <div aria-hidden="true" className="mx-auto mt-4 border-t-2 border-dashed border-ink/40" />
       </section>
 
       {ticket.queueStatus === 'PAUSED' && (
@@ -273,7 +290,7 @@ export default function QueueTracking() {
       <section aria-label="Queue status" className="card mt-4 divide-y divide-gray-200 p-0">
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-sm text-gray-600">Now serving</span>
-          <span className="text-2xl font-bold tabular-nums">#{ticket.currentToken}</span>
+          <span className="rounded-lg bg-brand-soft px-2 text-2xl font-bold tabular-nums">#{ticket.currentToken}</span>
         </div>
         <div className="px-4 py-3">
           <p className="text-lg font-semibold">

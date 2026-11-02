@@ -1,11 +1,34 @@
 @import "tailwindcss";
 
+@theme {
+  /* Brand, taken from the logo */
+  --color-brand: #FFC21A;
+  --color-brand-dark: #E8A900;
+  --color-brand-soft: #FFF4CC;
+  --color-ink: #1B2036;
+  --color-ink-soft: #2B3250;
+  --color-paper: #FFFBEF;
+
+  /* Grays re-tinted to match the logo: warm light end, navy dark end */
+  --color-gray-50: #FAF7EC;
+  --color-gray-100: #F3EFE0;
+  --color-gray-200: #E6E1CE;
+  --color-gray-300: #D2CBB3;
+  --color-gray-400: #8E91A3;
+  --color-gray-500: #6B6E82;
+  --color-gray-600: #50536A;
+  --color-gray-700: #3D4059;
+  --color-gray-800: #2B3250;
+  --color-gray-900: #1B2036;
+}
+
 :root {
   color-scheme: light;
 }
 
 body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+  @apply bg-paper text-ink antialiased;
+  border-top: 6px solid var(--color-brand); /* signature yellow strip */
 }
 
 html {
@@ -14,7 +37,7 @@ html {
 
 /* One consistent, visible keyboard focus indicator everywhere. */
 :focus-visible {
-  outline: 2px solid #111827;
+  outline: 3px solid var(--color-ink);
   outline-offset: 2px;
 }
 
@@ -28,20 +51,21 @@ html {
 
 @layer components {
   .card {
-    @apply rounded-xl border border-gray-200 bg-white p-4;
+    @apply rounded-2xl border border-gray-200 bg-white p-4 shadow-sm;
   }
+  /* Yellow, navy text (never white on yellow), chunky "pressable" look */
   .btn-primary {
-    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-black px-5 py-3 text-base font-medium text-white hover:bg-gray-800 disabled:opacity-50;
+    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl border-2 border-ink bg-brand px-5 py-3 text-base font-bold text-ink shadow-[0_3px_0_0_var(--color-ink)] hover:bg-brand-dark active:translate-y-[2px] active:shadow-none disabled:opacity-50;
   }
   .btn-secondary {
-    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-gray-400 bg-white px-5 py-3 text-base font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50;
+    @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl border-2 border-ink bg-white px-5 py-3 text-base font-semibold text-ink hover:bg-brand-soft disabled:opacity-50;
   }
   .btn-danger {
     @apply inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-red-700 px-5 py-3 text-base font-medium text-white hover:bg-red-800 disabled:opacity-50;
   }
   /* text-base (16px) also stops iOS Safari from zooming in on focus. */
   .field {
-    @apply min-h-12 w-full rounded-lg border border-gray-500 bg-white px-3 py-3 text-base aria-[invalid=true]:border-red-600;
+    @apply min-h-12 w-full rounded-lg border-2 border-gray-500 bg-white px-3 py-3 text-base focus:border-ink aria-[invalid=true]:border-red-600;
   }
   .pill {
     @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium;

@@ -19,6 +19,9 @@ import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 
 const QUEUE_KEY = ['barberQueue'];
 
+const navLink =
+  'inline-flex min-h-11 items-center rounded-lg border-2 border-ink bg-white px-3 text-sm font-semibold text-ink hover:bg-brand-soft';
+
 export default function BarberDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -106,25 +109,25 @@ export default function BarberDashboard() {
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
   const pauseMutation = useMutation({ mutationFn: () => runAction(pauseQueue) });
   const [walkInMsg, setWalkInMsg] = useState<string | null>(null);
-    useEffect(() => {
-      if (!walkInMsg) return;
-      const t = setTimeout(() => setWalkInMsg(null), 6000);
-      return () => clearTimeout(t);
-    }, [walkInMsg]);
-    const walkInMutation = useMutation({
-      mutationFn: addWalkIn,
-      onMutate: () => {
-        setActionError(null);
-        setWalkInMsg(null);
-      },
-      onSuccess: (r) => {
-        setWalkInMsg(`Token #${r.entry.tokenNumber} added to the queue.`);
-        refetch();
-      },
-      onError: (err: any) => {
-        setActionError(err.message);
-        refetch();
-      },
+  useEffect(() => {
+    if (!walkInMsg) return;
+    const t = setTimeout(() => setWalkInMsg(null), 6000);
+    return () => clearTimeout(t);
+  }, [walkInMsg]);
+  const walkInMutation = useMutation({
+    mutationFn: addWalkIn,
+    onMutate: () => {
+      setActionError(null);
+      setWalkInMsg(null);
+    },
+    onSuccess: (r) => {
+      setWalkInMsg(`Token #${r.entry.tokenNumber} added to the queue.`);
+      refetch();
+    },
+    onError: (err: any) => {
+      setActionError(err.message);
+      refetch();
+    },
   });
   async function handleLogout() {
     await logoutBarber().catch(() => {});
@@ -136,7 +139,7 @@ export default function BarberDashboard() {
     return (
       <main className="mx-auto w-full max-w-md p-4 md:max-w-2xl">
         <div className="animate-pulse space-y-4" aria-hidden="true">
-          <div className="h-8 w-40 rounded bg-gray-200" />
+          <div className="h-20 rounded-2xl bg-gray-200" />
           <div className="h-44 rounded-2xl bg-gray-200" />
           <div className="h-20 rounded-2xl bg-gray-200" />
         </div>
@@ -165,16 +168,16 @@ export default function BarberDashboard() {
 
   // What the one button says and does right now.
   let label: string;
-  let color = 'bg-black hover:bg-gray-800';
+  let color = 'bg-brand text-ink hover:bg-brand-dark';
   let disabled = busy;
   if (queue.serving) {
     label = `COMPLETE #${queue.serving.token_number}`;
-    color = 'bg-green-700 hover:bg-green-800';
+    color = 'bg-green-700 text-white hover:bg-green-800';
   } else if (queue.called) {
     label = `START #${queue.called.token_number}`;
   } else if (isPaused) {
     label = 'RESUME QUEUE';
-    color = 'bg-amber-700 hover:bg-amber-800';
+    color = 'bg-amber-700 text-white hover:bg-amber-800';
   } else if (nextWaiting) {
     label = `START NEXT #${nextWaiting.token_number}`;
   } else {
@@ -192,18 +195,21 @@ export default function BarberDashboard() {
         : 'Ready';
 
   const cardTone = queue.serving
-    ? 'border-green-400 bg-green-50'
+    ? 'border-green-600 bg-green-50'
     : queue.called
-      ? 'border-amber-400 bg-amber-50'
-      : 'border-gray-200 bg-white';
+      ? 'border-ink bg-brand-soft'
+      : 'border-gray-300 bg-white';
 
   return (
     <>
       <main className="mx-auto w-full max-w-md p-4 pb-36 md:max-w-2xl">
-        <header className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Salon queue</h1>
-            <p className="text-sm text-gray-600">Current token #{queue.currentToken}</p>
+        <header className="mb-3 flex items-start justify-between gap-3 rounded-2xl bg-ink p-4 text-white">
+          <div className="flex items-center gap-3">
+            <img src="/icon-192.png" alt="" width={44} height={44} className="h-11 w-11 rounded-xl" />
+            <div>
+              <h1 className="text-xl font-semibold">Salon queue</h1>
+              <p className="text-sm text-gray-300">Current token #{queue.currentToken}</p>
+            </div>
           </div>
           <span
             className={`pill shrink-0 ${
@@ -219,22 +225,13 @@ export default function BarberDashboard() {
         </header>
 
         <nav aria-label="Account" className="mb-4 flex gap-2">
-          <Link
-            to="/barber/offers"
-            className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50">
+          <Link to="/barber/offers" className={navLink}>
             Offers
           </Link>
-          <Link
-            to="/barber/qr"
-            className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
-          >
+          <Link to="/barber/qr" className={navLink}>
             Print salon QR
           </Link>
-          <button
-            onClick={handleLogout}
-            className="inline-flex min-h-11 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50"
-            type="button"
-          >
+          <button onClick={handleLogout} className={navLink} type="button">
             Log out
           </button>
         </nav>
@@ -249,23 +246,23 @@ export default function BarberDashboard() {
           aria-label="Current customer"
           className={`mb-4 rounded-2xl border-2 p-6 text-center ${cardTone}`}
         >
-          <p className="text-sm font-medium uppercase tracking-wide text-gray-700">{statusLine}</p>
-          <p className="my-2 text-7xl font-bold tabular-nums">{active ? `#${active.token_number}` : '—'}</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-gray-700">{statusLine}</p>
+          <p className="my-2 text-8xl font-extrabold tabular-nums text-ink">{active ? `#${active.token_number}` : '—'}</p>
           {!active && nextWaiting && !isPaused && (
-            <p className="text-sm text-gray-600">Next up: #{nextWaiting.token_number}</p>
+            <p className="text-sm text-gray-700">Next up: #{nextWaiting.token_number}</p>
           )}
         </section>
 
         {/* Rare actions stay out of the way. Skip is here so a no-show can never block the queue. */}
-        <details className="mb-6 rounded-xl border border-gray-200 bg-white px-3">
-          <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-gray-700">More actions</summary>
+        <details className="mb-6 rounded-xl border-2 border-gray-300 bg-white px-3">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-gray-700">More actions</summary>
           <div className="grid gap-3 pb-3">
             {active && (
               <button
                 type="button"
                 onClick={() => skipMutation.mutate(active.id)}
                 disabled={busy}
-                className="min-h-12 rounded-xl border border-red-300 px-4 text-base font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+                className="min-h-12 rounded-xl border-2 border-red-300 px-4 text-base font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
               >
                 {`Skip #${active.token_number}`}
               </button>
@@ -275,15 +272,16 @@ export default function BarberDashboard() {
                 type="button"
                 onClick={() => pauseMutation.mutate()}
                 disabled={busy}
-                className="min-h-12 rounded-xl border border-gray-500 px-4 text-base font-medium hover:bg-gray-50 disabled:opacity-40"
+                className="min-h-12 rounded-xl border-2 border-ink px-4 text-base font-medium hover:bg-brand-soft disabled:opacity-40"
               >
                 Pause queue
               </button>
             )}
           </div>
         </details>
-        <section aria-label="Redeem a reward" className="mb-6 rounded-xl border border-gray-200 bg-white p-3">
-          <label htmlFor="redeem-code" className="mb-1 block text-sm font-medium text-gray-700">
+
+        <section aria-label="Redeem a reward" className="mb-6 rounded-2xl border-2 border-ink bg-brand-soft p-3">
+          <label htmlFor="redeem-code" className="mb-1 block text-sm font-semibold text-ink">
             Customer showed a reward code?
           </label>
           <div className="flex gap-2">
@@ -307,34 +305,35 @@ export default function BarberDashboard() {
             </button>
           </div>
           {redeemMsg && (
-            <p role="status" className={`mt-2 text-sm ${redeemMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
+            <p role="status" className={`mt-2 text-sm font-medium ${redeemMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
               {redeemMsg.text}
             </p>
           )}
         </section>
+
         <section>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-medium text-gray-700">Waiting ({queue.waiting.length})</h2>
-              <button
-                type="button"
-                onClick={() => walkInMutation.mutate()}
-                disabled={busy || isPaused}
-                aria-busy={walkInMutation.isPending}
-                className="min-h-12 rounded-xl border-2 border-black bg-white px-5 text-lg font-semibold hover:bg-gray-50 disabled:border-gray-300 disabled:text-gray-500"
-              >
-                {walkInMutation.isPending ? 'Adding...' : '+1 Add walk-in'}
-              </button>
-            </div>
-            {isPaused && (
-              <p className="mb-2 text-sm text-gray-600">Resume the queue to add a walk-in.</p>
-            )}
-            {walkInMsg && (
-              <p role="status" className="mb-3 rounded-lg border border-green-300 bg-green-50 p-3 text-base font-medium text-green-900">
-                {walkInMsg}
-              </p>
-            )}
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-gray-700">Waiting ({queue.waiting.length})</h2>
+            <button
+              type="button"
+              onClick={() => walkInMutation.mutate()}
+              disabled={busy || isPaused}
+              aria-busy={walkInMutation.isPending}
+              className="min-h-12 rounded-xl border-2 border-ink bg-white px-5 text-lg font-bold text-ink hover:bg-brand-soft disabled:border-gray-300 disabled:text-gray-500"
+            >
+              {walkInMutation.isPending ? 'Adding...' : '+1 Add walk-in'}
+            </button>
+          </div>
+          {isPaused && (
+            <p className="mb-2 text-sm text-gray-600">Resume the queue to add a walk-in.</p>
+          )}
+          {walkInMsg && (
+            <p role="status" className="mb-3 rounded-lg border border-green-300 bg-green-50 p-3 text-base font-medium text-green-900">
+              {walkInMsg}
+            </p>
+          )}
           {queue.waiting.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-gray-300 p-4 text-center text-gray-600">
+            <p className="rounded-xl border-2 border-dashed border-gray-300 p-4 text-center text-gray-600">
               No one waiting.
             </p>
           ) : (
@@ -342,10 +341,12 @@ export default function BarberDashboard() {
               {queue.waiting.map((entry, i) => (
                 <li
                   key={entry.id}
-                  className="flex flex-col items-center rounded-xl border border-gray-200 bg-white py-3 text-xl font-semibold tabular-nums"
+                  className={`flex flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink ${
+                    i === 0 ? 'border-ink bg-brand' : 'border-gray-200 bg-white'
+                  }`}
                 >
                   #{entry.token_number}
-                  {i === 0 && <span className="text-xs font-medium text-gray-600">Next</span>}
+                  {i === 0 && <span className="text-xs font-semibold text-ink">Next</span>}
                 </li>
               ))}
             </ul>
@@ -354,14 +355,14 @@ export default function BarberDashboard() {
       </main>
 
       {/* The one big button sits at the bottom of the screen, within thumb reach. */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t-2 border-ink bg-paper/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto max-w-md md:max-w-2xl">
           <button
             type="button"
             onClick={() => primaryMutation.mutate()}
             disabled={disabled}
             aria-busy={primaryMutation.isPending}
-            className={`${color} min-h-20 w-full rounded-2xl py-5 text-xl font-semibold text-white disabled:bg-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-200`}
+            className={`${color} min-h-20 w-full rounded-2xl border-2 border-ink py-5 text-xl font-bold shadow-[0_4px_0_0_var(--color-ink)] active:translate-y-[2px] active:shadow-none disabled:border-gray-300 disabled:bg-gray-200 disabled:text-gray-600 disabled:shadow-none disabled:hover:bg-gray-200`}
           >
             {label}
           </button>

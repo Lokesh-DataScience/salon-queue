@@ -6,6 +6,39 @@ import { QRCodeSVG } from 'qrcode.react';
 import { fetchBarberSalon } from '../api/barber';
 import PageShell from '../components/PageShell';
 
+// Repeating comb + scissors pattern drawn in the logo's navy. Transparent, so the yellow shows through.
+const scissors = (x: number, y: number, rot: number) => `
+  <g transform="translate(${x} ${y}) rotate(${rot})" fill="none" stroke="#1B2036" stroke-width="4.5" stroke-linecap="round">
+    <circle cx="-12" cy="17" r="8"/><circle cx="12" cy="17" r="8"/>
+    <line x1="-7" y1="8" x2="9" y2="-27"/><line x1="7" y1="8" x2="-9" y2="-27"/>
+    <circle cx="0" cy="-7" r="2.5" fill="#1B2036" stroke="none"/>
+  </g>`;
+
+const comb = (x: number, y: number, rot: number) => `
+  <g transform="translate(${x} ${y}) rotate(${rot})" fill="#1B2036">
+    <rect x="-26" y="-12" width="52" height="18" rx="5"/>
+    ${[-23, -16, -9, -2, 5, 12, 19]
+      .map((tx) => `<rect x="${tx}" y="4" width="4" height="14" rx="2"/>`)
+      .join('')}
+  </g>`;
+
+const PATTERN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <g opacity="0.85">
+    ${scissors(45, 45, -30)}
+    ${comb(135, 45, 35)}
+    ${comb(45, 135, -45)}
+    ${scissors(135, 135, 25)}
+  </g>
+</svg>`;
+
+const PATTERN_URL = `url("data:image/svg+xml,${encodeURIComponent(PATTERN_SVG)}")`;
+
+// Makes browsers print the yellow and the pattern instead of dropping backgrounds.
+const keepColors = {
+  WebkitPrintColorAdjust: 'exact',
+  printColorAdjust: 'exact',
+} as React.CSSProperties;
+
 export default function BarberQr() {
   const welcome = (useLocation().state as { welcome?: boolean } | null)?.welcome;
   const { data: salon, isLoading, error } = useQuery({
@@ -32,6 +65,9 @@ export default function BarberQr() {
 
   return (
     <PageShell title="Salon QR code">
+      {/* No browser margins/headers when printing, so the poster can fill the whole page. */}
+      <style>{`@page { margin: 0; }`}</style>
+
       <div className="mb-4 flex items-center justify-between print:hidden">
         <Link to="/barber/dashboard" className="inline-block min-h-11 py-2 text-sm text-gray-600 underline">
           ← Back to dashboard
@@ -46,29 +82,37 @@ export default function BarberQr() {
 
       <section
         aria-label="Printable salon QR poster"
-        className="rounded-2xl border border-gray-300 bg-white p-6 text-center print:rounded-none print:border-0 print:p-0"
+        style={{ ...keepColors, backgroundImage: PATTERN_URL, backgroundSize: '180px 180px' }}
+        className="rounded-3xl border-2 border-ink bg-brand px-5 py-14 print:fixed print:inset-0 print:z-50 print:flex print:items-center print:justify-center print:rounded-none print:border-0 print:p-0"
       >
-        <h1 className="text-2xl font-bold print:text-4xl">{salon.name}</h1>
-        <p className="mt-2 text-lg font-medium print:text-2xl">Scan to get your queue token</p>
-        <p className="text-base text-gray-700 print:text-xl">QR स्कैन करें, अपना टोकन नंबर पाएं</p>
+        <div className="rounded-3xl bg-white p-6 text-center shadow-lg print:w-[78%] print:max-w-2xl print:p-10">
+          <div className="mx-auto w-full max-w-xs print:max-w-md">
+            <QRCodeSVG
+              value={url}
+              size={512}
+              level="H"
+              marginSize={1}
+              fgColor="#1B2036"
+              bgColor="#FFFFFF"
+              imageSettings={{ src: '/icon-192.png', height: 100, width: 100, excavate: true }}
+              title={`QR code for ${salon.name}`}
+              className="h-auto w-full"
+            />
+          </div>
 
-        <div className="mx-auto mt-5 w-full max-w-xs print:max-w-md">
-          <QRCodeSVG
-            value={url}
-            size={512}
-            level="M"
-            marginSize={2}
-            title={`QR code for ${salon.name}`}
-            className="h-auto w-full"
-          />
+          <h1 className="mt-4 text-3xl font-extrabold uppercase tracking-tight text-ink print:text-5xl">
+            {salon.name}
+          </h1>
+          <p className="mt-2 text-lg font-semibold text-ink print:text-3xl">Scan to get your queue token</p>
+          <p className="text-base text-gray-700 print:text-2xl">QR स्कैन करें, अपना टोकन नंबर पाएं</p>
+
+          <ol className="mx-auto mt-4 max-w-xs space-y-1 text-left text-sm text-gray-700 print:max-w-md print:text-xl">
+            <li>1. Open your phone camera and scan</li>
+            <li>2. Get your token number instantly</li>
+            <li>3. Follow your turn on your phone</li>
+          </ol>
+          <p className="mt-3 text-xs text-gray-600 print:text-lg">No app. No sign-up.</p>
         </div>
-
-        <ol className="mx-auto mt-5 max-w-xs space-y-1 text-left text-sm text-gray-700 print:max-w-md print:text-lg">
-          <li>1. Open your phone camera and scan</li>
-          <li>2. Get your token number instantly</li>
-          <li>3. Follow your turn on your phone</li>
-        </ol>
-        <p className="mt-3 text-xs text-gray-600 print:text-sm">No app. No sign-up.</p>
       </section>
 
       <div className="mt-4 space-y-3 print:hidden">
