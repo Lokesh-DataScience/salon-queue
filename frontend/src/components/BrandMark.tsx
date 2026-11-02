@@ -1,3 +1,4 @@
+// frontend/src/components/BrandMark.tsx
 export default function BrandMark() {
   return (
     <div className="mb-6 flex items-center gap-3">

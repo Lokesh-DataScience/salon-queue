@@ -15,6 +15,8 @@ import BarberQr from './pages/BarberQr';
 import BarberRegister from './pages/BarberRegister';
 import BarberOffers from './pages/BarberOffers';
 import { CUSTOMER_DISCOVERY } from './lib/features';
+import BarberSettings from './pages/BarberSettings';
+import BarberLayout from './components/BarberLayout';
 
 function NotFound() {
   return (
@@ -48,9 +50,12 @@ function App() {
       <Route path="/tickets/:ticketId" element={<QueueTracking />} />
       <Route path="/barber/login" element={<BarberLogin />} />
       <Route path="/barber/register" element={<BarberRegister />} />
-      <Route path="/barber/dashboard" element={<BarberDashboard />} />
-      <Route path="/barber/qr" element={<BarberQr />} />
-      <Route path="/barber/offers" element={<BarberOffers />} />
+      <Route element={<BarberLayout />}>
+        <Route path="/barber/dashboard" element={<BarberDashboard />} />
+        <Route path="/barber/settings" element={<BarberSettings />} />
+        <Route path="/barber/qr" element={<BarberQr />} />
+        <Route path="/barber/offers" element={<BarberOffers />} />
+      </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

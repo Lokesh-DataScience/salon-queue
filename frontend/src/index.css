@@ -24,6 +24,7 @@
 
 :root {
   color-scheme: light;
+  --barber-nav-h: 4rem; /* keep equal to the nav's inner height in BarberLayout */
 }
 
 body {
@@ -69,6 +70,16 @@ html {
   }
   .pill {
     @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium;
+  }
+  .barber-nav {
+    @apply fixed inset-x-0 bottom-0 z-20 border-t-2 border-ink bg-white;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .barber-nav-spacer {
+    padding-bottom: calc(var(--barber-nav-h) + env(safe-area-inset-bottom, 0px));
+  }
+  .above-barber-nav {
+    bottom: calc(var(--barber-nav-h) + env(safe-area-inset-bottom, 0px));
   }
 }
 

@@ -355,7 +355,7 @@ export default function BarberDashboard() {
       </main>
 
       {/* The one big button sits at the bottom of the screen, within thumb reach. */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t-2 border-ink bg-paper/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="above-barber-nav fixed inset-x-0 z-10 border-t-2 border-ink bg-paper/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto max-w-md md:max-w-2xl">
           <button
             type="button"
