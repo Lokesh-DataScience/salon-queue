@@ -7,7 +7,7 @@ import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 import type { JwtPayload, RefreshPayload, StaffRole } from '../types/auth.types';
 import type { RegisterSalonBody } from '../validators/auth.validators';
-
+import { assignPlaceToSalon } from './place.service';
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 interface SalonStaffRow {
@@ -137,6 +137,13 @@ export async function registerSalon(input: RegisterSalonBody) {
   }
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error('register_salon returned no row');
+    if (input.district || input.state) {
+    try {
+      await assignPlaceToSalon(row.o_salon_id, { district: input.district, state: input.state });
+    } catch {
+      console.error('[auth] could not assign a place to the new salon');
+    }
+  }
 
   return {
     tokens: signTokens({ staffId: row.o_staff_id, salonId: row.o_salon_id, role: 'OWNER' }),

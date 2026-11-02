@@ -28,6 +28,9 @@ export const registerSalonBodySchema = z
     openingTime: hhmm.default('09:00'),
     closingTime: hhmm.default('21:00'),
     averageServiceMinutes: z.number().int().min(1).max(240).default(15),
+    // area: z.string().trim().max(80).optional().transform((v) => v || undefined),
+    district: z.string().trim().max(80).optional().transform((v) => v || undefined),
+    state: z.string().trim().max(80).optional().transform((v) => v || undefined),
   })
   .refine((v) => v.openingTime < v.closingTime, {
     path: ['closingTime'],

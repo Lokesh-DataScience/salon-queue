@@ -14,6 +14,8 @@ import barberAuthRouter from './routes/auth.routes';
 import barberRouter from './routes/barber.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { createRateLimiters } from './middleware/rateLimit';
+import { feedRouter, geoRouter } from './routes/feed.routes';
+import { createNewsLimiters } from './middleware/newsRateLimit';
 
 export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {}) {
   const useLimits = opts.rateLimits ?? env.NODE_ENV !== 'test';
@@ -63,6 +65,9 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.use('/api/queue-tickets', limits.ticket);
     app.post('/api/auth/barber/login', limits.login);
     app.post('/api/auth/barber/register', limits.register);
+    const news = createNewsLimiters();
+    app.get('/api/salons/:salonId/feed', news.feed);
+    app.get('/api/geo/reverse', news.geo);
   }
 
   app.use(express.json({ limit: '10kb' })); // every body here is tiny
@@ -73,6 +78,9 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     const enabled = env.NOTIFICATION_PROVIDER === 'webpush' && !!env.VAPID_PUBLIC_KEY;
     res.json({ enabled, publicKey: enabled ? env.VAPID_PUBLIC_KEY : null });
   });
+  app.use('/api/salons', feedRouter);
+  app.use('/api/salons', salonRouter);
+  app.use('/api/geo', geoRouter);
   app.use('/api/salons', salonRouter);
   app.use('/api/queues', queueRouter);
   app.use('/api/queue-tickets', queueTicketRouter);

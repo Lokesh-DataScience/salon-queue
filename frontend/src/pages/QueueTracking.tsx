@@ -9,6 +9,7 @@ import { saveTicket, removeTicket } from '../lib/activeTickets';
 import NotifyMe from '../components/NotifyMe';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_DISCOVERY } from '../lib/features';
+import LocalNews from '../components/LocalNews';
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -333,6 +334,7 @@ export default function QueueTracking() {
           {leaveError && <p className="mt-3 text-sm text-red-700" role="alert">{leaveError}</p>}
         </div>
       )}
+      {ticket.status === 'WAITING' && <LocalNews salonId={ticket.salonId} />}
     </PageShell>
   );
 }

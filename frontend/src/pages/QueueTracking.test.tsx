@@ -8,6 +8,7 @@ import { socket, fireSocket, resetSocket } from '../test/fakeSocket';
 import { saveTicket, getTickets } from '../lib/activeTickets';
 import * as tickets from '../api/tickets';
 import * as push from '../lib/push';
+import * as feed from '../api/feed';
 
 vi.mock('../lib/socket', () => import('../test/fakeSocket'));
 vi.mock('../api/tickets', () => ({
@@ -20,6 +21,7 @@ vi.mock('../lib/push', () => ({
   disablePush: vi.fn(),
   pushSupport: vi.fn(),
 }));
+vi.mock('../api/feed', () => ({ fetchSalonFeed: vi.fn(), reverseGeocode: vi.fn() }));
 
 const TOKEN = 'a'.repeat(40);
 const base = {
@@ -43,6 +45,7 @@ beforeEach(() => {
   vi.mocked(tickets.leaveTicket).mockReset();
   vi.mocked(push.fetchPushConfig).mockReset().mockResolvedValue({ enabled: false, publicKey: null });
   vi.mocked(push.pushSupport).mockReset().mockReturnValue('ok');
+  vi.mocked(feed.fetchSalonFeed).mockReset().mockResolvedValue([]);
 });
 
 describe('QueueTracking: waiting', () => {
@@ -167,5 +170,38 @@ describe('QueueTracking: leaving', () => {
     renderTracking();
     await screen.findByText("It's your turn");
     expect(screen.queryByRole('button', { name: 'Leave queue' })).not.toBeInTheDocument();
+  });
+});
+describe('QueueTracking: local news', () => {
+  const item = {
+    kind: 'news' as const, scope: 'district' as const, title: 'कोरबा में बिजली कटौती',
+    url: 'https://example.test/a', source: 'Example', publishedAt: null,
+  };
+
+  it('shows headlines as plain links that open the publisher in a new tab', async () => {
+    given();
+    vi.mocked(feed.fetchSalonFeed).mockResolvedValue([item]);
+    renderTracking();
+
+    const link = await screen.findByRole('link', { name: /कोरबा में बिजली कटौती/ });
+    expect(link).toHaveAttribute('href', 'https://example.test/a');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(feed.fetchSalonFeed).toHaveBeenCalledWith('salon-1');
+  });
+
+  it('renders nothing when the feed fails or is empty', async () => {
+    given();
+    vi.mocked(feed.fetchSalonFeed).mockRejectedValue(new Error('down'));
+    renderTracking();
+    await screen.findByText('#7');
+    expect(screen.queryByText('While you wait')).not.toBeInTheDocument();
+  });
+
+  it('is not shown once the ticket is finished', async () => {
+    given({ status: 'COMPLETED' });
+    renderTracking();
+    await screen.findByText('Your service is complete. Thank you!');
+    expect(feed.fetchSalonFeed).not.toHaveBeenCalled();
   });
 });

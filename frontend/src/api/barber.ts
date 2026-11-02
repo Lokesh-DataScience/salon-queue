@@ -46,6 +46,9 @@ export interface RegisterSalonInput {
   salonName: string;
   phone: string;
   address: string;
+  area?: string;
+  district?: string;
+  state?: string;
   latitude: number;
   longitude: number;
   ownerName: string;

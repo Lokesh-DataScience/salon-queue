@@ -26,6 +26,16 @@ const envSchema = z.object({
   VAPID_SUBJECT: z.string().default('mailto:admin@example.com'),
     // true on the host: this server also serves the built frontend (one address, one origin)
   SERVE_FRONTEND: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+
+  NEWS_REFRESH_HOUR_IST: z.coerce.number().int().min(0).max(23).default(6),
+  NEWS_ITEMS_PER_PLACE: z.coerce.number().int().min(1).max(20).default(8),
+  NEWS_WINDOW_DAYS: z.coerce.number().int().min(1).max(30).default(3),
+  // Google News needs an edition. These two are the only language-related settings.
+  NEWS_GOOGLE_HL: z.string().default('hi'),
+  NEWS_GOOGLE_CEID: z.string().default('IN:hi'),
+  OUTBOUND_USER_AGENT: z.string().default('SalonVirtualQueue/1.0 (+https://salonqueue.onrender.com)'),
+  // optional: leave empty to get OpenStreetMap's local-language place names
+  GEOCODE_ACCEPT_LANGUAGE: z.string().default('en'),
 });
 
 const parsed = envSchema.safeParse(process.env);

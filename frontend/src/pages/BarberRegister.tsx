@@ -1,27 +1,60 @@
 // frontend/src/pages/BarberRegister.tsx
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerSalon } from '../api/barber';
+import { reverseGeocode } from '../api/feed';
 import { ApiError } from '../api/client';
 import PageShell from '../components/PageShell';
 import BrandMark from '../components/BrandMark';
 
 type FieldErrors = Record<string, string[] | undefined>;
+const AREA_FIELDS = ['district', 'state'] as const;
 
 export default function BarberRegister() {
   const navigate = useNavigate();
   const [f, setF] = useState({
     salonName: '', phone: '', address: '', latitude: '', longitude: '',
+    district: '', state: '',
     ownerName: '', email: '', password: '',
     openingTime: '09:00', closingTime: '21:00', averageServiceMinutes: '15',
   });
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [areaNote, setAreaNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  // Fields the owner typed in themselves: a later lookup must never overwrite these.
+  const edited = useRef(new Set<string>());
 
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    edited.current.add(k);
     setF((p) => ({ ...p, [k]: e.target.value }));
+  };
+
+  const coordsValid =
+    f.latitude.trim() !== '' && f.longitude.trim() !== '' &&
+    Number.isFinite(Number(f.latitude)) && Number.isFinite(Number(f.longitude));
+
+  async function lookupArea(lat: number, lng: number) {
+    setLookingUp(true);
+    setAreaNote(null);
+    try {
+      const place = await reverseGeocode(lat, lng);
+      setF((p) => {
+        const next = { ...p };
+        for (const k of AREA_FIELDS) {
+          if (!edited.current.has(k) && place[k]) next[k] = place[k] as string;
+        }
+        return next;
+      });
+      if (!place.district && !place.state) setAreaNote("We couldn't find your district automatically. Please type it in.");
+    } catch {
+      setAreaNote("We couldn't find your district automatically. Please type it in.");
+    } finally {
+      setLookingUp(false);
+    }
+  }
 
   function useMyLocation() {
     if (!navigator.geolocation) return setError('This browser cannot share your location. Enter it below.');
@@ -29,12 +62,11 @@ export default function BarberRegister() {
     setError(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setF((p) => ({
-          ...p,
-          latitude: pos.coords.latitude.toFixed(6),
-          longitude: pos.coords.longitude.toFixed(6),
-        }));
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setF((p) => ({ ...p, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
         setLocating(false);
+        void lookupArea(lat, lng);
       },
       () => {
         setLocating(false);
@@ -50,12 +82,16 @@ export default function BarberRegister() {
     setError(null);
     setFieldErrors({});
     try {
+      const district = f.district.trim();
+      const state = f.state.trim();
       await registerSalon({
         salonName: f.salonName,
         phone: f.phone,
         address: f.address,
         latitude: Number(f.latitude),
         longitude: Number(f.longitude),
+        ...(district && { district }),
+        ...(state && { state }),
         ownerName: f.ownerName,
         email: f.email,
         password: f.password,
@@ -122,6 +158,27 @@ export default function BarberRegister() {
             <p className="text-xs text-gray-600">Best done while you are at the salon.</p>
             {input('latitude', 'Latitude', { inputMode: 'decimal' })}
             {input('longitude', 'Longitude', { inputMode: 'decimal' })}
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded-lg border border-gray-300 p-3">
+            <legend className="px-1 text-sm font-medium">Your district</legend>
+            <p role="status" className="text-xs text-gray-600">
+              {lookingUp
+                ? 'Finding your district...'
+                : 'Filled in from your location. Leave it as it is unless it is wrong.'}
+            </p>
+            {coordsValid && !lookingUp && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => void lookupArea(Number(f.latitude), Number(f.longitude))}
+              >
+                Fill from location
+              </button>
+            )}
+            {areaNote && <p role="status" className="text-sm text-amber-900">{areaNote}</p>}
+            {input('district', 'District', { required: false, autoComplete: 'off' })}
+            {input('state', 'State', { required: false, autoComplete: 'off' })}
           </fieldset>
 
           <div className="grid grid-cols-2 gap-3">

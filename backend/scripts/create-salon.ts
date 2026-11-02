@@ -96,4 +96,4 @@ async function main() {
   console.log(`  password: ${password}${p.password ? '' : '   <-- shown once, share it securely'}\n`);
 }
 
-void main();
+void main();
