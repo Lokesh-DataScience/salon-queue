@@ -10,6 +10,7 @@ import type { BarberSalonProfile } from '../api/barber';
 vi.mock('../api/barber', () => ({
   fetchBarberSalonProfile: vi.fn(),
   updateBarberSalonProfile: vi.fn(),
+  logoutBarber: vi.fn(),
 }));
 
 const salon: BarberSalonProfile = {
@@ -28,6 +29,7 @@ const renderSettings = () => renderPage(<BarberSettings />, { path: '/barber/set
 beforeEach(() => {
   vi.mocked(barber.fetchBarberSalonProfile).mockReset().mockResolvedValue(salon);
   vi.mocked(barber.updateBarberSalonProfile).mockReset();
+  vi.mocked(barber.logoutBarber).mockReset();
 });
 
 describe('BarberSettings profile form', () => {
@@ -78,5 +80,19 @@ describe('BarberSettings profile form', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Closing time must be after opening time');
     expect(barber.updateBarberSalonProfile).not.toHaveBeenCalled();
+  });
+  it('logs out from Settings and leaves for the login page', async () => {
+    vi.mocked(barber.logoutBarber).mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    renderSettings();
+
+    await user.click(await screen.findByRole('button', { name: 'Log out' }));
+    expect(barber.logoutBarber).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
+  });
+  it('links to the QR poster and the Offers page', async () => {
+    renderSettings();
+    expect(await screen.findByRole('link', { name: /salon qr code/i })).toHaveAttribute('href', '/barber/qr');
+    expect(screen.getByRole('link', { name: /offers/i })).toHaveAttribute('href', '/barber/offers');
   });
 });

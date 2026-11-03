@@ -106,7 +106,7 @@ export default function BarberOffers() {
   return (
     <main className="mx-auto w-full max-w-md p-4 pb-12 md:max-w-2xl">
       <header className="mb-4">
-        <Link to="/barber/dashboard" className="text-sm font-medium text-gray-700 underline">← Back to queue</Link>
+        <Link to="/barber/settings" className="inline-block min-h-11 py-2 text-sm font-medium text-gray-700 underline">← Back to settings</Link>
         <h1 className="mt-2 text-xl font-semibold">Customer offers</h1>
         <p className="text-sm text-gray-600">
           Customers who scan your QR may win a surprise reward. You pick the offers and how many

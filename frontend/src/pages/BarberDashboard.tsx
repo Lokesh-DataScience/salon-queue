@@ -1,7 +1,7 @@
 // frontend/src/pages/BarberDashboard.tsx
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchBarberQueue,
   callNextCustomer,
@@ -10,7 +10,6 @@ import {
   skipEntry,
   pauseQueue,
   resumeQueue,
-  logoutBarber,
   addWalkIn,
 } from '../api/barber';
 import { redeemCode } from '../api/offers';
@@ -18,9 +17,6 @@ import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 
 const QUEUE_KEY = ['barberQueue'];
-
-const navLink =
-  'inline-flex min-h-11 items-center rounded-lg border-2 border-ink bg-white px-3 text-sm font-semibold text-ink hover:bg-brand-soft';
 
 export default function BarberDashboard() {
   const navigate = useNavigate();
@@ -129,11 +125,6 @@ export default function BarberDashboard() {
       refetch();
     },
   });
-  async function handleLogout() {
-    await logoutBarber().catch(() => {});
-    queryClient.clear();
-    navigate('/barber/login');
-  }
 
   if (isLoading) {
     return (
@@ -223,18 +214,6 @@ export default function BarberDashboard() {
             {isPaused ? 'Queue paused' : 'Queue active'}
           </span>
         </header>
-
-        <nav aria-label="Account" className="mb-4 flex gap-2">
-          <Link to="/barber/offers" className={navLink}>
-            Offers
-          </Link>
-          <Link to="/barber/qr" className={navLink}>
-            Print salon QR
-          </Link>
-          <button onClick={handleLogout} className={navLink} type="button">
-            Log out
-          </button>
-        </nav>
 
         {actionError && (
           <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">

@@ -1,11 +1,12 @@
 // frontend/src/pages/BarberSettings.tsx
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   fetchBarberSalonProfile,
   updateBarberSalonProfile,
+  logoutBarber,
   type BarberSalonProfile,
   type SalonProfileUpdate,
 } from '../api/barber';
@@ -120,7 +121,24 @@ function ProfileForm({ salon }: { salon: BarberSalonProfile }) {
     </form>
   );
 }
+function LogoutButton() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
 
+  async function handleLogout() {
+    setBusy(true);
+    await logoutBarber().catch(() => {});
+    navigate('/barber/login', { replace: true });
+    queryClient.clear();
+  }
+
+  return (
+    <button type="button" className="btn-secondary" onClick={handleLogout} disabled={busy} aria-busy={busy}>
+      {busy ? 'Logging out...' : 'Log out'}
+    </button>
+  );
+}
 export default function BarberSettings() {
   const { data: salon, isLoading, error, refetch } = useQuery({
     queryKey: PROFILE_KEY,
@@ -161,6 +179,10 @@ export default function BarberSettings() {
             </li>
           ))}
         </ul>
+      </section>
+            <section aria-labelledby="account-heading" className="mt-6">
+        <h2 id="account-heading" className="mb-2 text-sm font-semibold text-gray-700">Account</h2>
+        <LogoutButton />
       </section>
     </PageShell>
   );

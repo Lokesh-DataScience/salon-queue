@@ -69,8 +69,8 @@ export default function BarberQr() {
       <style>{`@page { margin: 0; }`}</style>
 
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <Link to="/barber/dashboard" className="inline-block min-h-11 py-2 text-sm text-gray-600 underline">
-          ← Back to dashboard
+        <Link to="/barber/settings" className="inline-block min-h-11 py-2 text-sm text-gray-600 underline">
+          ← Back to settings
         </Link>
       </div>
       {welcome && (

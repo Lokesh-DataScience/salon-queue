@@ -19,7 +19,6 @@ vi.mock('../api/barber', () => ({
   skipEntry: vi.fn(),
   pauseQueue: vi.fn(),
   resumeQueue: vi.fn(),
-  logoutBarber: vi.fn(),
 }));
 
 const entry = (
@@ -158,15 +157,14 @@ describe('BarberDashboard (one-button)', () => {
     expect(screen.queryByText('Waiting (2)')).not.toBeInTheDocument();
   });
 
-  it('logs out and leaves the dashboard', async () => {
+  it('keeps account links off the dashboard (they live in Settings)', async () => {
     given();
-    vi.mocked(barber.logoutBarber).mockResolvedValue({ ok: true });
-    const user = userEvent.setup();
     renderDashboard();
+    await screen.findByText('Waiting (2)');
 
-    await user.click(await screen.findByRole('button', { name: 'Log out' }));
-    expect(barber.logoutBarber).toHaveBeenCalled();
-    expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Offers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Print salon QR' })).not.toBeInTheDocument();
   });
   it('+1 adds a walk-in and confirms the token number', async () => {
     given();

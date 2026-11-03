@@ -76,8 +76,4 @@ describe('BarberDashboard: redeem a reward code', () => {
     expect(await screen.findByText('This prize was already redeemed.')).toBeInTheDocument();
   });
 
-  it('links to the Offers page', async () => {
-    renderDashboard();
-    expect(await screen.findByRole('link', { name: 'Offers' })).toHaveAttribute('href', '/barber/offers');
-  });
 });
