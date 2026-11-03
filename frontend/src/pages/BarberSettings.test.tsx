@@ -11,6 +11,9 @@ vi.mock('../api/barber', () => ({
   fetchBarberSalonProfile: vi.fn(),
   updateBarberSalonProfile: vi.fn(),
   logoutBarber: vi.fn(),
+  fetchBarberServices: vi.fn(),
+  addBarberService: vi.fn(),
+  removeBarberService: vi.fn(),
 }));
 
 const salon: BarberSalonProfile = {
@@ -30,6 +33,10 @@ beforeEach(() => {
   vi.mocked(barber.fetchBarberSalonProfile).mockReset().mockResolvedValue(salon);
   vi.mocked(barber.updateBarberSalonProfile).mockReset();
   vi.mocked(barber.logoutBarber).mockReset();
+  vi.mocked(barber.fetchBarberServices).mockReset().mockResolvedValue([
+  { id: 's1', name: 'hair cutting' },
+  { id: 's2', name: 'beard trimming' },
+  ]);
 });
 
 describe('BarberSettings profile form', () => {

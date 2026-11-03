@@ -14,6 +14,7 @@ import {
 import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
 import { postChangePassword } from '../controllers/auth.controller';
+import { getServices, postService, deleteService } from '../controllers/salonServices.controller';
 
 const router = Router();
 
@@ -35,5 +36,8 @@ router.post('/offers/redeem', postRedeem);
 router.patch('/offers/expected', patchExpected);
 router.patch('/offers/:offerId', patchOffer);
 router.delete('/offers/:offerId', removeOffer);
+router.get('/services', getServices);
+router.post('/services', postService);
+router.delete('/services/:serviceId', deleteService);
 
 export default router;

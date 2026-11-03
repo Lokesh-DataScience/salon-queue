@@ -11,6 +11,7 @@ import {
   type SalonProfileUpdate,
 } from '../api/barber';
 import ChangePasswordForm from '../components/ChangePasswordForm';
+import ServicesSection from '../components/ServicesSection';
 
 const PROFILE_KEY = ['barberSalonProfile'];
 
@@ -164,7 +165,10 @@ export default function BarberSettings() {
           <ProfileForm salon={salon} />
         )}
       </section>
-
+      <section aria-labelledby="services-heading" className="mb-6">
+        <h2 id="services-heading" className="mb-2 text-sm font-semibold text-gray-700">Services</h2>
+        <ServicesSection />
+      </section>
       <section aria-labelledby="more-heading">
         <h2 id="more-heading" className="mb-2 text-sm font-semibold text-gray-700">More</h2>
         <ul className="grid gap-3">

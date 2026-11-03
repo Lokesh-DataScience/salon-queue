@@ -149,3 +149,23 @@ export function changePassword(currentPassword: string, newPassword: string) {
     body: JSON.stringify({ currentPassword, newPassword }),
   });
 }
+
+export interface BarberService {
+  id: string;
+  name: string;
+}
+
+export function fetchBarberServices() {
+  return apiFetch<{ services: BarberService[] }>('/api/barber/services').then((r) => r.services);
+}
+
+export function addBarberService(name: string) {
+  return apiFetch<{ service: BarberService }>('/api/barber/services', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }).then((r) => r.service);
+}
+
+export function removeBarberService(serviceId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/barber/services/${serviceId}`, { method: 'DELETE' });
+}
