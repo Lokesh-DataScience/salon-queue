@@ -59,6 +59,29 @@ export interface RegisterSalonInput {
   averageServiceMinutes: number;
 }
 
+export interface BarberSalonProfile extends BarberSalon {
+  phone: string;
+  address: string;
+  openingTime: string;
+  closingTime: string;
+  averageServiceMinutes: number;
+}
+
+export type SalonProfileUpdate = Partial<
+  Pick<BarberSalonProfile, 'name' | 'phone' | 'address' | 'openingTime' | 'closingTime' | 'averageServiceMinutes'>
+>;
+
+export function fetchBarberSalonProfile() {
+  return apiFetch<{ salon: BarberSalonProfile }>('/api/barber/salon').then((r) => r.salon);
+}
+
+export function updateBarberSalonProfile(changes: SalonProfileUpdate) {
+  return apiFetch<{ salon: BarberSalonProfile }>('/api/barber/salon', {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  }).then((r) => r.salon);
+}
+
 export function loginBarber(email: string, password: string) {
   return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/login', {
     method: 'POST',
