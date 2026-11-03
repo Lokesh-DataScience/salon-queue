@@ -5,18 +5,31 @@ import { ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.
 import { joinQueue, getTicketStatus, broadcastQueueUpdate, QueueJoinError, leaveTicket } from '../services/queue.service';
 import { pushSubscriptionBodySchema, joinQueueBodySchema } from '../validators/queue.validators';
 import { savePushSubscription, removePushSubscription } from '../services/queue.service';
+import { listSalonServices } from '../services/salonServices.service';
 
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
-    const { clientKey } = joinQueueBodySchema.parse(req.body ?? {});
-    const ticket = await joinQueue(salonId, clientKey);
+    const { clientKey, serviceIds } = joinQueueBodySchema.parse(req.body ?? {});
+    const ticket = await joinQueue(salonId, clientKey, serviceIds);
     await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
     res.status(201).json({ ticket });
   } catch (err) {
     if (err instanceof QueueJoinError) {
       return res.status(409).json({ message: err.message });
     }
+    next(err);
+  }
+}
+
+// Public: the service names a customer can choose from. Ids and names only.
+export async function getPublicServices(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { salonId } = salonIdParamSchema.parse(req.params);
+    const services = await listSalonServices(salonId);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ services });
+  } catch (err) {
     next(err);
   }
 }

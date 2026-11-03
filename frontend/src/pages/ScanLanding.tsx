@@ -1,20 +1,25 @@
 // frontend/src/pages/ScanLanding.tsx
-// Where a salon's wall QR lands (/q/:code). One scan = one ticket, no taps:
-// resolve the salon, resume this phone's active ticket if it has one, otherwise take a token and open it.
+// Where a salon's wall QR lands (/q/:code). One scan = one ticket:
+// resolve the salon, resume this phone's active ticket if it has one, let the customer pick services if the
+// salon lists any, otherwise take a token straight away and open it.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchSalonByCode } from '../api/salons';
 import { fetchTicketStatus, joinSalonQueue } from '../api/tickets';
+import { fetchSalonServices, joinWithServices, type PublicService } from '../api/services';
 import { ApiError } from '../api/client';
 import { getTickets, removeTicket, saveTicket } from '../lib/activeTickets';
 import { clearJoinKey, getJoinKey } from '../lib/joinKey';
 import PageShell from '../components/PageShell';
+import ServicePicker from '../components/ServicePicker';
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
+const OFFLINE_MESSAGE = 'We could not reach the server. Please check your internet connection and try again.';
 
 type View =
   | { kind: 'working'; salonName?: string }
-  | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean };
+  | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean }
+  | { kind: 'choose'; salonId: string; salonName: string; services: PublicService[]; submitting: boolean; message?: string };
 
 const ticketUrl = (ticketId: string, accessToken: string) =>
   `/tickets/${ticketId}?accessToken=${accessToken}`;
@@ -23,6 +28,21 @@ const ticketUrl = (ticketId: string, accessToken: string) =>
 async function withSalonLock<T>(salonId: string, fn: () => Promise<T>): Promise<T> {
   const locks = (navigator as unknown as { locks?: { request: <R>(name: string, cb: () => Promise<R>) => Promise<R> } }).locks;
   return locks?.request ? locks.request(`join:${salonId}`, fn) : fn();
+}
+
+// Scanning again must never hand out a second token: find the ticket this phone already holds.
+async function resumeExisting(salonId: string): Promise<string | null> {
+  for (const stored of getTickets(salonId)) {
+    try {
+      const t = await fetchTicketStatus(stored.ticketId, stored.accessToken);
+      if (t && !FINISHED.includes(t.status)) return ticketUrl(stored.ticketId, stored.accessToken);
+      removeTicket(stored.ticketId);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) removeTicket(stored.ticketId);
+      // Any other failure (e.g. offline): we can't prove the ticket is dead, so keep it and try the next one.
+    }
+  }
+  return null;
 }
 
 export default function ScanLanding() {
@@ -34,6 +54,20 @@ export default function ScanLanding() {
   // A second tap on "Try again" while a request is in flight does nothing.
   const running = useRef(false);
 
+  const openTicket = useCallback(
+    (ticket: { ticketId: string; accessToken: string; salonId?: string; tokenNumber: number }, salonId: string) => {
+      saveTicket({
+        ticketId: ticket.ticketId,
+        accessToken: ticket.accessToken,
+        salonId: ticket.salonId ?? salonId,
+        tokenNumber: ticket.tokenNumber,
+      });
+      clearJoinKey(salonId);
+      navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
+    },
+    [navigate],
+  );
+
   const runOnce = useCallback(async () => {
     setView({ kind: 'working' });
     let salonName: string | undefined;
@@ -43,31 +77,23 @@ export default function ScanLanding() {
       setView({ kind: 'working', salonName });
 
       await withSalonLock(salon.id, async () => {
-        // Scanning again must never hand out a second token: go back to the ticket this phone already holds.
-        for (const stored of getTickets(salon.id)) {
-          try {
-            const t = await fetchTicketStatus(stored.ticketId, stored.accessToken);
-            if (t && !FINISHED.includes(t.status)) {
-              navigate(ticketUrl(stored.ticketId, stored.accessToken), { replace: true });
-              return;
-            }
-            removeTicket(stored.ticketId);
-          } catch (err) {
-            if (err instanceof ApiError && err.status === 404) removeTicket(stored.ticketId);
-            // Any other failure (e.g. offline): we can't prove the ticket is dead, so keep it and try the next one.
-          }
+        const existing = await resumeExisting(salon.id);
+        if (existing) {
+          navigate(existing, { replace: true });
+          return;
+        }
+
+        // Salon lists services: the customer chooses first. If the list can't be loaded we don't block
+        // anyone from getting a token, we just join without services.
+        const services = await fetchSalonServices(salon.id).catch(() => [] as PublicService[]);
+        if (services.length > 0) {
+          setView({ kind: 'choose', salonId: salon.id, salonName: salon.name, services, submitting: false });
+          return;
         }
 
         // The same key for every attempt of this scan, so the server never creates a second ticket for it.
         const ticket = await joinSalonQueue(salon.id, getJoinKey(salon.id));
-        saveTicket({
-          ticketId: ticket.ticketId,
-          accessToken: ticket.accessToken,
-          salonId: ticket.salonId ?? salon.id,
-          tokenNumber: ticket.tokenNumber,
-        });
-        clearJoinKey(salon.id);
-        navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
+        openTicket(ticket, salon.id);
       });
     } catch (err) {
       if (!salonName && err instanceof ApiError && err.status === 404) {
@@ -82,15 +108,12 @@ export default function ScanLanding() {
       setView({
         kind: 'error',
         title: salonName ? "Can't get a token right now" : "Couldn't open the queue",
-        message:
-          err instanceof ApiError
-            ? err.message
-            : 'We could not reach the server. Please check your internet connection and try again.',
+        message: err instanceof ApiError ? err.message : OFFLINE_MESSAGE,
         salonName,
         canRetry: true,
       });
     }
-  }, [code, navigate]);
+  }, [code, navigate, openTicket]);
 
   const run = useCallback(async () => {
     if (running.current) return;
@@ -107,6 +130,51 @@ export default function ScanLanding() {
     started.current = true;
     void run();
   }, [run]);
+
+  // The customer pressed Submit (or Continue with nothing chosen).
+  const submitChoice = useCallback(
+    async (serviceIds: string[]) => {
+      if (view.kind !== 'choose' || view.submitting) return;
+      const { salonId, salonName, services } = view;
+      setView({ kind: 'choose', salonId, salonName, services, submitting: true });
+      try {
+        await withSalonLock(salonId, async () => {
+          // Another tab may have taken a ticket while this one was choosing.
+          const existing = await resumeExisting(salonId);
+          if (existing) {
+            navigate(existing, { replace: true });
+            return;
+          }
+          const ticket = await joinWithServices(salonId, getJoinKey(salonId), serviceIds);
+          openTicket(ticket, salonId);
+        });
+      } catch (err) {
+        setView({
+          kind: 'choose',
+          salonId,
+          salonName,
+          services,
+          submitting: false,
+          message: err instanceof ApiError ? err.message : OFFLINE_MESSAGE,
+        });
+      }
+    },
+    [view, navigate, openTicket],
+  );
+
+  if (view.kind === 'choose') {
+    return (
+      <PageShell title="Choose your service">
+        <ServicePicker
+          salonName={view.salonName}
+          services={view.services}
+          submitting={view.submitting}
+          message={view.message}
+          onSubmit={(ids) => void submitChoice(ids)}
+        />
+      </PageShell>
+    );
+  }
 
   if (view.kind === 'error') {
     return (

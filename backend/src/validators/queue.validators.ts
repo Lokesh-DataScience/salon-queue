@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 export const joinQueueBodySchema = z.object({
   clientKey: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/, 'Invalid request key.').optional(),
+  serviceIds: z.array(z.string().uuid('Invalid service.')).max(12).optional(),
 });
 export const ticketParamSchema = z.object({
   ticketId: z.string().uuid(),
