@@ -11,7 +11,7 @@ import {
   postResume,
   postWalkIn,
 } from '../controllers/barber.controller';
-import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
+import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected, postClaim } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
 import { postChangePassword } from '../controllers/auth.controller';
 import { getServices, postService, deleteService } from '../controllers/salonServices.controller';
@@ -27,6 +27,7 @@ router.post('/queue/next', postNext);
 router.post('/queue/:entryId/start', postStart);
 router.post('/queue/:entryId/complete', postComplete);
 router.post('/queue/:entryId/skip', postSkip);
+router.post('/queue/:entryId/claim', postClaim);
 router.post('/queue/pause', postPause);
 router.post('/queue/resume', postResume);
 router.post('/queue/walk-in', postWalkIn);

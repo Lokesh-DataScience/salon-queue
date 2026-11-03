@@ -144,3 +144,37 @@ export async function redeemPrize(salonId: string, code: string) {
   const offer = data.salon_offers as unknown as { name: string } | null;
   return { prizeName: offer?.name ?? 'Reward' };
 }
+
+// Claim by entry (the dashboard's Tap to claim). Same column as the code redeem, so the Offers page
+// count stays correct. Allowed while the customer is called or being served.
+export async function claimPrize(salonId: string, entryId: string) {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .select('id, status, offer_id, prize_redeemed_at, salon_offers(name), queues!inner(salon_id)')
+    .eq('id', entryId)
+    .eq('queues.salon_id', salonId) // the salon comes from the login, never the request
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError('Queue entry not found.', 404); // another salon's entry looks the same
+
+  if (!data.offer_id) throw new AppError('This customer has no offer to claim.', 409);
+  if (data.prize_redeemed_at) throw new AppError('This offer was already claimed.', 409);
+  if (!['CALLED', 'SERVING'].includes(data.status)) {
+    throw new AppError('An offer can only be claimed while the customer is being served.', 409);
+  }
+
+  const { data: updated, error: upErr } = await supabase
+    .from('queue_entries')
+    .update({ prize_redeemed_at: new Date().toISOString() })
+    .eq('id', entryId)
+    .is('prize_redeemed_at', null) // compare-and-swap: a double tap or a second device claims once
+    .not('offer_id', 'is', null)
+    .in('status', ['CALLED', 'SERVING'])
+    .select('id')
+    .maybeSingle();
+  if (upErr) throw upErr;
+  if (!updated) throw new AppError('This offer was already claimed.', 409);
+
+  const offer = data.salon_offers as unknown as { name: string } | null;
+  return { prizeName: offer?.name ?? 'Reward' };
+}

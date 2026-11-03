@@ -8,7 +8,11 @@ export interface BarberStaff {
   role: 'OWNER' | 'BARBER' | 'MANAGER';
   salonId: string;
 }
-
+export interface BarberPrize {
+  name: string;
+  code: string;
+  redeemed: boolean;
+}
 export interface BarberQueueEntry {
   id: string;
   token_number: number;
@@ -18,6 +22,8 @@ export interface BarberQueueEntry {
   started_at: string | null;
   completed_at: string | null;
   skipped_at: string | null;
+  services: string[];
+  prize?: BarberPrize | null; // only on the called / serving customer, never on waiting rows
 }
 
 export interface BarberQueueSnapshot {
@@ -168,4 +174,7 @@ export function addBarberService(name: string) {
 
 export function removeBarberService(serviceId: string) {
   return apiFetch<{ ok: boolean }>(`/api/barber/services/${serviceId}`, { method: 'DELETE' });
+}
+export function claimEntry(entryId: string) {
+  return apiFetch<{ prizeName: string }>(`/api/barber/queue/${entryId}/claim`, { method: 'POST' });
 }

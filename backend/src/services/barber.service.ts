@@ -6,14 +6,46 @@ import { todayISODate } from '../utils/date';
 interface QueueEntryRow {
   id: string;
   token_number: number;
-  // customer_name: string | null;
-  // customer_phone: string | null;
   status: string;
   joined_at: string;
   called_at: string | null;
   started_at: string | null;
   completed_at: string | null;
   skipped_at: string | null;
+  offer_id: string | null;
+  prize_code: string | null;
+  prize_redeemed_at: string | null;
+  salon_offers: { name: string } | null;
+  queue_entry_services: { service_name: string }[] | null;
+}
+
+// What the dashboard may know about any entry. Prize fields are NOT here, on purpose:
+// a waiting customer's offer stays secret until they are called.
+function toEntry(r: QueueEntryRow) {
+  return {
+    id: r.id,
+    token_number: r.token_number,
+    status: r.status,
+    joined_at: r.joined_at,
+    called_at: r.called_at,
+    started_at: r.started_at,
+    completed_at: r.completed_at,
+    skipped_at: r.skipped_at,
+    services: (r.queue_entry_services ?? [])
+      .map((s) => s.service_name)
+      .sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+// Only the customer being called or served carries the prize.
+function toEntryWithPrize(r: QueueEntryRow) {
+  return {
+    ...toEntry(r),
+    prize:
+      r.offer_id && r.prize_code
+        ? { name: r.salon_offers?.name ?? 'Reward', code: r.prize_code, redeemed: !!r.prize_redeemed_at }
+        : null,
+  };
 }
 
 // ── Dashboard read ──────────────────────────────────────────────────────
@@ -30,7 +62,7 @@ export async function getBarberQueueSnapshot(salonId: string) {
 
   if (!queue) {
     return {
-      salonId, // NEW
+      salonId,
       queueStatus: 'ACTIVE' as const,
       currentToken: 0,
       called: null,
@@ -42,7 +74,8 @@ export async function getBarberQueueSnapshot(salonId: string) {
   const { data: entries, error: entriesError } = await supabase
     .from('queue_entries')
     .select(
-      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at',
+      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at, ' +
+        'offer_id, prize_code, prize_redeemed_at, salon_offers(name), queue_entry_services(service_name)',
     )
     .eq('queue_id', queue.id)
     .in('status', ['CALLED', 'SERVING', 'WAITING'])
@@ -50,15 +83,17 @@ export async function getBarberQueueSnapshot(salonId: string) {
 
   if (entriesError) throw entriesError;
 
-  const rows = (entries ?? []) as QueueEntryRow[];
+  const rows = (entries ?? []) as unknown as QueueEntryRow[];
+  const called = rows.find((e) => e.status === 'CALLED');
+  const serving = rows.find((e) => e.status === 'SERVING');
 
   return {
-    salonId, // NEW
+    salonId,
     queueStatus: queue.status as 'ACTIVE' | 'PAUSED' | 'CLOSED',
     currentToken: queue.current_token,
-    called: rows.find((e) => e.status === 'CALLED') ?? null,
-    serving: rows.find((e) => e.status === 'SERVING') ?? null,
-    waiting: rows.filter((e) => e.status === 'WAITING'),
+    called: called ? toEntryWithPrize(called) : null,
+    serving: serving ? toEntryWithPrize(serving) : null,
+    waiting: rows.filter((e) => e.status === 'WAITING').map(toEntry),
   };
 }
 

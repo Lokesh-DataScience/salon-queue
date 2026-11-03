@@ -11,8 +11,8 @@ import {
   pauseQueue,
   resumeQueue,
   addWalkIn,
+  claimEntry,
 } from '../api/barber';
-import { redeemCode } from '../api/offers';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 
@@ -22,13 +22,6 @@ export default function BarberDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [redeemInput, setRedeemInput] = useState('');
-  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const redeem = useMutation({
-    mutationFn: () => redeemCode(redeemInput),
-    onSuccess: (r) => { setRedeemMsg({ ok: true, text: `Redeemed: ${r.prizeName}. Give it to the customer.` }); setRedeemInput(''); },
-    onError: (e: any) => setRedeemMsg({ ok: false, text: e.message ?? 'Could not redeem.' }),
-  });
 
   const { data: queue, isLoading, error } = useQuery({
     queryKey: QUEUE_KEY,
@@ -104,6 +97,16 @@ export default function BarberDashboard() {
   });
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
   const pauseMutation = useMutation({ mutationFn: () => runAction(pauseQueue) });
+  // The server claims once; a double tap or a second device gets a clear "already claimed".
+  const claimMutation = useMutation({
+    mutationFn: (id: string) => claimEntry(id),
+    onMutate: () => setActionError(null),
+    onSuccess: () => refetch(),
+    onError: (err: any) => {
+      setActionError(err.message);
+      refetch();
+    },
+  });
   const [walkInMsg, setWalkInMsg] = useState<string | null>(null);
   useEffect(() => {
     if (!walkInMsg) return;
@@ -153,7 +156,12 @@ export default function BarberDashboard() {
   }
 
   const isPaused = queue.queueStatus === 'PAUSED';
-  const busy = primaryMutation.isPending || skipMutation.isPending || pauseMutation.isPending || walkInMutation.isPending;
+  const busy =
+    primaryMutation.isPending ||
+    skipMutation.isPending ||
+    pauseMutation.isPending ||
+    walkInMutation.isPending ||
+    claimMutation.isPending;
   const nextWaiting = queue.waiting[0] ?? null;
   const active = queue.serving ?? queue.called; // whoever is at the chair / being called
 
@@ -230,6 +238,48 @@ export default function BarberDashboard() {
           {!active && nextWaiting && !isPaused && (
             <p className="text-sm text-gray-700">Next up: #{nextWaiting.token_number}</p>
           )}
+
+          {active && active.services.length > 0 && (
+            <ul aria-label="Services chosen" className="mt-2 flex flex-wrap justify-center gap-2">
+              {active.services.map((s) => (
+                <li
+                  key={s}
+                  className="rounded-full border-2 border-ink bg-white px-3 py-1 text-base font-semibold text-ink"
+                >
+                  {s}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {active?.prize && (
+            <div role="group" aria-label="Offer won" className="mt-4 rounded-xl border-2 border-ink bg-white p-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-gray-700">Offer won</p>
+              <p className="text-2xl font-extrabold text-ink">{active.prize.name}</p>
+              <p className="mt-1 text-base text-gray-700">
+                Code{' '}
+                <span className="font-mono text-lg font-bold tracking-widest text-ink">{active.prize.code}</span>
+              </p>
+              {active.prize.redeemed ? (
+                <p
+                  role="status"
+                  className="mt-3 rounded-xl border-2 border-green-600 bg-green-50 py-3 text-lg font-bold text-green-900"
+                >
+                  Claimed ✓
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => claimMutation.mutate(active.id)}
+                  disabled={busy}
+                  aria-busy={claimMutation.isPending}
+                  className="mt-3 min-h-14 w-full rounded-xl border-2 border-ink bg-brand px-4 text-lg font-bold text-ink hover:bg-brand-dark disabled:border-gray-300 disabled:bg-gray-200 disabled:text-gray-600"
+                >
+                  {claimMutation.isPending ? 'Claiming...' : 'Tap to claim'}
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Rare actions stay out of the way. Skip is here so a no-show can never block the queue. */}
@@ -259,37 +309,6 @@ export default function BarberDashboard() {
           </div>
         </details>
 
-        <section aria-label="Redeem a reward" className="mb-6 rounded-2xl border-2 border-ink bg-brand-soft p-3">
-          <label htmlFor="redeem-code" className="mb-1 block text-sm font-semibold text-ink">
-            Customer showed a reward code?
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="redeem-code"
-              className="field uppercase tracking-widest"
-              value={redeemInput}
-              maxLength={7}
-              autoCapitalize="characters"
-              autoComplete="off"
-              placeholder="ABC234"
-              onChange={(e) => { setRedeemInput(e.target.value); setRedeemMsg(null); }}
-            />
-            <button
-              type="button"
-              className="btn-primary !w-auto"
-              disabled={redeem.isPending || redeemInput.replace(/[\s-]/g, '').length < 6}
-              onClick={() => redeem.mutate()}
-            >
-              Redeem
-            </button>
-          </div>
-          {redeemMsg && (
-            <p role="status" className={`mt-2 text-sm font-medium ${redeemMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
-              {redeemMsg.text}
-            </p>
-          )}
-        </section>
-
         <section>
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-gray-700">Waiting ({queue.waiting.length})</h2>
@@ -316,16 +335,24 @@ export default function BarberDashboard() {
               No one waiting.
             </p>
           ) : (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            // One line per customer: "#4 | hair cutting | beard trimming". A long list is cut with "…",
+            // never wrapped, so every row keeps the same height.
+            <ul className="grid gap-2">
               {queue.waiting.map((entry, i) => (
                 <li
                   key={entry.id}
-                  className={`flex flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink ${
+                  title={entry.services.length > 0 ? entry.services.join(', ') : undefined}
+                  className={`flex min-h-12 items-center gap-3 rounded-xl border-2 px-3 ${
                     i === 0 ? 'border-ink bg-brand' : 'border-gray-200 bg-white'
                   }`}
                 >
-                  #{entry.token_number}
-                  {i === 0 && <span className="text-xs font-semibold text-ink">Next</span>}
+                  <span className="shrink-0 text-xl font-bold tabular-nums text-ink">#{entry.token_number}</span>
+                  {entry.services.length > 0 && (
+                    <span className="min-w-0 flex-1 truncate text-base text-ink">
+                      {`| ${entry.services.join(' | ')}`}
+                    </span>
+                  )}
+                  {i === 0 && <span className="ml-auto shrink-0 text-xs font-semibold text-ink">Next</span>}
                 </li>
               ))}
             </ul>

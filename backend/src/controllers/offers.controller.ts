@@ -8,7 +8,9 @@ import {
   offerIdParamSchema,
   redeemBodySchema,
 } from '../validators/offer.validators';
-import {setExpectedCustomers, listOffers, createOffer, updateOffer, deleteOffer, redeemPrize } from '../services/offers.service';
+import {setExpectedCustomers, listOffers, createOffer, updateOffer, deleteOffer, redeemPrize, claimPrize } from '../services/offers.service';
+import { entryIdParamSchema } from '../validators/barber.validators';
+import { broadcastQueueUpdate } from '../services/queue.service';
 
 export async function patchExpected(req: Request, res: Response, next: NextFunction) {
   try {
@@ -55,5 +57,15 @@ export async function postRedeem(req: Request, res: Response, next: NextFunction
   try {
     const { code } = redeemBodySchema.parse(req.body);
     res.json(await redeemPrize(salonIdOf(req), code));
+  } catch (err) { next(err); }
+}
+
+export async function postClaim(req: Request, res: Response, next: NextFunction) {
+  try {
+    const salonId = salonIdOf(req);
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const result = await claimPrize(salonId, entryId);
+    await broadcastQueueUpdate(salonId); // a second device and the customer's ticket page see "claimed"
+    res.json(result);
   } catch (err) { next(err); }
 }

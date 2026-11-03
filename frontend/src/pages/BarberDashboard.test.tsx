@@ -19,6 +19,7 @@ vi.mock('../api/barber', () => ({
   skipEntry: vi.fn(),
   pauseQueue: vi.fn(),
   resumeQueue: vi.fn(),
+  claimEntry: vi.fn(),
 }));
 
 const entry = (
@@ -33,6 +34,7 @@ const entry = (
   started_at: null,
   completed_at: null,
   skipped_at: null,
+  services: [],
 });
 
 const snapshot = (overrides: Partial<BarberQueueSnapshot> = {}): BarberQueueSnapshot => ({
