@@ -10,6 +10,7 @@ import {
   type BarberSalonProfile,
   type SalonProfileUpdate,
 } from '../api/barber';
+import ChangePasswordForm from '../components/ChangePasswordForm';
 
 const PROFILE_KEY = ['barberSalonProfile'];
 
@@ -180,8 +181,14 @@ export default function BarberSettings() {
           ))}
         </ul>
       </section>
-            <section aria-labelledby="account-heading" className="mt-6">
+      <section aria-labelledby="account-heading" className="mt-6">
         <h2 id="account-heading" className="mb-2 text-sm font-semibold text-gray-700">Account</h2>
+        <details className="card mb-3">
+          <summary className="min-h-11 cursor-pointer py-2 text-base font-semibold">Change password</summary>
+          <div className="mt-3">
+            <ChangePasswordForm />
+          </div>
+        </details>
         <LogoutButton />
       </section>
     </PageShell>

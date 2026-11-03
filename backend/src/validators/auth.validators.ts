@@ -36,5 +36,17 @@ export const registerSalonBodySchema = z
     path: ['closingTime'],
     message: 'Closing time must be after opening time',
   });
+export const changePasswordBodySchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password.').max(200),
+    // bcrypt silently ignores everything past 72 bytes, so cap it (same rule as registration).
+    newPassword: z.string().min(10, 'Use at least 10 characters').max(72),
+  })
+  .strict()
+  .refine((v) => v.newPassword !== v.currentPassword, {
+    path: ['newPassword'],
+    message: 'Choose a new password that is different from your current one.',
+});
 
+export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>;
 export type RegisterSalonBody = z.infer<typeof registerSalonBodySchema>;

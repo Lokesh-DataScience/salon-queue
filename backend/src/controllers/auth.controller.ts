@@ -1,13 +1,14 @@
 // backend/src/controllers/auth.controller.ts
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
-import { barberLoginBodySchema, registerSalonBodySchema } from '../validators/auth.validators';
+import { barberLoginBodySchema, registerSalonBodySchema, changePasswordBodySchema } from '../validators/auth.validators';
 import {
   loginBarber,
   registerSalon,
   rotateRefreshToken,
   revokeRefreshToken,
   REFRESH_TOKEN_TTL_SECONDS,
+  changePassword,
 } from '../services/auth.service';
 import { AppError } from '../middleware/errorHandler';
 
@@ -70,6 +71,19 @@ export async function postBarberRegister(req: Request, res: Response, next: Next
     const { tokens, staff } = await registerSalon(body);
     setSessionCookies(res, tokens); // signed in straight away
     res.status(201).json({ staff });
+  } catch (err) {
+    next(err);
+  }
+}
+export async function postChangePassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.staff) throw new AppError('Not authenticated.', 401);
+    const { currentPassword, newPassword } = changePasswordBodySchema.parse(req.body);
+    // The account comes from the verified session, never from the request body.
+    const tokens = await changePassword(req.staff.staffId, currentPassword, newPassword);
+    setSessionCookies(res, tokens); // this device stays signed in
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({ ok: true });
   } catch (err) {
     next(err);
   }

@@ -81,11 +81,18 @@ export async function rotateRefreshToken(refreshToken: string) {
 
   const { data: staff, error: staffError } = await supabase
     .from('salon_staff')
-    .select('id, salon_id, role')
+    .select('id, salon_id, role, password_changed_at')
     .eq('id', payload.staffId)
     .maybeSingle();
   if (staffError) throw staffError; // infrastructure problem: 500, not a forced logout
   if (!staff) throw new AppError(SESSION_ENDED, 401);
+
+  // A password change ends every session started before it.
+  if (staff.password_changed_at) {
+    const issuedAt = (payload as { iat?: number }).iat;
+    const cutoff = Math.floor(new Date(staff.password_changed_at).getTime() / 1000);
+    if (issuedAt === undefined || issuedAt < cutoff) throw new AppError(SESSION_ENDED, 401);
+  }
 
   const { error: claimError } = await supabase
     .from('revoked_tokens')
@@ -155,4 +162,62 @@ export async function registerSalon(input: RegisterSalonBody) {
       salonId: row.o_salon_id as string,
     },
   };
+}
+// ── Change password ───────────────────────────────────────────────────────
+// Wrong-password attempts per barber. In memory: resets on restart and is per server
+// instance. Fine for one instance; use a shared limiter if you scale out.
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MS = 15 * 60 * 1000;
+const failedAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function assertNotLocked(staffId: string) {
+  const f = failedAttempts.get(staffId);
+  if (!f) return;
+  if (Date.now() > f.resetAt) {
+    failedAttempts.delete(staffId);
+    return;
+  }
+  if (f.count >= MAX_FAILED_ATTEMPTS) {
+    throw new AppError('Too many wrong attempts. Please try again in 15 minutes.', 429);
+  }
+}
+
+function recordFailure(staffId: string) {
+  const now = Date.now();
+  const f = failedAttempts.get(staffId);
+  if (!f || now > f.resetAt) failedAttempts.set(staffId, { count: 1, resetAt: now + LOCK_MS });
+  else f.count += 1;
+}
+
+export async function changePassword(staffId: string, currentPassword: string, newPassword: string) {
+  assertNotLocked(staffId);
+
+  const { data, error } = await supabase
+    .from('salon_staff')
+    .select('id, salon_id, role, password_hash')
+    .eq('id', staffId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError(SESSION_ENDED, 401); // the account no longer exists
+
+  // 400, not 401: the client treats a 401 on barber routes as "session expired" and logs out.
+  if (!(await bcrypt.compare(currentPassword, data.password_hash))) {
+    recordFailure(staffId);
+    throw new AppError('Your current password is incorrect.', 400);
+  }
+  failedAttempts.delete(staffId);
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+  const { data: updated, error: updateError } = await supabase
+    .from('salon_staff')
+    .update({ password_hash: newHash, password_changed_at: new Date().toISOString() })
+    .eq('id', staffId)
+    .eq('password_hash', data.password_hash) // loses cleanly if another change just happened
+    .select('id')
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (!updated) throw new AppError('Your password was just changed. Please try again.', 409);
+
+  // Tokens are signed after the change, so this device's new tokens pass the cutoff above.
+  return signTokens({ staffId: data.id, salonId: data.salon_id, role: data.role });
 }

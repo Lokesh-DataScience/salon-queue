@@ -13,11 +13,12 @@ import {
 } from '../controllers/barber.controller';
 import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
+import { postChangePassword } from '../controllers/auth.controller';
 
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in barber
-
+router.post('/account/password', postChangePassword);
 router.get('/salon', getProfile);
 router.patch('/salon', patchProfile);
 router.get('/queue', getQueue);

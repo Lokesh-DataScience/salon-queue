@@ -143,3 +143,9 @@ export function addWalkIn() {
     method: 'POST',
   });
 }
+export function changePassword(currentPassword: string, newPassword: string) {
+  return apiFetch<{ ok: boolean }>('/api/barber/account/password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
