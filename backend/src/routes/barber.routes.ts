@@ -13,13 +13,14 @@ import {
 } from '../controllers/barber.controller';
 import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
-
+import { getStats } from '../controllers/barberStats.controller';
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in barber
 
 router.get('/salon', getProfile);
 router.patch('/salon', patchProfile);
+router.get('/stats', getStats); // after router.patch('/salon', patchProfile)
 router.get('/queue', getQueue);
 router.post('/queue/next', postNext);
 router.post('/queue/:entryId/start', postStart);

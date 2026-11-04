@@ -1,3 +1,4 @@
+// backend/tests/auth.test.ts
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import bcrypt from 'bcrypt';
