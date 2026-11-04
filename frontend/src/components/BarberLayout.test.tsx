@@ -19,6 +19,7 @@ function renderAt(path: string) {
             <Route path="/barber/dashboard" element={<p>DASH CONTENT</p>} />
             <Route path="/barber/settings" element={<p>SETTINGS CONTENT</p>} />
             <Route path="/barber/offers" element={<p>OFFERS CONTENT</p>} />
+            <Route path="/barber/stats" element={<p>STATS CONTENT</p>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -32,12 +33,21 @@ beforeEach(() => {
 });
 
 describe('BarberLayout', () => {
-  it('shows exactly two tabs and marks Dashboard as current', async () => {
+  it('shows three tabs in order and marks Dashboard as current', async () => {
     renderAt('/barber/dashboard');
     expect(await screen.findByText('DASH CONTENT')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    expect(nav.querySelectorAll('a')).toHaveLength(2);
+    const links = nav.querySelectorAll('a');
+    expect(links).toHaveLength(3);
+    expect(Array.from(links).map((a) => a.textContent)).toEqual(['Dashboard', 'Customers', 'Settings']);
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Customers' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks Customers as current on the stats page', async () => {
+    renderAt('/barber/stats');
+    expect(await screen.findByText('STATS CONTENT')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current');
   });
 

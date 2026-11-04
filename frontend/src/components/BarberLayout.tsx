@@ -35,6 +35,18 @@ const tabs = [
     ),
   },
   {
+  to: '/barber/stats',
+    label: 'Customers',
+    match: (p: string) => p.startsWith('/barber/stats'),
+    icon: (
+      <svg {...iconProps}>
+        <line x1="6" y1="20" x2="6" y2="12" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="18" y1="20" x2="18" y2="9" />
+      </svg>
+    ),
+  },
+  {
     to: '/barber/settings',
     label: 'Settings',
     match: (p: string) => SETTINGS_PATHS.some((s) => p.startsWith(s)),
@@ -80,7 +92,7 @@ export default function BarberLayout() {
       </div>
 
       <nav aria-label="Main" className="barber-nav print:hidden">
-        <div className="mx-auto grid h-[var(--barber-nav-h)] max-w-md grid-cols-2 md:max-w-2xl">
+        <div className="mx-auto grid h-[var(--barber-nav-h)] max-w-md grid-cols-3 md:max-w-2xl">
           {tabs.map((t) => {
             const active = t.match(pathname);
             return (

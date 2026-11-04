@@ -143,3 +143,30 @@ export function addWalkIn() {
     method: 'POST',
   });
 }
+export interface StatsDay {
+  date: string; // YYYY-MM-DD, IST
+  count: number;
+}
+
+export interface StatsPeriod {
+  start: string;
+  total: number;
+  walkIn: number;
+  qr: number;
+  prevSamePeriod: number;
+  days: StatsDay[];
+}
+
+export interface BarberStats {
+  today: string;
+  servedToday: number;
+  walkInToday: number;
+  qrToday: number;
+  servedYesterday: number;
+  week: StatsPeriod;
+  month: StatsPeriod;
+}
+
+export function fetchBarberStats() {
+  return apiFetch<{ stats: BarberStats }>('/api/barber/stats').then((r) => r.stats);
+}
