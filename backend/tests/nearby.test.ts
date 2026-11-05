@@ -1,7 +1,9 @@
+// backend/tests/nearby.test.ts
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
-import { app, makeSalon, cleanupSalons, joinViaApi } from './helpers';
+import { app, makeSalon, cleanupSalons} from './helpers';
 import { callNext } from '../src/services/barber.service';
+import { joinQueue } from '../src/services/queue.service';
 
 afterAll(cleanupSalons);
 
@@ -14,8 +16,8 @@ describe('Nearby salons', () => {
     const near = await makeSalon({ ...HOME, average_service_minutes: 10 });
     const mid = await makeSalon({ latitude: -45.0, longitude: 170.03 }); // about 2.4 km east
     const far = await makeSalon({ latitude: -45.0, longitude: 170.2 }); // about 16 km east
-    await joinViaApi(near);
-    await joinViaApi(near);
+    await joinQueue(near);
+    await joinQueue(near);
 
     const res = await nearby(5);
     expect(res.status).toBe(200);
@@ -44,8 +46,8 @@ describe('Nearby salons', () => {
 
   it('counts only people still waiting, not the one already called', async () => {
     const salonId = await makeSalon({ ...HOME });
-    await joinViaApi(salonId);
-    await joinViaApi(salonId);
+    await joinQueue(salonId);
+    await joinQueue(salonId);
     await callNext(salonId); // first is now CALLED
 
     const row = (await nearby(5)).body.salons.find((s: { id: string }) => s.id === salonId);

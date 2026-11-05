@@ -5,12 +5,20 @@ import { ticketParamSchema, ticketAccessQuerySchema } from '../validators/queue.
 import { joinQueue, getTicketStatus, broadcastQueueUpdate, QueueJoinError, leaveTicket } from '../services/queue.service';
 import { pushSubscriptionBodySchema, joinQueueBodySchema } from '../validators/queue.validators';
 import { savePushSubscription, removePushSubscription } from '../services/queue.service';
+import { advanceSalonQueue } from '../services/queueAutomation.service';
 
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
     const { clientKey } = joinQueueBodySchema.parse(req.body ?? {});
     const ticket = await joinQueue(salonId, clientKey);
+
+    // First customer in an empty queue starts now. A failure here must never lose the
+    // customer's ticket: the sweeper picks the queue up within about 10 seconds anyway.
+    await advanceSalonQueue(salonId).catch(() => {
+      console.error(`[queue] auto-start failed salon=${salonId}`);
+    });
+
     await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
     res.status(201).json({ ticket });
   } catch (err) {

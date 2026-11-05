@@ -14,6 +14,8 @@ import {
 import { broadcastQueueUpdate } from '../services/queue.service';
 import { AppError } from '../middleware/errorHandler';
 import { NotificationService } from '../services/notification.service';
+import { advanceSalonQueue, extendEntry } from '../services/queueAutomation.service';
+import { extendBodySchema } from '../validators/barber.validators';
 
 function salonIdOf(req: Request): string {
   if (!req.staff) throw new AppError('Not authenticated.', 401);
@@ -56,6 +58,7 @@ export async function postComplete(req: Request, res: Response, next: NextFuncti
     const salonId = salonIdOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
     const entry = await completeEntry(salonId, entryId);
+    await advanceSalonQueue(salonId);
     await broadcastQueueUpdate(salonId); // NEW
     res.json({ entry });
   } catch (err) {
@@ -68,6 +71,7 @@ export async function postSkip(req: Request, res: Response, next: NextFunction) 
     const salonId = salonIdOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
     const entry = await skipEntry(salonId, entryId);
+    await advanceSalonQueue(salonId);
     await broadcastQueueUpdate(salonId); // NEW
     if (entry.previousStatus === 'WAITING' || entry.previousStatus === 'CALLED') {
       await NotificationService.notifyQueueCancelled({
@@ -106,8 +110,22 @@ export async function postWalkIn(req: Request, res: Response, next: NextFunction
   try {
     const salonId = salonIdOf(req); // always from the verified session, never the body
     const entry = await addWalkIn(salonId);
+    await advanceSalonQueue(salonId);
     await broadcastQueueUpdate(salonId); // customers' "people ahead" updates live
     res.status(201).json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postExtend(req: Request, res: Response, next: NextFunction) {
+  try {
+    const salonId = salonIdOf(req);
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const { minutes } = extendBodySchema.parse(req.body ?? {});
+    const result = await extendEntry(salonId, entryId, minutes);
+    await broadcastQueueUpdate(salonId);
+    res.json(result);
   } catch (err) {
     next(err);
   }

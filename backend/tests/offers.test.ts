@@ -111,7 +111,7 @@ describe('Reveal, redeem and secrecy', () => {
     const salonId = await makeSalon();
     const other = await makeSalon();
     const { cookie } = await addOffer(salonId, 'Head massage', 50);
-    const t = (await joinViaApi(salonId)).body.ticket;
+    const t = (await joinQueue(salonId));
 
     const mine = await ticket(t.ticketId, t.accessToken);
     expect(mine.prize).toMatchObject({ name: 'Head massage', redeemed: false });
@@ -139,7 +139,7 @@ describe('Reveal, redeem and secrecy', () => {
   it('the barber snapshot and the live broadcast never reveal who won', async () => {
     const salonId = await makeSalon();
     const { cookie } = await addOffer(salonId, 'Scrub', 50);
-    const t = (await joinViaApi(salonId)).body.ticket;
+    const t = (await joinQueue(salonId));
     const code = (await ticket(t.ticketId, t.accessToken)).prize.code;
 
     const snap = await request(app).get('/api/barber/queue').set('Cookie', cookie);

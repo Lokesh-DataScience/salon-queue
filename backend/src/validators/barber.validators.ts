@@ -37,3 +37,7 @@ export const updateServiceSchema = z
   .refine((v) => v.name !== undefined || v.durationMinutes !== undefined, {
     message: 'Nothing to update.',
   });
+
+  export const extendBodySchema = z
+  .object({ minutes: z.number().int().min(1).max(30).default(5) })
+  .strict();

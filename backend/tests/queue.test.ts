@@ -52,10 +52,10 @@ describe("Test 3: another ticket's secret token", () => {
 
     const cross = await request(app).get(`/api/queue-tickets/${a.ticketId}`).query({ accessToken: b.accessToken });
     expect(cross.status).toBe(404);
-
+    const before = (await statusOf(a.ticketId)).status; // add before the crossLeave request
     const crossLeave = await request(app).post(`/api/queue-tickets/${a.ticketId}/leave`).send({ accessToken: b.accessToken });
     expect(crossLeave.status).toBe(404);
-    expect((await statusOf(a.ticketId)).status).toBe('WAITING');
+    expect((await statusOf(a.ticketId)).status).toBe(before);
   });
 });
 
@@ -109,6 +109,7 @@ describe('NEXT on the last customer (Bug 2)', () => {
 describe('Customer leave', () => {
   it('cancels a waiting ticket once, and refuses after being called', async () => {
     const salonId = await makeSalon();
+    await joinViaApi(salonId); // front customer: starts at once, so the next ones really wait
     const a = (await joinViaApi(salonId)).body.ticket;
 
     const first = await request(app).post(`/api/queue-tickets/${a.ticketId}/leave`).send({ accessToken: a.accessToken });
@@ -121,7 +122,7 @@ describe('Customer leave', () => {
     expect(again.status).toBe(409);
 
     const b = (await joinViaApi(salonId)).body.ticket;
-    await callNext(salonId);
+    await callNext(salonId); // completes the front customer and calls b (a is cancelled)
     const late = await request(app).post(`/api/queue-tickets/${b.ticketId}/leave`).send({ accessToken: b.accessToken });
     expect(late.status).toBe(409);
   });

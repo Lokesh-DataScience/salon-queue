@@ -7,6 +7,7 @@ import { setIO } from './sockets/io';
 import { initQueueSockets } from './sockets/queue.socket';
 import { startCleanupJob } from './jobs/cleanup.job';
 import { startNewsJob } from './jobs/news.job';
+import { startQueueSweeper } from './jobs/queueSweeper';
 
 const app = createApp();
 const httpServer = http.createServer(app);
@@ -26,4 +27,5 @@ httpServer.listen(env.PORT, () => {
   console.log(`Backend listening on http://localhost:${env.PORT} (${env.NODE_ENV})`);
   startCleanupJob();
   startNewsJob();
+  startQueueSweeper();
 });

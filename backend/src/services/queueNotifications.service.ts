@@ -7,7 +7,7 @@ import { NotificationService } from './notification.service';
 // Stages: 0 none, 1 "getting close", 2 "you're next", 3 "your turn".
 // "People ahead" is INCLUSIVE: WAITING + CALLED + SERVING entries before you.
 function desiredStage(status: string, peopleAhead: number): number {
-  if (status === 'CALLED') return 3;
+  if (status === 'CALLED' || status === 'SERVING') return 3;
   if (status !== 'WAITING') return 0;
   if (peopleAhead <= env.NOTIFY_NEXT_AT) return 2;
   if (peopleAhead <= env.NOTIFY_CLOSE_AT) return 1;

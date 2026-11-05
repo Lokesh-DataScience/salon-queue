@@ -78,13 +78,13 @@ describe('barber walk-in (+1)', () => {
     lastToken = 1;
 
     const row = await entryRow(res.body.entry.id);
-    expect(row.status).toBe('WAITING');
+    expect(row.status).toBe('SERVING');
     expect(row.is_walk_in).toBe(true);
     expect(row.customer_name).toBeNull();
     expect(row.customer_phone).toBeNull();
 
     const snap = await A.agent.get('/api/barber/queue');
-    expect(snap.body.waiting.map((e: any) => e.token_number)).toContain(1);
+    expect(snap.body.serving.token_number).toBe(1);
   });
 
   it('two simultaneous +1 taps get different, consecutive tokens', async () => {
@@ -171,20 +171,17 @@ describe('barber walk-in (+1)', () => {
     const after = await A.agent.get('/api/barber/queue');
     expect(after.body.waiting.length).toBe(before.body.waiting.length);
   }, 60_000);
-
-  it('a walk-in goes through NEXT → START → COMPLETE like any other ticket', async () => {
+  it('a walk-in starts at once, and Done early completes it and starts the next one', async () => {
     const C = await newBarber('c');
-    const added = await walkIn(C);
-    expect(added.status).toBe(201);
-    const id = added.body.entry.id as string;
+    const first = (await walkIn(C)).body.entry.id as string;
+    const second = (await walkIn(C)).body.entry.id as string;
 
-    const next = await C.agent.post('/api/barber/queue/next');
-    expect(next.status).toBe(200);
-    expect(next.body.result.called_entry_id).toBe(id);
+    expect((await entryRow(first)).status).toBe('SERVING');
+    expect((await entryRow(second)).status).toBe('WAITING');
 
-    expect((await C.agent.post(`/api/barber/queue/${id}/start`)).status).toBe(200);
-    expect((await C.agent.post(`/api/barber/queue/${id}/complete`)).status).toBe(200);
+    expect((await C.agent.post(`/api/barber/queue/${first}/complete`)).status).toBe(200);
 
-    expect((await entryRow(id)).status).toBe('COMPLETED');
+    expect((await entryRow(first)).status).toBe('COMPLETED');
+    expect((await entryRow(second)).status).toBe('SERVING');
   }, 60_000);
 });

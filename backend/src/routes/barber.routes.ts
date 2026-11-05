@@ -10,6 +10,7 @@ import {
   postPause,
   postResume,
   postWalkIn,
+  postExtend,
 } from '../controllers/barber.controller';
 import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
@@ -31,6 +32,7 @@ router.get('/queue', getQueue);
 router.post('/queue/next', postNext);
 router.post('/queue/:entryId/start', postStart);
 router.post('/queue/:entryId/complete', postComplete);
+router.post('/queue/:entryId/extend', postExtend);
 router.post('/queue/:entryId/skip', postSkip);
 router.post('/queue/pause', postPause);
 router.post('/queue/resume', postResume);

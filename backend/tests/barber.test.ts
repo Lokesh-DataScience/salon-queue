@@ -134,6 +134,7 @@ describe('Ownership: a barber can only touch their own salon', () => {
     const salonB = await makeSalon();
     const entryA = (await joinViaApi(salonA)).body.ticket;
     const cookieB = await barberCookieFor(salonB);
+    const before = (await row(entryA.ticketId)).status; // SERVING: the first customer starts at once
 
     for (const action of ['start', 'complete', 'skip']) {
       const res = await request(app)
@@ -141,19 +142,22 @@ describe('Ownership: a barber can only touch their own salon', () => {
         .set('Cookie', cookieB);
       expect(res.status).toBe(404);
     }
-    expect((await row(entryA.ticketId)).status).toBe('WAITING');
+    expect((await row(entryA.ticketId)).status).toBe(before);
   });
 
   it("a barber's dashboard shows only their own salon's customers", async () => {
     const salonA = await makeSalon();
     const salonB = await makeSalon();
-    await joinViaApi(salonA);
-    await joinViaApi(salonB);
+    await joinViaApi(salonA); // starts at once
+    await joinViaApi(salonA); // waits
+    await joinViaApi(salonB); // must never appear in A's dashboard
     const cookieA = await barberCookieFor(salonA);
 
     const snap = await request(app).get('/api/barber/queue').set('Cookie', cookieA);
     expect(snap.status).toBe(200);
+    expect(snap.body.serving.token_number).toBe(1);
     expect(snap.body.waiting).toHaveLength(1);
+    expect(snap.body.waiting[0].token_number).toBe(2);
     const text = JSON.stringify(snap.body);
     expect(text).not.toContain('customer_name');
     expect(text).not.toContain('customer_phone');
