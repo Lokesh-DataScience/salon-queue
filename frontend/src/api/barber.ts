@@ -170,3 +170,36 @@ export interface BarberStats {
 export function fetchBarberStats() {
   return apiFetch<{ stats: BarberStats }>('/api/barber/stats').then((r) => r.stats);
 }
+
+export interface SalonService {
+  id: string;
+  name: string;
+  durationMinutes: number;
+}
+
+export interface ServiceInput {
+  name: string;
+  durationMinutes: number;
+}
+
+export function fetchServices() {
+  return apiFetch<{ services: SalonService[] }>('/api/barber/services').then((r) => r.services);
+}
+
+export function createService(input: ServiceInput) {
+  return apiFetch<{ service: SalonService }>('/api/barber/services', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }).then((r) => r.service);
+}
+
+export function updateService(id: string, changes: Partial<ServiceInput>) {
+  return apiFetch<{ service: SalonService }>(`/api/barber/services/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  }).then((r) => r.service);
+}
+
+export function deleteService(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/barber/services/${id}`, { method: 'DELETE' });
+}

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import PageShell from '../components/PageShell';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchBarberSalonProfile,
   updateBarberSalonProfile,
@@ -10,6 +10,7 @@ import {
   type BarberSalonProfile,
   type SalonProfileUpdate,
 } from '../api/barber';
+import ServicesSection from '../components/ServicesSection';
 
 const PROFILE_KEY = ['barberSalonProfile'];
 
@@ -140,6 +141,7 @@ function LogoutButton() {
   );
 }
 export default function BarberSettings() {
+  const welcome = Boolean((useLocation().state as { welcome?: boolean } | null)?.welcome);
   const { data: salon, isLoading, error, refetch } = useQuery({
     queryKey: PROFILE_KEY,
     queryFn: fetchBarberSalonProfile,
@@ -163,6 +165,8 @@ export default function BarberSettings() {
           <ProfileForm salon={salon} />
         )}
       </section>
+
+      <ServicesSection welcome={welcome} />
 
       <section aria-labelledby="more-heading">
         <h2 id="more-heading" className="mb-2 text-sm font-semibold text-gray-700">More</h2>
