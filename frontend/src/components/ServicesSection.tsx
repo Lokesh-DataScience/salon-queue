@@ -1,4 +1,5 @@
 // frontend/src/components/ServicesSection.tsx
+import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -180,9 +181,14 @@ export default function ServicesSection({ welcome = false }: { welcome?: boolean
       <h2 id="services-heading" className="mb-2 text-sm font-semibold text-gray-700">Services</h2>
 
       {welcome && (
-        <p role="status" className="card mb-3 text-sm">
-          Add the services you offer and how long each takes. Customers will pick from these when they scan your QR.
-        </p>
+        <div role="status" className="card mb-3 grid gap-3 text-sm">
+          <p>
+            Add the services you offer and how long each takes. Customers will pick from these when they scan your QR.
+          </p>
+          <Link to="/barber/qr" state={{ welcome: true }} className="btn-primary text-center">
+            Done, show my QR code
+          </Link>
+        </div>
       )}
 
       {isLoading ? (
