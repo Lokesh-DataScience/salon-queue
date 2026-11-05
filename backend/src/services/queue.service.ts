@@ -4,6 +4,7 @@ import { getIO } from '../sockets/io';
 import { AppError } from '../middleware/errorHandler';
 import { todayISODate } from '../utils/date';
 import { evaluateNotifications } from './queueNotifications.service';
+import { advanceQueue } from './queueAutomation.service';
 
 export class QueueJoinError extends Error {
   constructor(public code: string, message: string) {
@@ -57,7 +58,14 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     .maybeSingle();
 
   if (error || !entry) return null;
-
+    // Time is up: complete (and promote the next customer) now, instead of waiting for the sweeper.
+  if (entry.status === 'SERVING' && entry.ends_at && Date.parse(entry.ends_at) <= Date.now()) {
+    const changes = await advanceQueue(entry.queues.salon_id, entry.queue_id).catch(() => 0);
+    if (changes > 0) {
+      await broadcastQueueUpdate(entry.queues.salon_id).catch(() => {});
+      return getTicketStatus(ticketId, accessToken); // read it again, now completed
+    }
+  }
   const { count: peopleAhead } = await supabase
     .from('queue_entries')
     .select('*', { count: 'exact', head: true })
@@ -116,7 +124,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     endsAt: entry.status === 'SERVING' ? entry.ends_at : null, // for the countdown
     remainingSeconds:
       entry.status === 'SERVING' && entry.ends_at
-        ? Math.max(0, Math.round((Date.parse(entry.ends_at) - Date.now()) / 1000))
+        ? Math.max(0, Math.ceil((Date.parse(entry.ends_at) - Date.now()) / 1000))
         : null,
     durationMinutes: entry.duration_minutes ?? avg,
     services: (chosen ?? []).map((s) => ({ name: s.name, durationMinutes: s.duration_minutes })),

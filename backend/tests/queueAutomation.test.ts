@@ -13,7 +13,8 @@ import {
   type NotificationEvent,
 } from '../src/services/notification.service';
 import { evaluateNotifications } from '../src/services/queueNotifications.service';
-import { joinViaApi } from './helpers';
+import { joinViaApi, app } from './helpers';
+import request from 'supertest';
 async function retried(
   run: () => PromiseLike<{ data: { id: string } | null; error: { message: string } | null }>,
   label: string,
@@ -271,5 +272,17 @@ describe('Queue automation (Slice 2)', () => {
     expect(e1.status).toBe('SERVING');
     expect(e1.ends_at).not.toBeNull();
     expect((await entry(second.ticketId)).status).toBe('WAITING');
+  });
+  it('reading a ticket whose time is up completes it on the spot, without the sweeper', async () => {
+    const salonId = await makeSalon();
+    const q = await makeQueue(salonId);
+    const a = await addEntry(q, 1, { status: 'SERVING', startedAt: ago(2 * MIN), endsAt: ago(1000) });
+    const b = await addEntry(q, 2, { durationMinutes: 10 });
+    const { data: tok } = await supabase.from('queue_entries').select('access_token').eq('id', a).single();
+
+    const res = await request(app).get(`/api/queue-tickets/${a}`).set('X-Ticket-Token', tok!.access_token);
+
+    expect(res.body.ticket.status).toBe('COMPLETED');
+    expect((await entry(b)).status).toBe('SERVING');
   });
 });

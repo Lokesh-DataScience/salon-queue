@@ -24,7 +24,9 @@ function salonIdOf(req: Request): string {
 
 export async function getQueue(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await getBarberQueueSnapshot(salonIdOf(req)));
+    const salonId = salonIdOf(req);
+    await advanceSalonQueue(salonId).catch(() => {});
+    res.json(await getBarberQueueSnapshot(salonId));
   } catch (err) {
     next(err);
   }

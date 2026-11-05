@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function Countdown({ endAtMs, onExpired }: { endAtMs: number; onExpired: () => void }) {
   const [now, setNow] = useState(() => Date.now());
+  // The end time we ran out at. Once set, the countdown never goes back to counting.
+  const [expiredAt, setExpiredAt] = useState<number | null>(null);
   const callback = useRef(onExpired);
   callback.current = onExpired;
 
@@ -12,13 +14,24 @@ export default function Countdown({ endAtMs, onExpired }: { endAtMs: number; onE
   }, []);
 
   const left = Math.max(0, Math.ceil((endAtMs - now) / 1000));
-  const expired = left === 0;
 
-  // At zero, re-check with the server now and every 10 seconds until the ticket moves on.
+  useEffect(() => {
+    if (left === 0) setExpiredAt((prev) => prev ?? endAtMs);
+  }, [left, endAtMs]);
+
+  // The barber added time: a clearly later end resumes the countdown.
+  const extended = expiredAt !== null && endAtMs > expiredAt + 2000;
+  useEffect(() => {
+    if (extended) setExpiredAt(null);
+  }, [extended]);
+
+  const expired = expiredAt !== null && !extended;
+
+  // Ask the server now, and again every 3 seconds, until this ticket moves on.
   useEffect(() => {
     if (!expired) return;
     callback.current();
-    const id = setInterval(() => callback.current(), 10_000);
+    const id = setInterval(() => callback.current(), 3000);
     return () => clearInterval(id);
   }, [expired]);
 
