@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { nearbySalonsQuerySchema, salonIdParamSchema, salonCodeParamSchema } from '../validators/salon.validators';
 import { findNearbySalons, getSalonById, getSalonByQrCode, getSalonQueueSnapshot } from '../services/salon.service';
+import { listServices } from '../services/salonServices.service';
 
 export async function getNearbySalons(req: Request, res: Response, next: NextFunction) {
   try {
@@ -41,6 +42,15 @@ export async function getSalonByCode(req: Request, res: Response, next: NextFunc
     const salon = parsed.success ? await getSalonByQrCode(parsed.data.code) : null;
     if (!salon) return res.status(404).json({ message: 'This QR code is not recognised.' });
     res.json({ salon });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getPublicServices(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { salonId } = salonIdParamSchema.parse(req.params);
+    res.json({ services: await listServices(salonId) });
   } catch (err) {
     next(err);
   }

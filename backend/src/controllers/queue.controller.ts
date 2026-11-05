@@ -10,8 +10,8 @@ import { advanceSalonQueue } from '../services/queueAutomation.service';
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
-    const { clientKey } = joinQueueBodySchema.parse(req.body ?? {});
-    const ticket = await joinQueue(salonId, clientKey);
+    const { clientKey, serviceIds } = joinQueueBodySchema.parse(req.body ?? {});
+    const ticket = await joinQueue(salonId, clientKey, serviceIds);
 
     // First customer in an empty queue starts now. A failure here must never lose the
     // customer's ticket: the sweeper picks the queue up within about 10 seconds anyway.

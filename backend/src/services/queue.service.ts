@@ -10,18 +10,24 @@ export class QueueJoinError extends Error {
     super(message);
   }
 }
-
 const JOIN_ERROR_MESSAGES: Record<string, string> = {
   SALON_NOT_FOUND: 'Salon not found.',
   SALON_CLOSED: 'Salon is currently closed.',
   QUEUE_NOT_ACTIVE: 'Queue is paused.',
+  INVALID_SERVICES: 'One of the services you chose is no longer available. Please choose again.',
 };
 
-export async function joinQueue(salonId: string, clientKey?: string) {
-  const { data, error } = await supabase.rpc('join_queue', {
-    p_salon_id: salonId,
-    p_client_key: clientKey ?? null,
-  });
+export async function joinQueue(salonId: string, clientKey?: string, serviceIds?: string[]) {
+  const { data, error } = serviceIds?.length
+    ? await supabase.rpc('join_queue_with_services', {
+        p_salon_id: salonId,
+        p_service_ids: serviceIds,
+        p_client_key: clientKey ?? null,
+      })
+    : await supabase.rpc('join_queue', {
+        p_salon_id: salonId,
+        p_client_key: clientKey ?? null,
+      });
   if (error) {
     const code = error.message?.split(':')[0]?.trim();
     if (code && JOIN_ERROR_MESSAGES[code]) {
@@ -73,7 +79,32 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
       .maybeSingle();
     prize = { name: offer?.name ?? 'Reward', code: entry.prize_code, redeemed: !!entry.prize_redeemed_at };
   }
+  const avg = salon?.average_service_minutes ?? 15;
+  let estimatedWait = 0;
 
+  if (entry.status === 'WAITING') {
+    const { data: ahead } = await supabase
+      .from('queue_entries')
+      .select('status, duration_minutes, ends_at')
+      .eq('queue_id', entry.queue_id)
+      .in('status', ['SERVING', 'CALLED', 'WAITING'])
+      .lt('token_number', entry.token_number);
+
+    const nowMs = Date.now();
+    for (const a of ahead ?? []) {
+      if (a.status === 'SERVING' && a.ends_at) {
+        estimatedWait += Math.max(0, Math.ceil((Date.parse(a.ends_at) - nowMs) / 60000));
+      } else {
+        estimatedWait += a.duration_minutes ?? avg;
+      }
+    }
+  }
+
+  const { data: chosen } = await supabase
+    .from('queue_entry_services')
+    .select('name, duration_minutes')
+    .eq('queue_entry_id', entry.id)
+    .order('created_at', { ascending: true });
   return {
     ticketId: entry.id,
     salonId: entry.queues.salon_id, // NEW — was already fetched via the join, just wasn't returned
@@ -81,7 +112,10 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     status: entry.status,
     currentToken: entry.queues.current_token,
     peopleAhead: peopleAhead ?? 0,
-    estimatedWaitMinutes: (peopleAhead ?? 0) * (salon?.average_service_minutes ?? 15),
+    estimatedWaitMinutes: estimatedWait,
+    endsAt: entry.status === 'SERVING' ? entry.ends_at : null, // for the countdown
+    durationMinutes: entry.duration_minutes ?? avg,
+    services: (chosen ?? []).map((s) => ({ name: s.name, durationMinutes: s.duration_minutes })),
     queueStatus: entry.queues.status,
     notificationsOn: !!entry.push_subscription, // a flag only, never the subscription itself
     prize,
