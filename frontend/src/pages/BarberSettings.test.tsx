@@ -12,7 +12,9 @@ vi.mock('../api/barber', () => ({
   updateBarberSalonProfile: vi.fn(),
   logoutBarber: vi.fn(),
 }));
-
+vi.mock('../components/ServicesSection', () => ({ 
+  default: () => null 
+}));
 const salon: BarberSalonProfile = {
   id: 'salon-1',
   name: 'Style Studio',

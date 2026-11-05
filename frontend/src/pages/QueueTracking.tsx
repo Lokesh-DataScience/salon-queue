@@ -10,6 +10,7 @@ import NotifyMe from '../components/NotifyMe';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_DISCOVERY } from '../lib/features';
 import LocalNews from '../components/LocalNews';
+import Countdown from '../components/Countdown';
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -87,7 +88,10 @@ export default function QueueTracking() {
 
   const { data: ticket, isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => fetchTicketStatus(ticketId!, accessToken),
+    queryFn: async () => {
+      const t = await fetchTicketStatus(ticketId!, accessToken);
+      return t ? { ...t, fetchedAt: Date.now() } : t;
+    },
     enabled: !!ticketId && !!accessToken,
   });
 
@@ -150,9 +154,10 @@ export default function QueueTracking() {
           currentToken: state.currentToken,
           queueStatus: state.queueStatus,
           peopleAhead,
-          estimatedWaitMinutes: peopleAhead * state.averageServiceMinutes,
         };
       });
+      // Wait estimate and countdown come from the server.
+      queryClient.invalidateQueries({ queryKey });
     }
 
     socket.on('queue:updated', handleUpdate);
@@ -165,7 +170,7 @@ export default function QueueTracking() {
   useEffect(() => {
     if (!ticket) return;
     const original = document.title;
-    if (ticket.status === 'CALLED') document.title = `Your turn! #${ticket.tokenNumber}`;
+    if (ticket.status === 'CALLED' || ticket.status === 'SERVING') document.title = `Your turn! #${ticket.tokenNumber}`;
     else if (ticket.status === 'WAITING' && ticket.peopleAhead <= 1)
       document.title = `Almost your turn · #${ticket.tokenNumber}`;
     return () => {
@@ -246,7 +251,7 @@ export default function QueueTracking() {
   if (ticket.status === 'CALLED') {
     banner = { icon: '🔔', text: "It's your turn", detail: 'Please head to the counter now.', classes: 'border-green-400 bg-green-50 text-green-900' };
   } else if (ticket.status === 'SERVING') {
-    banner = { icon: '✂️', text: 'Service in progress', detail: 'You are being served.', classes: 'border-blue-300 bg-blue-50 text-blue-900' };
+    banner = { icon: '🔔', text: "It's your turn", detail: 'Please head to the counter now. Your service time is running.', classes: 'border-green-400 bg-green-50 text-green-900' };
   } else if (ticket.status === 'WAITING' && ticket.peopleAhead === 0) {
     banner = { icon: '🚶', text: "You're next", detail: 'Start making your way to the salon.', classes: 'border-amber-400 bg-amber-50 text-amber-900' };
   } else if (ticket.status === 'WAITING' && ticket.peopleAhead === 1) {
@@ -286,20 +291,49 @@ export default function QueueTracking() {
         </div>
       )}
 
+      {ticket.status === 'SERVING' && ticket.remainingSeconds != null && (
+        <section aria-label="Service time left" className="card mt-4 p-4 text-center">
+          <p className="text-sm text-gray-600">Time left for your service</p>
+          <Countdown
+            endAtMs={ticket.fetchedAt + ticket.remainingSeconds * 1000}
+            onExpired={() => queryClient.invalidateQueries({ queryKey })}
+          />
+        </section>
+      )}
+
+      {ticket.services?.length > 0 && (
+        <section aria-label="Your services" className="card mt-4 p-4">
+          <p className="mb-2 text-sm text-gray-600">Your services</p>
+          <ul className="grid gap-1">
+            {ticket.services.map((s: { name: string; durationMinutes: number }) => (
+              <li key={s.name} className="flex justify-between gap-3">
+                <span className="font-semibold">{s.name}</span>
+                <span className="text-sm text-gray-700">{s.durationMinutes} min</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-gray-700">Total time: ~{ticket.durationMinutes} min</p>
+        </section>
+      )}
+
       {/* Live numbers */}
       <section aria-label="Queue status" className="card mt-4 divide-y divide-gray-200 p-0">
         <div className="flex items-center justify-between px-4 py-3">
           <span className="text-sm text-gray-600">Now serving</span>
           <span className="rounded-lg bg-brand-soft px-2 text-2xl font-bold tabular-nums">#{ticket.currentToken}</span>
         </div>
-        <div className="px-4 py-3">
-          <p className="text-lg font-semibold">
-            {ticket.peopleAhead} {ticket.peopleAhead === 1 ? 'person' : 'people'} ahead
-          </p>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-sm text-gray-700">Estimated wait: ~{ticket.estimatedWaitMinutes} min</p>
-        </div>
+        {ticket.status === 'WAITING' && (
+          <>
+            <div className="px-4 py-3">
+              <p className="text-lg font-semibold">
+                {ticket.peopleAhead} {ticket.peopleAhead === 1 ? 'person' : 'people'} ahead
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-sm text-gray-700">Estimated wait: ~{ticket.estimatedWaitMinutes} min</p>
+            </div>
+          </>
+        )}
       </section>
       {ticket.prize && <PrizeCard prize={ticket.prize} status={ticket.status} />}
 

@@ -1,19 +1,23 @@
 // frontend/src/pages/ScanLanding.tsx
-// Where a salon's wall QR lands (/q/:code). One scan = one ticket, no taps:
-// resolve the salon, resume this phone's active ticket if it has one, otherwise take a token and open it.
+// Where a salon's wall QR lands (/q/:code). Resume this phone's active ticket if it has one.
+// Salons with services show a picker first; salons without join straight away.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchSalonByCode } from '../api/salons';
+import { fetchSalonServices, type PublicService } from '../api/publicServices';
 import { fetchTicketStatus, joinSalonQueue } from '../api/tickets';
 import { ApiError } from '../api/client';
 import { getTickets, removeTicket, saveTicket } from '../lib/activeTickets';
 import { clearJoinKey, getJoinKey } from '../lib/joinKey';
+import { askPushPermission, enablePushAfterJoin } from '../lib/push';
 import PageShell from '../components/PageShell';
+import ServicePicker from '../components/ServicePicker';
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
 
 type View =
   | { kind: 'working'; salonName?: string }
+  | { kind: 'choose'; salon: { id: string; name: string }; services: PublicService[]; error?: string }
   | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean };
 
 const ticketUrl = (ticketId: string, accessToken: string) =>
@@ -29,10 +33,28 @@ export default function ScanLanding() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   const [view, setView] = useState<View>({ kind: 'working' });
+  const [joining, setJoining] = useState(false);
   // React StrictMode runs effects twice in development. This makes sure a scan can never take two tokens.
   const started = useRef(false);
   // A second tap on "Try again" while a request is in flight does nothing.
   const running = useRef(false);
+
+  // The same key for every attempt of this scan, so the server never creates a second ticket for it.
+  const joinNow = useCallback(
+    async (salonId: string, serviceIds: string[]) => {
+      const ticket = await joinSalonQueue(salonId, getJoinKey(salonId), serviceIds);
+      saveTicket({
+        ticketId: ticket.ticketId,
+        accessToken: ticket.accessToken,
+        salonId: ticket.salonId ?? salonId,
+        tokenNumber: ticket.tokenNumber,
+      });
+      clearJoinKey(salonId);
+      navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
+      return ticket;
+    },
+    [navigate],
+  );
 
   const runOnce = useCallback(async () => {
     setView({ kind: 'working' });
@@ -58,16 +80,12 @@ export default function ScanLanding() {
           }
         }
 
-        // The same key for every attempt of this scan, so the server never creates a second ticket for it.
-        const ticket = await joinSalonQueue(salon.id, getJoinKey(salon.id));
-        saveTicket({
-          ticketId: ticket.ticketId,
-          accessToken: ticket.accessToken,
-          salonId: ticket.salonId ?? salon.id,
-          tokenNumber: ticket.tokenNumber,
-        });
-        clearJoinKey(salon.id);
-        navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
+        const services = await fetchSalonServices(salon.id);
+        if (services.length > 0) {
+          setView({ kind: 'choose', salon: { id: salon.id, name: salon.name }, services });
+          return; // the lock is released while the customer chooses
+        }
+        await joinNow(salon.id, []);
       });
     } catch (err) {
       if (!salonName && err instanceof ApiError && err.status === 404) {
@@ -90,7 +108,7 @@ export default function ScanLanding() {
         canRetry: true,
       });
     }
-  }, [code, navigate]);
+  }, [code, navigate, joinNow]);
 
   const run = useCallback(async () => {
     if (running.current) return;
@@ -107,6 +125,49 @@ export default function ScanLanding() {
     started.current = true;
     void run();
   }, [run]);
+
+  function onChoose(serviceIds: string[]) {
+    if (view.kind !== 'choose' || joining) return;
+    const alerts = askPushPermission(); // must start straight from the tap, before any await
+    const { salon, services } = view;
+    setJoining(true);
+
+    void (async () => {
+      try {
+        const ticket = await withSalonLock(salon.id, () => joinNow(salon.id, serviceIds));
+        void alerts
+          .then((p) => {
+            if (p === 'granted') return enablePushAfterJoin(ticket.ticketId, ticket.accessToken);
+          })
+          .catch(() => {}); // the Notify me button on the ticket is the fallback
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : 'We could not reach the server. Please check your internet connection and try again.';
+        // A service may have been removed meanwhile: show the current list with the message.
+        let fresh = services;
+        try {
+          fresh = await fetchSalonServices(salon.id);
+        } catch {
+          /* keep the old list */
+        }
+        setView({ kind: 'choose', salon, services: fresh, error: message });
+      } finally {
+        setJoining(false);
+      }
+    })();
+  }
+
+  if (view.kind === 'choose') {
+    return (
+      <PageShell title="Choose your service">
+        <p className="mb-1 text-sm text-gray-600">{view.salon.name}</p>
+        <h1 className="mb-4 text-xl font-semibold">Choose your service</h1>
+        <ServicePicker services={view.services} busy={joining} error={view.error} onJoin={onChoose} />
+      </PageShell>
+    );
+  }
 
   if (view.kind === 'error') {
     return (

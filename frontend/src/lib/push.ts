@@ -1,3 +1,4 @@
+// frontend/src/lib/push.ts
 import { apiFetch } from '../api/client';
 
 export type PushSupport = 'ok' | 'ios-install' | 'unsupported';
@@ -56,4 +57,20 @@ export async function disablePush(ticketId: string, accessToken: string) {
     method: 'DELETE',
     body: JSON.stringify({ accessToken }),
   });
+}
+
+// Call straight from a tap, before any await: browsers only show the prompt for a user gesture.
+export function askPushPermission(): Promise<'granted' | 'skip'> {
+  if (pushSupport() !== 'ok') return Promise.resolve('skip');
+  if (Notification.permission === 'granted') return Promise.resolve('granted');
+  if (Notification.permission === 'denied') return Promise.resolve('skip');
+  return Notification.requestPermission()
+    .then((p): 'granted' | 'skip' => (p === 'granted' ? 'granted' : 'skip'))
+    .catch((): 'skip' => 'skip');
+}
+
+export async function enablePushAfterJoin(ticketId: string, accessToken: string) {
+  const config = await fetchPushConfig();
+  if (!config.enabled || !config.publicKey) return;
+  await enablePush(ticketId, accessToken, config.publicKey);
 }

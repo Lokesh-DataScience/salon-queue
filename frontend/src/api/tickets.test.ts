@@ -1,3 +1,4 @@
+// frontend/src/api/tickets.test.ts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchTicketStatus } from './tickets';
 

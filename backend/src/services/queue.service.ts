@@ -114,6 +114,10 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     peopleAhead: peopleAhead ?? 0,
     estimatedWaitMinutes: estimatedWait,
     endsAt: entry.status === 'SERVING' ? entry.ends_at : null, // for the countdown
+    remainingSeconds:
+      entry.status === 'SERVING' && entry.ends_at
+        ? Math.max(0, Math.round((Date.parse(entry.ends_at) - Date.now()) / 1000))
+        : null,
     durationMinutes: entry.duration_minutes ?? avg,
     services: (chosen ?? []).map((s) => ({ name: s.name, durationMinutes: s.duration_minutes })),
     queueStatus: entry.queues.status,

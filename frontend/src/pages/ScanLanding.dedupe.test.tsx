@@ -1,3 +1,4 @@
+// frontend/src/pages/ScanLanding.dedupe.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,7 +9,7 @@ import * as tickets from '../api/tickets';
 
 vi.mock('../api/salons', () => ({ fetchSalonByCode: vi.fn() }));
 vi.mock('../api/tickets', () => ({ fetchTicketStatus: vi.fn(), joinSalonQueue: vi.fn() }));
-
+vi.mock('../api/publicServices', () => ({ fetchSalonServices: vi.fn().mockResolvedValue([]) }));
 beforeEach(() => {
   localStorage.clear();
   vi.mocked(salons.fetchSalonByCode).mockReset().mockResolvedValue({ id: 'salon-1', name: 'Style Studio' });

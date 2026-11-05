@@ -1,3 +1,4 @@
+// frontend/src/pages/ScanLanding.test.tsx
 import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -16,7 +17,9 @@ vi.mock('../api/tickets', () => ({
 vi.mock('../api/salons', () => ({
   fetchSalonByCode: vi.fn(),
 }));
-
+vi.mock('../api/publicServices', () => ({ 
+  fetchSalonServices: vi.fn().mockResolvedValue([]) 
+}));
 const TOKEN = 'a'.repeat(40);
 const newTicket = { ticketId: 't-new', accessToken: TOKEN, salonId: 'salon-1', tokenNumber: 9 };
 const renderScan = (ui = <ScanLanding />) =>
@@ -36,7 +39,7 @@ describe('ScanLanding (wall QR)', () => {
 
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
     expect(salons.fetchSalonByCode).toHaveBeenCalledWith('87bcee043619');
-    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', expect.any(String));
+    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', expect.any(String), []);
     const stored = getTickets('salon-1');
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ ticketId: 't-new', tokenNumber: 9, salonId: 'salon-1' });

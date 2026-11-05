@@ -33,6 +33,9 @@ const base = {
   peopleAhead: 3,
   estimatedWaitMinutes: 30,
   queueStatus: 'ACTIVE',
+  services: [],
+  durationMinutes: 10,
+  remainingSeconds: null,
 };
 const given = (overrides: Record<string, unknown> = {}) =>
   vi.mocked(tickets.fetchTicketStatus).mockResolvedValue({ ...base, ...overrides });
@@ -63,7 +66,7 @@ describe('QueueTracking: waiting', () => {
     [{ peopleAhead: 1 }, "You're getting close"],
     [{ peopleAhead: 0 }, "You're next"],
     [{ status: 'CALLED', peopleAhead: 0 }, "It's your turn"],
-    [{ status: 'SERVING', peopleAhead: 0 }, 'Service in progress'],
+    [{ status: 'SERVING', peopleAhead: 0 }, "It's your turn"],
   ])('status banner for %j is "%s"', async (overrides, banner) => {
     given(overrides);
     renderTracking();
@@ -81,6 +84,7 @@ describe('QueueTracking: waiting', () => {
     renderTracking();
     await screen.findByText('3 people ahead');
 
+    given({ peopleAhead: 1, estimatedWaitMinutes: 10 }); // what the server will say on the refetch
     act(() => {
       fireSocket('queue:updated', {
         salonId: 'salon-1',
@@ -95,7 +99,7 @@ describe('QueueTracking: waiting', () => {
     });
 
     expect(await screen.findByText('1 person ahead')).toBeInTheDocument();
-    expect(screen.getByText(/Estimated wait: ~10 min/)).toBeInTheDocument();
+    expect(await screen.findByText(/Estimated wait: ~10 min/)).toBeInTheDocument();
     expect(screen.getByText("You're getting close")).toBeInTheDocument();
   });
     it('offers notifications, and keeps the "keep this page open" line until they are on', async () => {
@@ -203,5 +207,31 @@ describe('QueueTracking: local news', () => {
     renderTracking();
     await screen.findByText('Your service is complete. Thank you!');
     expect(feed.fetchSalonFeed).not.toHaveBeenCalled();
+  });
+});
+
+describe('QueueTracking: services and countdown', () => {
+  it('lists the chosen services and the total time', async () => {
+    given({
+      services: [
+        { name: 'Haircut', durationMinutes: 20 },
+        { name: 'Beard', durationMinutes: 10 },
+      ],
+      durationMinutes: 30,
+    });
+    renderTracking();
+
+    expect(await screen.findByText('Haircut')).toBeInTheDocument();
+    expect(screen.getByText('Beard')).toBeInTheDocument();
+    expect(screen.getByText(/Total time: ~30 min/)).toBeInTheDocument();
+  });
+
+  it('counts down the service time once it is the customer\'s turn, and hides the wait rows', async () => {
+    given({ status: 'SERVING', peopleAhead: 0, remainingSeconds: 125 });
+    renderTracking();
+
+    expect(await screen.findByRole('timer')).toHaveTextContent(/2:0[45]/);
+    expect(screen.queryByText(/people ahead|person ahead/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Estimated wait/)).not.toBeInTheDocument();
   });
 });

@@ -1,3 +1,4 @@
+// frontend/src/lib/push.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { enablePush, disablePush, pushSupport } from './push';
 import { apiFetch } from '../api/client';
