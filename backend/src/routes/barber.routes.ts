@@ -14,6 +14,8 @@ import {
 import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
 import { getStats } from '../controllers/barberStats.controller';
+import { getServices, postService, patchService, removeService } from '../controllers/salonServices.controller';
+
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in barber
@@ -21,6 +23,10 @@ router.use(requireAuth); // every route below requires a logged-in barber
 router.get('/salon', getProfile);
 router.patch('/salon', patchProfile);
 router.get('/stats', getStats); // after router.patch('/salon', patchProfile)
+router.get('/services', getServices);
+router.post('/services', postService);
+router.patch('/services/:serviceId', patchService);
+router.delete('/services/:serviceId', removeService);
 router.get('/queue', getQueue);
 router.post('/queue/next', postNext);
 router.post('/queue/:entryId/start', postStart);
@@ -35,5 +41,4 @@ router.post('/offers/redeem', postRedeem);
 router.patch('/offers/expected', patchExpected);
 router.patch('/offers/:offerId', patchOffer);
 router.delete('/offers/:offerId', removeOffer);
-
 export default router;
