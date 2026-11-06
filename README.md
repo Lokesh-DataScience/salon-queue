@@ -1,105 +1,219 @@
 # Salon Virtual Queue
 
-Privacy-first local salon queue platform. Customers discover nearby salons,
-see live queue status, join remotely, and get notified as their turn
-approaches — no account required. Barbers/salon staff authenticate to run
-the queue from a dashboard.
+A privacy-first virtual queue for salons and barber shops. A customer scans the salon's QR code, instantly gets a queue token, and can step away from the shop while the queue moves. The barber runs everything from a one-thumb, two-tab mobile dashboard.
 
-Full product/technical spec: `Salon_Virtual_Queue.txt`.
-Build order and working discipline: `INSTRUCTIONS.md`.
+**Live app:** https://salonqueue.onrender.com
+(hosted on a free plan, so the first request after a quiet period can take a few seconds)
 
-## Stack
+> **Product principle:** the barber should never have to think about the queue.
+> Every feature is judged by one question: *does this save the barber time, taps, or attention during a busy shift?*
 
-- **Frontend:** React + Vite + TypeScript + Tailwind CSS + React Router +
-  TanStack Query + Socket.IO client
-- **Backend:** Node.js + Express + TypeScript + `@supabase/supabase-js` +
-  hosted Supabase (PostgreSQL) + Socket.IO + Zod + JWT + bcrypt
+---
+
+## How it works
+
+**Customer (no account, no typing)**
+
+1. Scan the salon's QR code, which is printed once and stuck on the shop wall.
+2. Get a queue token immediately. No name, no phone number, no signup.
+3. Keep the ticket page open or allow notifications, then walk around or wait elsewhere.
+4. Get a push notification when your turn is close and when it is your turn.
+
+**Barber / salon owner**
+
+1. Register or log in at `/barber/login`.
+2. **Dashboard tab:** see who is being served, who is next and how many are waiting. One big Start then Complete button handles each customer. A **+1** button adds walk-ins who have no smartphone.
+3. **Settings tab:** salon profile (name, address, phone, hours, average service time), services, QR code, offers, password and log out.
+
+---
+
+## Features
+
+- **QR-first customer flow:** each salon gets a unique QR code that opens the ticket page directly.
+- **Anonymous tickets:** customers are never asked for a name or phone number. A random, opaque access token (sent in a request header, never in the URL) protects each ticket.
+- **One-button barber dashboard:** a single state-changing Start / Complete action, pinned above a fixed bottom navigation bar.
+- **Walk-in +1:** add a customer without a phone to the queue in one tap.
+- **Live updates:** Socket.IO rooms per salon push queue changes to the barber and customer screens with no refreshing.
+- **Web Push notifications:** a free, phone-number-independent provider behind a swappable `NotificationService` abstraction. Each customer gets "getting close", "you're next" and "your turn".
+- **Lucky-draw offers:** barbers add their own offers (for example, a free head massage a few times a day) and customers who scan may win one at random. The barber claims it with a tap.
+- **Barber self-registration:** salons sign themselves up; no admin work needed.
+- **Salon settings:** profile, opening hours (India time) and average service time feed directly into wait estimates.
+- **Installable app:** works as a mobile app wrapper around the website.
+
+---
+
+## Privacy by design
+
+- No customer accounts, passwords or profiles. Ever.
+- No customer name or phone is collected at join. Legacy contact columns are nullable and are wiped by a scheduled cleanup job after the retention window.
+- No personal data in logs, URLs or Socket.IO room names.
+- Customers can only access their own ticket; ownership violations on the barber side return `404` so entry IDs are not leaked.
+- The database is the source of truth. The frontend never talks to the database directly.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React, Vite, TypeScript, Tailwind CSS v4, React Router, TanStack Query, Socket.IO client |
+| Backend | Node.js, Express, TypeScript, Socket.IO, Zod, JWT, bcrypt, `express-rate-limit`, Helmet |
+| Database | PostgreSQL on Supabase, accessed through `@supabase/supabase-js` |
+| Notifications | Web Push (VAPID) via a pluggable provider |
+| Testing | Vitest, Supertest, React Testing Library |
+| Hosting | Render (single web service serving the API and the built frontend) |
+
+### Concurrency
+
+`supabase-js` has no client-side transactions, so all concurrency-sensitive operations are Postgres functions called with `supabase.rpc(...)`:
+
+- `join_queue`: atomic, row-locked token generation (no duplicate tokens)
+- `barber_next` / `advance_queue`: one state transition per press, even on a rapid double tap
+- `nearby_salons`: Haversine distance query
+- `cleanup_customer_data`: retention cleanup
+
+Complete / skip use optimistic concurrency (compare-and-swap on status).
+
+### Queue state machine
+
+```
+WAITING → CALLED → SERVING → COMPLETED
+   ├──→ SKIPPED
+   └──→ CANCELLED
+```
+
+---
 
 ## Project structure
 
 ```
 salon-queue/
-├── frontend/     React app (customer + barber UI)
-├── backend/      Express API + Socket.IO server
-│   └── supabase/ schema.sql (run in Supabase SQL Editor) + seed.ts
-└── shared/       Types/constants shared between frontend and backend
+├── frontend/     React + Vite app
+├── backend/      Express API, Socket.IO, jobs, tests
+│   └── supabase/ SQL schema and functions
+├── shared/       Shared types
+└── README.md
 ```
 
-## A note on database access
+Frontend and backend run independently in development. In production a single Express service can also serve the built frontend (`SERVE_FRONTEND=true`), which keeps everything same-origin so `SameSite` cookies work.
 
-The backend talks to Postgres through `@supabase/supabase-js` (PostgREST),
-using a hosted Supabase project and the **service role key** — never the
-anon key, and never from the frontend. Per spec §6/§20, the frontend must
-never access the database directly; only backend API routes do.
+---
 
-**Important:** `supabase-js` does not support client-side multi-statement
-transactions the way an ORM like Prisma does. The spec's atomicity
-requirements — token generation (§23) and the barber's NEXT logic (§27–28)
-— will be implemented as **Postgres functions (RPC)**, called via
-`supabase.rpc(...)`, starting in Milestone 2/3. This keeps the database as
-the actual source of truth for concurrency-sensitive operations.
+## Getting started
 
-There is no `docker-compose.yml` / local Postgres anymore — the database is
-hosted on Supabase.
+### Prerequisites
 
-## Local setup
+- Node.js 22 or newer
+- A Supabase project (use a separate one for tests)
 
-### 1. Create the schema
+### 1. Clone and install
 
-In your Supabase project dashboard → SQL Editor → New query, paste and run
-`backend/supabase/schema.sql`. It's idempotent (safe to re-run). This
-creates `salons`, `salon_staff`, `queues`, `queue_entries`, their enums,
-indexes, `updated_at` triggers, and enables Row Level Security with no
-policies (only the service role key — i.e. only the backend — can read or
-write anything).
+```bash
+git clone https://github.com/<your-username>/salon-queue.git
+cd salon-queue
 
-### 2. Backend
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### 2. Set up the database
+
+Run the SQL in `backend/supabase/` (schema, then functions) in the Supabase SQL editor. Optionally seed demo data:
 
 ```bash
 cd backend
-cp .env.example .env
+npm run db:seed
 ```
 
-Fill in `.env`:
-- `SUPABASE_URL` — Project Settings → API → Project URL
-- `SUPABASE_SERVICE_ROLE_KEY` — Project Settings → API → service_role key
-  (keep this secret; never commit it or send it to the frontend)
+### 3. Configure environment variables
+
+Create `backend/.env`:
 
 ```bash
-npm install
-npm run db:seed    # loads 5 demo salons
-npm run dev          # starts on http://localhost:4000
+PORT=4000
+FRONTEND_URL=http://localhost:5173
+
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+JWT_SECRET=
+JWT_REFRESH_SECRET=
+ACCESS_TOKEN_TTL_SECONDS=
+
+# Web Push (generate with: npx web-push generate-vapid-keys)
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+
+# Production only
+TRUST_PROXY=
+SERVE_FRONTEND=
 ```
 
-Check `GET http://localhost:4000/api/health` — should return
-`{ "status": "ok", "db": "connected", ... }`.
+Never commit `.env` files, and never expose backend secrets through `VITE_*` variables. The service-role key stays on the server only.
 
-### 3. Frontend
+### 4. Run in development
 
 ```bash
-cd frontend
-cp .env.example .env
-npm install
-npm run dev                # starts on http://localhost:5173
+# terminal 1
+cd backend && npm run dev
+
+# terminal 2
+cd frontend && npm run dev
 ```
 
-Visit `http://localhost:5173/health` to confirm the frontend can reach the
-backend end-to-end.
+Open http://localhost:5173.
 
-## A note on the TypeScript runner
+### 5. Create a salon
 
-The backend runs via `node --require tsx/cjs`, not the `tsx` CLI directly
-and not `ts-node`. Both of those have known Windows/Node-24 resolution bugs
-(`ts-node` fails before even reading the file; the bare `tsx` CLI resolves
-through Node's ESM loader even though this project is CommonJS). Using
-`node -r tsx/cjs <file>` sidesteps both — this is what `npm run dev` and
-`npm run db:seed` use.
+Salons can register themselves at `/barber/register`. There is also a `create-salon` CLI script in the backend for creating salons manually.
 
-## Current status
+---
 
-**Milestone 1 — Skeleton.** Monorepo, Supabase schema (`salons`,
-`salon_staff`, `queues`, `queue_entries`), Express app with
-Helmet/CORS/Zod/error handling, and a health check backed by
-`@supabase/supabase-js` are in place. No salon discovery, queue joining,
-auth, or real-time features yet — those land in Milestones 2–4 per
-`INSTRUCTIONS.md`.
+## Testing
+
+```bash
+cd backend && npm test      # Vitest + Supertest, run against a SEPARATE test Supabase project
+cd frontend && npm test     # Vitest + React Testing Library
+```
+
+The backend suite covers authentication, ownership, concurrent joins, the barber state machine, notifications, retention cleanup and public-data exposure. A safety guard in the test setup refuses to run against the production database.
+
+---
+
+## Deployment
+
+The app is deployed as a single Render web service:
+
+1. Build the frontend and backend (`npm ci --include=dev`, then the build scripts).
+2. Set the environment variables above, with `SERVE_FRONTEND=true` and `TRUST_PROXY` set for the platform.
+3. Point the service at your production Supabase project.
+4. Use an external pinger on `/api/health` if you are on a free plan that sleeps.
+
+---
+
+## Security
+
+- bcrypt password hashing, JWT access and refresh tokens in HTTP-only cookies, with refresh-token rotation and revocation
+- Rate limiting on join, login, registration, nearby and ticket endpoints
+- Zod validation on every request body
+- Helmet, strict CORS and a Content-Security-Policy
+- Every protected route re-verifies auth and salon ownership server-side; `salonId` is always read from the verified session, never from the client
+
+---
+
+## Roadmap
+
+- Services with per-service durations and automatic queue advancement
+- Custom domain and a Mumbai-region database
+- Wider rollout to salons in small-town markets
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Please keep changes small and focused, and run both test suites before opening a PR.
+
+## Author
+
+Built by **Lokesh Kumar**. Portfolio: https://lokesh-datascience.github.io/portfolio/
