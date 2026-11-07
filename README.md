@@ -109,7 +109,7 @@ Frontend and backend run independently in development. In production a single Ex
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/<your-username>/salon-queue.git
+git clone https://github.com/Lokesh-DataScience/salon-queue.git
 cd salon-queue
 
 cd backend && npm install
