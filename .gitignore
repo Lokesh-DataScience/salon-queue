@@ -22,3 +22,5 @@ npm-debug.log*
 .DS_Store
 .vscode/
 .idea/
+
+slice-f-context.txt
