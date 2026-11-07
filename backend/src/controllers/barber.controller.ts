@@ -10,6 +10,7 @@ import {
   pauseQueue,
   resumeQueue,
   addWalkIn,
+  moveToFront,
 } from '../services/barber.service';
 import { broadcastQueueUpdate } from '../services/queue.service';
 import { AppError } from '../middleware/errorHandler';
@@ -128,6 +129,18 @@ export async function postExtend(req: Request, res: Response, next: NextFunction
     const result = await extendEntry(salonId, entryId, minutes);
     await broadcastQueueUpdate(salonId);
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postPrioritize(req: Request, res: Response, next: NextFunction) {
+  try {
+    const salonId = salonIdOf(req); // from the verified session only
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const entry = await moveToFront(salonId, entryId);
+    await broadcastQueueUpdate(salonId);
+    res.json({ entry });
   } catch (err) {
     next(err);
   }

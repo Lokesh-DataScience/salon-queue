@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { todayISODate } from '../utils/date';
 import { NotificationService } from './notification.service';
+import { compareServeOrder } from '../utils/serveOrder';
 
 // Stages: 0 none, 1 "getting close", 2 "you're next", 3 "your turn".
 // "People ahead" is INCLUSIVE: WAITING + CALLED + SERVING entries before you.
@@ -29,14 +30,15 @@ export async function evaluateNotifications(
 
     const { data: entries } = await supabase
       .from('queue_entries')
-      .select('id, token_number, status, notified_stage')
+      .select('id, token_number, status, notified_stage, priority_at')
       .eq('queue_id', queue.id)
       .in('status', ['WAITING', 'CALLED', 'SERVING'])
       .order('token_number', { ascending: true });
     if (!entries) return;
 
-    for (let i = 0; i < entries.length; i++) {
-      const e = entries[i];
+    const ordered = [...entries].sort(compareServeOrder);
+    for (let i = 0; i < ordered.length; i++) {
+      const e = ordered[i];
       const stage = desiredStage(e.status, i); // i = active entries ahead of this one
       if (stage <= e.notified_stage) continue;
 

@@ -11,6 +11,7 @@ import {
   pauseQueue,
   resumeQueue,
   addWalkIn,
+  prioritizeEntry,
 } from '../api/barber';
 import { redeemCode } from '../api/offers';
 import { socket } from '../lib/socket';
@@ -104,6 +105,14 @@ export default function BarberDashboard() {
   });
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
   const pauseMutation = useMutation({ mutationFn: () => runAction(pauseQueue) });
+
+  // Emergency: serve a waiting customer right after the current one.
+  const [bumpTarget, setBumpTarget] = useState<{ id: string; token_number: number } | null>(null);
+  const bumpMutation = useMutation({
+    mutationFn: (id: string) => runAction(() => prioritizeEntry(id)),
+    onSettled: () => setBumpTarget(null),
+  });
+
   const [walkInMsg, setWalkInMsg] = useState<string | null>(null);
   useEffect(() => {
     if (!walkInMsg) return;
@@ -153,7 +162,12 @@ export default function BarberDashboard() {
   }
 
   const isPaused = queue.queueStatus === 'PAUSED';
-  const busy = primaryMutation.isPending || skipMutation.isPending || pauseMutation.isPending || walkInMutation.isPending;
+  const busy =
+    primaryMutation.isPending ||
+    skipMutation.isPending ||
+    pauseMutation.isPending ||
+    walkInMutation.isPending ||
+    bumpMutation.isPending;
   const nextWaiting = queue.waiting[0] ?? null;
   const active = queue.serving ?? queue.called; // whoever is at the chair / being called
 
@@ -316,19 +330,46 @@ export default function BarberDashboard() {
               No one waiting.
             </p>
           ) : (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {queue.waiting.map((entry, i) => (
-                <li
-                  key={entry.id}
-                  className={`flex flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink ${
-                    i === 0 ? 'border-ink bg-brand' : 'border-gray-200 bg-white'
-                  }`}
-                >
-                  #{entry.token_number}
-                  {i === 0 && <span className="text-xs font-semibold text-ink">Next</span>}
-                </li>
-              ))}
-            </ul>
+            <>
+              {queue.waiting.length > 1 && (
+                <p className="mb-2 text-sm text-gray-600">Emergency? Tap a token to serve it next.</p>
+              )}
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {queue.waiting.map((entry, i) => {
+                  const isPriority = !!entry.priority_at;
+                  const base =
+                    'flex w-full flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink';
+                  const tone =
+                    i === 0
+                      ? 'border-ink bg-brand'
+                      : isPriority
+                        ? 'border-ink bg-brand-soft'
+                        : 'border-gray-200 bg-white';
+                  return (
+                    <li key={entry.id}>
+                      {i === 0 || isPriority ? (
+                        <div className={`${base} ${tone}`}>
+                          #{entry.token_number}
+                          <span className="text-xs font-semibold">
+                            {isPriority ? (i === 0 ? '⚡ Priority · Next' : '⚡ Priority') : 'Next'}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Serve #${entry.token_number} next`}
+                          disabled={busy}
+                          onClick={() => setBumpTarget({ id: entry.id, token_number: entry.token_number })}
+                          className={`${base} ${tone} min-h-14 hover:bg-brand-soft disabled:opacity-40`}
+                        >
+                          #{entry.token_number}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </section>
       </main>
@@ -347,6 +388,47 @@ export default function BarberDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Emergency confirm sheet: one extra tap so a stray touch can never reorder the queue. */}
+      {bumpTarget && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/50 p-4"
+          onClick={() => !bumpMutation.isPending && setBumpTarget(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="bump-title"
+            className="mx-auto w-full max-w-md rounded-2xl border-2 border-ink bg-white p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="bump-title" className="text-xl font-bold text-ink">
+              Serve #{bumpTarget.token_number} next?
+            </h2>
+            <p className="mt-1 text-sm text-gray-700">
+              They go right after the current customer. Everyone else keeps their order.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={bumpMutation.isPending}
+                onClick={() => bumpMutation.mutate(bumpTarget.id)}
+              >
+                {bumpMutation.isPending ? 'Moving...' : 'Yes, serve next'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={bumpMutation.isPending}
+                onClick={() => setBumpTarget(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

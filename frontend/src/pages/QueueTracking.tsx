@@ -145,9 +145,10 @@ export default function QueueTracking() {
 
       queryClient.setQueryData(queryKey, (prev: any) => {
         if (!prev) return prev;
-        const peopleAhead = state.entries.filter(
-          (e) => e.status === 'WAITING' && e.tokenNumber < mine.tokenNumber,
-        ).length;
+        const idx = state.entries.findIndex((e) => e.id === ticketId);
+        const peopleAhead = state.entries
+          .slice(0, idx)
+          .filter((e) => e.status === 'WAITING').length;
         return {
           ...prev,
           status: mine.status,
@@ -276,7 +277,12 @@ export default function QueueTracking() {
           <span>The salon has paused the queue for now. Your place is saved.</span>
         </p>
       )}
-
+      {ticket.status === 'WAITING' && ticket.movedAhead && (
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900" role="status">
+          <span aria-hidden="true">ℹ️</span>
+          <span>A customer with an urgent need was moved ahead of you.</span>
+        </p>
+      )}
       {banner && (
         <div
           className={`mt-4 flex items-start gap-3 rounded-2xl border-2 p-4 ${banner.classes}`}

@@ -5,7 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import { todayISODate } from '../utils/date';
 import { evaluateNotifications } from './queueNotifications.service';
 import { advanceQueue } from './queueAutomation.service';
-
+import { compareServeOrder } from '../utils/serveOrder';
 export class QueueJoinError extends Error {
   constructor(public code: string, message: string) {
     super(message);
@@ -66,12 +66,21 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
       return getTicketStatus(ticketId, accessToken); // read it again, now completed
     }
   }
-  const { count: peopleAhead } = await supabase
+    // Who is ahead, in SERVE order (the barber can move an urgent customer to the front).
+  const { data: active } = await supabase
     .from('queue_entries')
-    .select('*', { count: 'exact', head: true })
+    .select('id, status, token_number, priority_at, duration_minutes, ends_at')
     .eq('queue_id', entry.queue_id)
-    .eq('status', 'WAITING')
-    .lt('token_number', entry.token_number);
+    .in('status', ['SERVING', 'CALLED', 'WAITING']);
+
+  const ahead = ['WAITING', 'CALLED', 'SERVING'].includes(entry.status)
+    ? (active ?? []).filter((a) => a.id !== entry.id && compareServeOrder(a, entry) < 0)
+    : [];
+  const peopleAhead = ahead.filter((a) => a.status === 'WAITING').length;
+  const movedAhead =
+    entry.status === 'WAITING' &&
+    !entry.priority_at &&
+    ahead.some((a) => a.priority_at && a.token_number > entry.token_number);
 
   const { data: salon } = await supabase
     .from('salons')
@@ -91,15 +100,8 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
   let estimatedWait = 0;
 
   if (entry.status === 'WAITING') {
-    const { data: ahead } = await supabase
-      .from('queue_entries')
-      .select('status, duration_minutes, ends_at')
-      .eq('queue_id', entry.queue_id)
-      .in('status', ['SERVING', 'CALLED', 'WAITING'])
-      .lt('token_number', entry.token_number);
-
     const nowMs = Date.now();
-    for (const a of ahead ?? []) {
+    for (const a of ahead) {
       if (a.status === 'SERVING' && a.ends_at) {
         estimatedWait += Math.max(0, Math.ceil((Date.parse(a.ends_at) - nowMs) / 60000));
       } else {
@@ -115,11 +117,12 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     .order('created_at', { ascending: true });
   return {
     ticketId: entry.id,
-    salonId: entry.queues.salon_id, // NEW — was already fetched via the join, just wasn't returned
+    salonId: entry.queues.salon_id,
     tokenNumber: entry.token_number,
     status: entry.status,
     currentToken: entry.queues.current_token,
-    peopleAhead: peopleAhead ?? 0,
+    peopleAhead,            // was: peopleAhead ?? 0
+    movedAhead,             // NEW: drives the "urgent customer was moved ahead of you" notice
     estimatedWaitMinutes: estimatedWait,
     endsAt: entry.status === 'SERVING' ? entry.ends_at : null, // for the countdown
     remainingSeconds:
@@ -150,10 +153,9 @@ export async function getSanitizedQueueState(salonId: string) {
 
   const { data: entries } = await supabase
     .from('queue_entries')
-    .select('id, token_number, status')
+    .select('id, token_number, status, priority_at')
     .eq('queue_id', queue.id)
-    .in('status', ['WAITING', 'CALLED', 'SERVING'])
-    .order('token_number', { ascending: true });
+    .in('status', ['WAITING', 'CALLED', 'SERVING']);
 
   const { data: salon } = await supabase
     .from('salons')
@@ -166,7 +168,7 @@ export async function getSanitizedQueueState(salonId: string) {
     currentToken: queue.current_token,
     queueStatus: queue.status,
     averageServiceMinutes: salon?.average_service_minutes ?? 15,
-    entries: (entries ?? []).map((e) => ({
+    entries: (entries ?? []).sort(compareServeOrder).map((e) => ({
       id: e.id,
       tokenNumber: e.token_number,
       status: e.status,

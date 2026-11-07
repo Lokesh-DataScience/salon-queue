@@ -19,6 +19,7 @@ vi.mock('../api/barber', () => ({
   skipEntry: vi.fn(),
   pauseQueue: vi.fn(),
   resumeQueue: vi.fn(),
+  prioritizeEntry: vi.fn()
 }));
 
 const entry = (
@@ -33,6 +34,7 @@ const entry = (
   started_at: null,
   completed_at: null,
   skipped_at: null,
+  priority_at: null,
 });
 
 const snapshot = (overrides: Partial<BarberQueueSnapshot> = {}): BarberQueueSnapshot => ({
@@ -193,5 +195,35 @@ describe('BarberDashboard (one-button)', () => {
 
     expect(await screen.findByRole('button', { name: /add walk-in/i })).toBeDisabled();
     expect(screen.getByText('Resume the queue to add a walk-in.')).toBeInTheDocument();
+  });
+  it('emergency: tapping a waiting token and confirming moves it to the front', async () => {
+    given({ waiting: [entry(4), entry(5), entry(6)] });
+    vi.mocked(barber.prioritizeEntry).mockResolvedValue({ entry: { id: 'entry-6', tokenNumber: 6 } });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'Serve #6 next' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, serve next' }));
+    await waitFor(() => expect(barber.prioritizeEntry).toHaveBeenCalledWith('entry-6'));
+  });
+
+  it('emergency: cancelling the sheet does nothing', async () => {
+    given({ waiting: [entry(4), entry(5)] });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'Serve #5 next' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(barber.prioritizeEntry).not.toHaveBeenCalled();
+  });
+
+  it('emergency: the next token and priority tokens cannot be tapped', async () => {
+    given({ waiting: [{ ...entry(8), priority_at: '2026-01-01T00:00:01Z' }, entry(3), entry(4)] });
+    renderDashboard();
+
+    await screen.findByText('Waiting (3)');
+    expect(screen.queryByRole('button', { name: 'Serve #8 next' })).not.toBeInTheDocument();
+    expect(screen.getByText('⚡ Priority · Next')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Serve #3 next' })).toBeInTheDocument();
   });
 });

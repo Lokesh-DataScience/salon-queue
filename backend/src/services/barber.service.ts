@@ -2,6 +2,7 @@
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 import { todayISODate } from '../utils/date';
+import { compareServeOrder } from '../utils/serveOrder';
 
 interface QueueEntryRow {
   id: string;
@@ -14,6 +15,33 @@ interface QueueEntryRow {
   started_at: string | null;
   completed_at: string | null;
   skipped_at: string | null;
+  priority_at: string | null;
+}
+
+// above getBarberQueueSnapshot
+function byServeOrder(a: QueueEntryRow, b: QueueEntryRow) {
+  if (a.priority_at && b.priority_at) return Date.parse(a.priority_at) - Date.parse(b.priority_at);
+  if (a.priority_at) return -1;
+  if (b.priority_at) return 1;
+  return a.token_number - b.token_number;
+}
+
+// ── PRIORITY: serve a waiting customer right after the current one ──────────
+export async function moveToFront(salonId: string, entryId: string) {
+  const { data, error } = await supabase.rpc('move_to_front', {
+    p_salon_id: salonId,
+    p_entry_id: entryId,
+  });
+
+  if (error) {
+    const msg = error.message ?? '';
+    if (msg.includes('ENTRY_NOT_FOUND')) throw new AppError('Queue entry not found.', 404);
+    if (msg.includes('NOT_WAITING')) throw new AppError('Only a waiting customer can be moved up.', 409);
+    if (msg.includes('ALREADY_NEXT')) throw new AppError('This customer is already next.', 409);
+    if (msg.includes('ALREADY_PRIORITY')) throw new AppError('This customer was already moved up.', 409);
+    throw error;
+  }
+  return { id: entryId, tokenNumber: data as number };
 }
 
 // ── Dashboard read ──────────────────────────────────────────────────────
@@ -42,7 +70,7 @@ export async function getBarberQueueSnapshot(salonId: string) {
   const { data: entries, error: entriesError } = await supabase
     .from('queue_entries')
     .select(
-      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at',
+      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at, priority_at'
     )
     .eq('queue_id', queue.id)
     .in('status', ['CALLED', 'SERVING', 'WAITING'])
@@ -58,7 +86,7 @@ export async function getBarberQueueSnapshot(salonId: string) {
     currentToken: queue.current_token,
     called: rows.find((e) => e.status === 'CALLED') ?? null,
     serving: rows.find((e) => e.status === 'SERVING') ?? null,
-    waiting: rows.filter((e) => e.status === 'WAITING'),
+    waiting: rows.filter((e) => e.status === 'WAITING').sort(compareServeOrder),
   };
 }
 

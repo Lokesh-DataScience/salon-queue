@@ -18,6 +18,7 @@ export interface BarberQueueEntry {
   started_at: string | null;
   completed_at: string | null;
   skipped_at: string | null;
+  priority_at: string | null;
 }
 
 export interface BarberQueueSnapshot {
@@ -202,4 +203,11 @@ export function updateService(id: string, changes: Partial<ServiceInput>) {
 
 export function deleteService(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/barber/services/${id}`, { method: 'DELETE' });
+}
+
+export function prioritizeEntry(entryId: string) {
+  return apiFetch<{ entry: { id: string; tokenNumber: number } }>(
+    `/api/barber/queue/${entryId}/prioritize`,
+    { method: 'POST' },
+  );
 }
