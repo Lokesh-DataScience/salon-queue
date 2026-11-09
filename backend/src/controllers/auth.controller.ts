@@ -30,8 +30,8 @@ function setSessionCookies(res: Response, tokens: { accessToken: string; refresh
 
 export async function postBarberLogin(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email, password } = barberLoginBodySchema.parse(req.body);
-    const { tokens, staff } = await loginBarber(email, password);
+    const { identifier, password } = barberLoginBodySchema.parse(req.body);
+    const { tokens, staff } = await loginBarber(identifier, password);
     setSessionCookies(res, tokens);
     res.status(200).json({ staff });
   } catch (err) {

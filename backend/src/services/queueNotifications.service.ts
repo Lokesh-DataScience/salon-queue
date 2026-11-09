@@ -30,35 +30,44 @@ export async function evaluateNotifications(
 
     const { data: entries } = await supabase
       .from('queue_entries')
-      .select('id, token_number, status, notified_stage, priority_at')
+      .select('id, token_number, status, notified_stage, priority_at, lane_id')
       .eq('queue_id', queue.id)
       .in('status', ['WAITING', 'CALLED', 'SERVING'])
       .order('token_number', { ascending: true });
     if (!entries) return;
 
-    const ordered = [...entries].sort(compareServeOrder);
-    for (let i = 0; i < ordered.length; i++) {
-      const e = ordered[i];
-      const stage = desiredStage(e.status, i); // i = active entries ahead of this one
-      if (stage <= e.notified_stage) continue;
+    // Each barber has their own line: "people ahead" is counted inside the customer's own line.
+    const lines = new Map<string, typeof entries>();
+    for (const e of entries) {
+      const key = String(e.lane_id ?? '');
+      lines.set(key, [...(lines.get(key) ?? []), e]);
+    }
 
-      // Atomic claim: a single conditional UPDATE. If two evaluations race,
-      // only one gets a row back, so each stage fires at most once per ticket.
-      const { data: claimed } = await supabase
-        .from('queue_entries')
-        .update({ notified_stage: stage })
-        .eq('id', e.id)
-        .lt('notified_stage', stage)
-        .select('id')
-        .maybeSingle();
+    for (const line of lines.values()) {
+      const ordered = [...line].sort(compareServeOrder);
+      for (let i = 0; i < ordered.length; i++) {
+        const e = ordered[i];
+        const stage = desiredStage(e.status, i); // i = active entries ahead of this one, in this line
+        if (stage <= e.notified_stage) continue;
 
-      // Silent claim for a customer who just joined: record the stage they
-      // already sit at without sending an instant "you're next".
-      if (!claimed || e.id === opts.silentEntryId) continue;
+        // Atomic claim: a single conditional UPDATE. If two evaluations race,
+        // only one gets a row back, so each stage fires at most once per ticket.
+        const { data: claimed } = await supabase
+          .from('queue_entries')
+          .update({ notified_stage: stage })
+          .eq('id', e.id)
+          .lt('notified_stage', stage)
+          .select('id')
+          .maybeSingle();
 
-      const target = { entryId: e.id, salonId, tokenNumber: e.token_number };
-      if (stage === 3) await NotificationService.notifyTurnNow(target);
-      else await NotificationService.notifyQueueApproaching(target, i);
+        // Silent claim for a customer who just joined: record the stage they
+        // already sit at without sending an instant "you're next".
+        if (!claimed || e.id === opts.silentEntryId) continue;
+
+        const target = { entryId: e.id, salonId, tokenNumber: e.token_number };
+        if (stage === 3) await NotificationService.notifyTurnNow(target);
+        else await NotificationService.notifyQueueApproaching(target, i);
+      }
     }
   } catch (err) {
     console.error(`[notify] evaluation failed salon=${salonId}`); // no error object: may echo row data

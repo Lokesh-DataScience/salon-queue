@@ -1,7 +1,7 @@
 // backend/src/controllers/salon.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { nearbySalonsQuerySchema, salonIdParamSchema, salonCodeParamSchema } from '../validators/salon.validators';
-import { findNearbySalons, getSalonById, getSalonByQrCode, getSalonQueueSnapshot } from '../services/salon.service';
+import { findNearbySalons, getSalonById, getSalonByQrCode, getSalonQueueSnapshot, getPublicLanes } from '../services/salon.service';
 import { listServices } from '../services/salonServices.service';
 
 export async function getNearbySalons(req: Request, res: Response, next: NextFunction) {
@@ -51,6 +51,17 @@ export async function getPublicServices(req: Request, res: Response, next: NextF
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
     res.json({ services: await listServices(salonId) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// A salon with one barber returns one lane; the app only shows the barber choice for two or more.
+export async function getSalonLanes(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { salonId } = salonIdParamSchema.parse(req.params);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ lanes: await getPublicLanes(salonId) });
   } catch (err) {
     next(err);
   }

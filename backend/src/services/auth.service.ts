@@ -8,29 +8,47 @@ import { AppError } from '../middleware/errorHandler';
 import type { JwtPayload, RefreshPayload, StaffRole } from '../types/auth.types';
 import type { RegisterSalonBody } from '../validators/auth.validators';
 import { assignPlaceToSalon } from './place.service';
+import { normalizePhone } from '../utils/phone';
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 interface SalonStaffRow {
   id: string;
   salon_id: string;
   name: string;
-  email: string;
+  email: string | null;
   password_hash: string;
   role: StaffRole;
+  is_active: boolean;
 }
 
-export async function loginBarber(email: string, password: string) {
-  const { data, error } = await supabase
-    .from('salon_staff')
-    .select('id, salon_id, name, email, password_hash, role')
-    .eq('email', email)
-    .maybeSingle<SalonStaffRow>();
+const BAD_LOGIN = 'Invalid email, phone number or password.';
 
-  // Same message for "no such email" and "wrong password": no account enumeration.
-  if (error || !data) throw new AppError('Invalid email or password.', 401);
+// identifier is an email (contains "@") or a phone number.
+export async function loginBarber(identifier: string, password: string) {
+  const select = supabase
+    .from('salon_staff')
+    .select('id, salon_id, name, email, password_hash, role, is_active');
+
+  let lookup;
+  if (identifier.includes('@')) {
+    lookup = select.eq('email', identifier.toLowerCase());
+  } else {
+    const phone = normalizePhone(identifier);
+    if (!phone) throw new AppError(BAD_LOGIN, 401);
+    lookup = select.eq('phone', phone);
+  }
+  const { data, error } = await lookup.maybeSingle<SalonStaffRow>();
+
+  // Same message for "no such account" and "wrong password": no account enumeration.
+  if (error || !data) throw new AppError(BAD_LOGIN, 401);
 
   const passwordMatches = await bcrypt.compare(password, data.password_hash);
-  if (!passwordMatches) throw new AppError('Invalid email or password.', 401);
+  if (!passwordMatches) throw new AppError(BAD_LOGIN, 401);
+
+  // Checked only after the password, so this message cannot be used to probe for accounts.
+  if (!data.is_active) {
+    throw new AppError('This account has been switched off. Please contact your salon owner.', 403);
+  }
 
   return {
     tokens: signTokens({ staffId: data.id, salonId: data.salon_id, role: data.role }),
@@ -81,11 +99,11 @@ export async function rotateRefreshToken(refreshToken: string) {
 
   const { data: staff, error: staffError } = await supabase
     .from('salon_staff')
-    .select('id, salon_id, role')
+    .select('id, salon_id, role, is_active')
     .eq('id', payload.staffId)
     .maybeSingle();
   if (staffError) throw staffError; // infrastructure problem: 500, not a forced logout
-  if (!staff) throw new AppError(SESSION_ENDED, 401);
+  if (!staff || !staff.is_active) throw new AppError(SESSION_ENDED, 401); // removed or switched-off staff end here
 
   const { error: claimError } = await supabase
     .from('revoked_tokens')

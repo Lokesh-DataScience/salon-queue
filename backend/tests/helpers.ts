@@ -59,7 +59,7 @@ export async function plantLegacyPersonalData(entryId: string, name: string, pho
   if (error) throw new Error(`plantLegacyPersonalData failed: ${error.message}`);
 }
 
-export async function barberCookieFor(salonId: string): Promise<string> {
+export async function barberCookieFor(salonId: string, role: 'OWNER' | 'BARBER' = 'OWNER',): Promise<string> {
   const email = `barber-${randomUUID()}@example.test`;
   const password = 'testpass123';
   const { error } = await supabase.from('salon_staff').insert({
@@ -67,7 +67,7 @@ export async function barberCookieFor(salonId: string): Promise<string> {
     name: 'Test Barber',
     email,
     password_hash: await bcrypt.hash(password, 4),
-    role: 'BARBER',
+    role,
   });
   if (error) throw new Error(`barberCookieFor insert failed: ${error.message}`);
 

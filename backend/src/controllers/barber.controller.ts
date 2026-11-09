@@ -1,33 +1,38 @@
 // backend/src/controllers/barber.controller.ts
 import type { Request, Response, NextFunction } from 'express';
-import { entryIdParamSchema } from '../validators/barber.validators';
+import { entryIdParamSchema, laneQuerySchema } from '../validators/barber.validators';
 import {
   getBarberQueueSnapshot,
   callNext,
   startEntry,
   completeEntry,
   skipEntry,
-  pauseQueue,
-  resumeQueue,
+  pauseForScope,
+  resumeForScope,
   addWalkIn,
   moveToFront,
+  assertEntryAccess,
 } from '../services/barber.service';
+import { resolveScope } from '../services/barberScope.service';
 import { broadcastQueueUpdate } from '../services/queue.service';
 import { AppError } from '../middleware/errorHandler';
 import { NotificationService } from '../services/notification.service';
 import { advanceSalonQueue, extendEntry } from '../services/queueAutomation.service';
 import { extendBodySchema } from '../validators/barber.validators';
 
-function salonIdOf(req: Request): string {
+// Who is asking and which barber's line this is about (see barberScope.service.ts).
+// The line comes from the database for staff; only the owner may name another with ?laneId=.
+async function scopeOf(req: Request) {
   if (!req.staff) throw new AppError('Not authenticated.', 401);
-  return req.staff.salonId;
+  const { laneId } = laneQuerySchema.parse(req.query);
+  return resolveScope(req.staff, laneId);
 }
 
 export async function getQueue(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
-    await advanceSalonQueue(salonId).catch(() => {});
-    res.json(await getBarberQueueSnapshot(salonId));
+    const scope = await scopeOf(req);
+    await advanceSalonQueue(scope.salonId).catch(() => {});
+    res.json(await getBarberQueueSnapshot(scope));
   } catch (err) {
     next(err);
   }
@@ -35,9 +40,9 @@ export async function getQueue(req: Request, res: Response, next: NextFunction) 
 
 export async function postNext(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
-    const result = await callNext(salonId);
-    await broadcastQueueUpdate(salonId); // NEW
+    const scope = await scopeOf(req);
+    const result = await callNext(scope);
+    await broadcastQueueUpdate(scope.salonId);
     res.json({ result });
   } catch (err) {
     next(err);
@@ -46,10 +51,10 @@ export async function postNext(req: Request, res: Response, next: NextFunction) 
 
 export async function postStart(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
+    const scope = await scopeOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
-    const entry = await startEntry(salonId, entryId);
-    await broadcastQueueUpdate(salonId); // NEW
+    const entry = await startEntry(scope.salonId, entryId, scope.entryLaneId);
+    await broadcastQueueUpdate(scope.salonId);
     res.json({ entry });
   } catch (err) {
     next(err);
@@ -58,11 +63,11 @@ export async function postStart(req: Request, res: Response, next: NextFunction)
 
 export async function postComplete(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
+    const scope = await scopeOf(req);
     const { entryId } = entryIdParamSchema.parse(req.params);
-    const entry = await completeEntry(salonId, entryId);
-    await advanceSalonQueue(salonId);
-    await broadcastQueueUpdate(salonId); // NEW
+    const entry = await completeEntry(scope.salonId, entryId, scope.entryLaneId);
+    await advanceSalonQueue(scope.salonId);
+    await broadcastQueueUpdate(scope.salonId);
     res.json({ entry });
   } catch (err) {
     next(err);
@@ -71,11 +76,12 @@ export async function postComplete(req: Request, res: Response, next: NextFuncti
 
 export async function postSkip(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
+    const scope = await scopeOf(req);
+    const { salonId } = scope;
     const { entryId } = entryIdParamSchema.parse(req.params);
-    const entry = await skipEntry(salonId, entryId);
+    const entry = await skipEntry(salonId, entryId, scope.entryLaneId);
     await advanceSalonQueue(salonId);
-    await broadcastQueueUpdate(salonId); // NEW
+    await broadcastQueueUpdate(salonId);
     if (entry.previousStatus === 'WAITING' || entry.previousStatus === 'CALLED') {
       await NotificationService.notifyQueueCancelled({
         entryId, salonId, tokenNumber: entry.tokenNumber,
@@ -89,9 +95,9 @@ export async function postSkip(req: Request, res: Response, next: NextFunction) 
 
 export async function postPause(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
-    const queue = await pauseQueue(salonId);
-    await broadcastQueueUpdate(salonId); // NEW
+    const scope = await scopeOf(req);
+    const queue = await pauseForScope(scope);
+    await broadcastQueueUpdate(scope.salonId);
     res.json({ queue });
   } catch (err) {
     next(err);
@@ -100,9 +106,9 @@ export async function postPause(req: Request, res: Response, next: NextFunction)
 
 export async function postResume(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
-    const queue = await resumeQueue(salonId);
-    await broadcastQueueUpdate(salonId); // NEW
+    const scope = await scopeOf(req);
+    const queue = await resumeForScope(scope);
+    await broadcastQueueUpdate(scope.salonId);
     res.json({ queue });
   } catch (err) {
     next(err);
@@ -111,10 +117,10 @@ export async function postResume(req: Request, res: Response, next: NextFunction
 
 export async function postWalkIn(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req); // always from the verified session, never the body
-    const entry = await addWalkIn(salonId);
-    await advanceSalonQueue(salonId);
-    await broadcastQueueUpdate(salonId); // customers' "people ahead" updates live
+    const scope = await scopeOf(req); // salon and line come from the session, never the body
+    const entry = await addWalkIn(scope);
+    await advanceSalonQueue(scope.salonId);
+    await broadcastQueueUpdate(scope.salonId); // customers' "people ahead" updates live
     res.status(201).json({ entry });
   } catch (err) {
     next(err);
@@ -123,9 +129,11 @@ export async function postWalkIn(req: Request, res: Response, next: NextFunction
 
 export async function postExtend(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req);
+    const scope = await scopeOf(req);
+    const { salonId } = scope;
     const { entryId } = entryIdParamSchema.parse(req.params);
     const { minutes } = extendBodySchema.parse(req.body ?? {});
+    await assertEntryAccess(salonId, entryId, scope.entryLaneId); // staff: their own line only
     const result = await extendEntry(salonId, entryId, minutes);
     await broadcastQueueUpdate(salonId);
     res.json(result);
@@ -136,9 +144,10 @@ export async function postExtend(req: Request, res: Response, next: NextFunction
 
 export async function postPrioritize(req: Request, res: Response, next: NextFunction) {
   try {
-    const salonId = salonIdOf(req); // from the verified session only
+    const scope = await scopeOf(req); // from the verified session only
+    const { salonId } = scope;
     const { entryId } = entryIdParamSchema.parse(req.params);
-    const entry = await moveToFront(salonId, entryId);
+    const entry = await moveToFront(salonId, entryId, scope.entryLaneId);
     await broadcastQueueUpdate(salonId);
     res.json({ entry });
   } catch (err) {

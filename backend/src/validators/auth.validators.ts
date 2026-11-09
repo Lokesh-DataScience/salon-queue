@@ -1,10 +1,19 @@
 // backend/src/validators/auth.validators.ts
 import { z } from 'zod';
 
-export const barberLoginBodySchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(1, 'Password is required.'),
-});
+// Staff sign in with an email OR a phone number. "email" is still accepted as the field name
+// so a browser tab that loaded the old login page keeps working across a deploy.
+export const barberLoginBodySchema = z
+  .object({
+    identifier: z.string().trim().min(1, 'Enter your email or phone number.').max(254).optional(),
+    email: z.string().trim().min(1).max(254).optional(),
+    password: z.string().min(1, 'Password is required.').max(200),
+  })
+  .refine((v) => Boolean(v.identifier || v.email), {
+    path: ['identifier'],
+    message: 'Enter your email or phone number.',
+  })
+  .transform((v) => ({ identifier: (v.identifier ?? v.email) as string, password: v.password }));
 
 export type BarberLoginBody = z.infer<typeof barberLoginBodySchema>;
 

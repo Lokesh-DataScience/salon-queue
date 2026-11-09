@@ -16,18 +16,29 @@ const JOIN_ERROR_MESSAGES: Record<string, string> = {
   SALON_CLOSED: 'Salon is currently closed.',
   QUEUE_NOT_ACTIVE: 'Queue is paused.',
   INVALID_SERVICES: 'One of the services you chose is no longer available. Please choose again.',
+  LANE_NOT_FOUND: "That barber isn't available right now. Please choose again.",
+  LANE_INACTIVE: "That barber isn't available right now. Please choose again.",
+  LANE_PAUSED: 'That barber is on a break right now. Please choose another barber, or pick Any barber.',
 };
 
-export async function joinQueue(salonId: string, clientKey?: string, serviceIds?: string[]) {
+export async function joinQueue(
+  salonId: string,
+  clientKey?: string,
+  serviceIds?: string[],
+  laneId?: string,
+) {
+  // laneId undefined = "Any barber": the database picks the line with the shortest wait.
   const { data, error } = serviceIds?.length
     ? await supabase.rpc('join_queue_with_services', {
         p_salon_id: salonId,
         p_service_ids: serviceIds,
         p_client_key: clientKey ?? null,
+        p_lane_id: laneId ?? null,
       })
     : await supabase.rpc('join_queue', {
         p_salon_id: salonId,
         p_client_key: clientKey ?? null,
+        p_lane_id: laneId ?? null,
       });
   if (error) {
     const code = error.message?.split(':')[0]?.trim();
@@ -71,6 +82,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     .from('queue_entries')
     .select('id, status, token_number, priority_at, duration_minutes, ends_at')
     .eq('queue_id', entry.queue_id)
+    .eq('lane_id', entry.lane_id) // only this customer's own barber line counts
     .in('status', ['SERVING', 'CALLED', 'WAITING']);
 
   const ahead = ['WAITING', 'CALLED', 'SERVING'].includes(entry.status)
@@ -87,6 +99,31 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     .select('average_service_minutes')
     .eq('id', entry.queues.salon_id)
     .single();
+  // Several barbers: show whose line this is, and "now serving" for that line only.
+  const { data: laneRows } = await supabase
+    .from('lanes')
+    .select('id, name, is_active')
+    .eq('salon_id', entry.queues.salon_id);
+  const multiLane = (laneRows ?? []).filter((l) => l.is_active).length > 1;
+  const myLane = (laneRows ?? []).find((l) => l.id === entry.lane_id);
+  let currentToken: number = entry.queues.current_token;
+  if (multiLane) {
+    const live = (active ?? []).find((a) => a.status === 'SERVING' || a.status === 'CALLED');
+    if (live) {
+      currentToken = live.token_number;
+    } else {
+      const { data: last } = await supabase
+        .from('queue_entries')
+        .select('token_number')
+        .eq('queue_id', entry.queue_id)
+        .eq('lane_id', entry.lane_id)
+        .not('started_at', 'is', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      currentToken = last?.token_number ?? 0;
+    }
+  }
     let prize: { name: string; code: string; redeemed: boolean } | null = null;
   if (entry.offer_id && !['CANCELLED', 'SKIPPED'].includes(entry.status)) {
     const { data: offer } = await supabase
@@ -120,7 +157,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     salonId: entry.queues.salon_id,
     tokenNumber: entry.token_number,
     status: entry.status,
-    currentToken: entry.queues.current_token,
+    currentToken,
     peopleAhead,            // was: peopleAhead ?? 0
     movedAhead,             // NEW: drives the "urgent customer was moved ahead of you" notice
     estimatedWaitMinutes: estimatedWait,
@@ -132,6 +169,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     durationMinutes: entry.duration_minutes ?? avg,
     services: (chosen ?? []).map((s) => ({ name: s.name, durationMinutes: s.duration_minutes })),
     queueStatus: entry.queues.status,
+    lane: multiLane && myLane ? { id: myLane.id as string, name: myLane.name as string } : null, // null when the salon has one line
     notificationsOn: !!entry.push_subscription, // a flag only, never the subscription itself
     prize,
   };

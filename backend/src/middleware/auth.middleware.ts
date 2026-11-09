@@ -21,3 +21,14 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     next(new AppError('Session expired or invalid. Please log in again.', 401));
   }
 }
+
+// Salon settings, offers, stats and the team list are for the owner only. Staff accounts
+// (role BARBER) can run the queue but nothing else. Always placed AFTER requireAuth.
+// The role comes from the verified token, which is refreshed from the database on every
+// token rotation, so a role change takes effect within one access-token lifetime.
+export function requireOwner(req: Request, _res: Response, next: NextFunction) {
+  if (req.staff?.role !== 'OWNER') {
+    return next(new AppError('Only the salon owner can do this.', 403));
+  }
+  next();
+}

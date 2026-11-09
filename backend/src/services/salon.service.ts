@@ -65,3 +65,27 @@ export async function getSalonQueueSnapshot(salonId: string) {
 
   return { currentToken: queue.current_token, waitingCount: count ?? 0 };
 }
+
+// The barber lines a customer can choose from (switched-off barbers are left out).
+// Only what a customer needs: a name and how long a new customer would wait. No staff details.
+export async function getPublicLanes(salonId: string) {
+  const { data, error } = await supabase.rpc('lane_waits', { p_salon_id: salonId });
+  if (error) throw error;
+  return ((data ?? []) as Array<{
+    lane_id: string;
+    name: string;
+    is_default: boolean;
+    created_at: string;
+    waiting_count: number;
+    wait_minutes: number;
+    is_paused: boolean;
+  }>)
+    .sort((a, b) => Number(b.is_default) - Number(a.is_default) || a.created_at.localeCompare(b.created_at))
+    .map((l) => ({
+      id: l.lane_id,
+      name: l.name,
+      waitingCount: l.waiting_count,
+      estimatedWaitMinutes: l.wait_minutes,
+      isPaused: l.is_paused, // on a break: shown, but not selectable
+    }));
+}
