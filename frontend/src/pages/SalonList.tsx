@@ -1,3 +1,4 @@
+// frontend/src/pages/SalonList.tsx
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { fetchNearbySalons } from '../api/salons';

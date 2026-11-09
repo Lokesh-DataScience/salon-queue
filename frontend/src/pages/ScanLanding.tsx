@@ -3,7 +3,7 @@
 // Salons with services show a picker first; salons without join straight away.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchSalonByCode } from '../api/salons';
+import { fetchSalonByCode, fetchSalonLanes, type PublicLane } from '../api/salons';
 import { fetchSalonServices, type PublicService } from '../api/publicServices';
 import { fetchTicketStatus, joinSalonQueue } from '../api/tickets';
 import { ApiError } from '../api/client';
@@ -12,12 +12,22 @@ import { clearJoinKey, getJoinKey } from '../lib/joinKey';
 import { askPushPermission, enablePushAfterJoin } from '../lib/push';
 import PageShell from '../components/PageShell';
 import ServicePicker from '../components/ServicePicker';
+import LanePicker from '../components/LanePicker';
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
 
+// The barber list must never get in the way of taking a token: any failure just means "no choice".
+async function loadLanes(salonId: string): Promise<PublicLane[]> {
+  try {
+    return await fetchSalonLanes(salonId);
+  } catch {
+    return [];
+  }
+}
+
 type View =
   | { kind: 'working'; salonName?: string }
-  | { kind: 'choose'; salon: { id: string; name: string }; services: PublicService[]; error?: string }
+  | { kind: 'choose'; salon: { id: string; name: string }; services: PublicService[]; lanes: PublicLane[]; error?: string }
   | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean };
 
 const ticketUrl = (ticketId: string, accessToken: string) =>
@@ -34,6 +44,7 @@ export default function ScanLanding() {
   const navigate = useNavigate();
   const [view, setView] = useState<View>({ kind: 'working' });
   const [joining, setJoining] = useState(false);
+  const [laneId, setLaneId] = useState<string | null>(null); // null = Any barber
   // React StrictMode runs effects twice in development. This makes sure a scan can never take two tokens.
   const started = useRef(false);
   // A second tap on "Try again" while a request is in flight does nothing.
@@ -41,8 +52,12 @@ export default function ScanLanding() {
 
   // The same key for every attempt of this scan, so the server never creates a second ticket for it.
   const joinNow = useCallback(
-    async (salonId: string, serviceIds: string[]) => {
-      const ticket = await joinSalonQueue(salonId, getJoinKey(salonId), serviceIds);
+    async (salonId: string, serviceIds: string[], chosenLaneId?: string) => {
+      // Exactly the call it always was, unless the customer picked a barber.
+      const key = getJoinKey(salonId);
+      const ticket = chosenLaneId
+        ? await joinSalonQueue(salonId, key, serviceIds, chosenLaneId)
+        : await joinSalonQueue(salonId, key, serviceIds);
       saveTicket({
         ticketId: ticket.ticketId,
         accessToken: ticket.accessToken,
@@ -80,9 +95,20 @@ export default function ScanLanding() {
           }
         }
 
-        const services = await fetchSalonServices(salon.id);
-        if (services.length > 0) {
-          setView({ kind: 'choose', salon: { id: salon.id, name: salon.name }, services });
+        const [services, lanes] = await Promise.all([
+          fetchSalonServices(salon.id),
+          loadLanes(salon.id), // never blocks a join
+        ]);
+        // The barber choice only appears when the salon has more than one barber.
+        const pickBarber = lanes.length > 1;
+        if (services.length > 0 || pickBarber) {
+          setLaneId(null);
+          setView({
+            kind: 'choose',
+            salon: { id: salon.id, name: salon.name },
+            services,
+            lanes: pickBarber ? lanes : [],
+          });
           return; // the lock is released while the customer chooses
         }
         await joinNow(salon.id, []);
@@ -129,12 +155,12 @@ export default function ScanLanding() {
   function onChoose(serviceIds: string[]) {
     if (view.kind !== 'choose' || joining) return;
     const alerts = askPushPermission(); // must start straight from the tap, before any await
-    const { salon, services } = view;
+    const { salon, services, lanes } = view;
     setJoining(true);
 
     void (async () => {
       try {
-        const ticket = await withSalonLock(salon.id, () => joinNow(salon.id, serviceIds));
+        const ticket = await withSalonLock(salon.id, () => joinNow(salon.id, serviceIds, laneId ?? undefined));
         void alerts
           .then((p) => {
             if (p === 'granted') return enablePushAfterJoin(ticket.ticketId, ticket.accessToken);
@@ -145,14 +171,27 @@ export default function ScanLanding() {
           err instanceof ApiError
             ? err.message
             : 'We could not reach the server. Please check your internet connection and try again.';
-        // A service may have been removed meanwhile: show the current list with the message.
+        // A service or a barber may have been removed meanwhile: show the current lists with the message.
         let fresh = services;
+        let freshLanes = lanes;
         try {
           fresh = await fetchSalonServices(salon.id);
         } catch {
           /* keep the old list */
         }
-        setView({ kind: 'choose', salon, services: fresh, error: message });
+        try {
+          freshLanes = await fetchSalonLanes(salon.id);
+        } catch {
+          /* keep the old list */
+        }
+        if (laneId && !freshLanes.some((l) => l.id === laneId)) setLaneId(null);
+        setView({
+          kind: 'choose',
+          salon,
+          services: fresh,
+          lanes: freshLanes.length > 1 ? freshLanes : [],
+          error: message,
+        });
       } finally {
         setJoining(false);
       }
@@ -161,10 +200,28 @@ export default function ScanLanding() {
 
   if (view.kind === 'choose') {
     return (
-      <PageShell title="Choose your service">
+      <PageShell title={view.services.length > 0 ? 'Choose your service' : 'Get your token'}>
         <p className="mb-1 text-sm text-gray-600">{view.salon.name}</p>
-        <h1 className="mb-4 text-xl font-semibold">Choose your service</h1>
-        <ServicePicker services={view.services} busy={joining} error={view.error} onJoin={onChoose} />
+        {view.lanes.length > 1 && (
+          <LanePicker lanes={view.lanes} value={laneId} onChange={setLaneId} disabled={joining} />
+        )}
+        {view.services.length > 0 ? (
+          <>
+            <h1 className="mb-4 text-xl font-semibold">Choose your service</h1>
+            <ServicePicker services={view.services} busy={joining} error={view.error} onJoin={onChoose} />
+          </>
+        ) : (
+          <>
+            {view.error && (
+              <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                {view.error}
+              </p>
+            )}
+            <button type="button" className="btn-primary" disabled={joining} onClick={() => onChoose([])}>
+              {joining ? 'Getting your token...' : 'Get my token'}
+            </button>
+          </>
+        )}
       </PageShell>
     );
   }

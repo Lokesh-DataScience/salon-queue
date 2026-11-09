@@ -1,6 +1,9 @@
 // frontend/src/pages/JoinQueue.tsx
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { fetchSalonLanes } from '../api/salons';
+import LanePicker from '../components/LanePicker';
 import { joinSalonQueue } from '../api/tickets';
 import { saveTicket } from '../lib/activeTickets';
 import { useActiveTickets } from '../hooks/useActiveTickets';
@@ -13,12 +16,22 @@ export default function JoinQueue() {
   const [addingAnother, setAddingAnother] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [laneId, setLaneId] = useState<string | null>(null); // null = Any barber
+  // The barber choice only appears when the salon has more than one barber.
+  const { data: lanes = [] } = useQuery({
+    queryKey: ['salonLanes', salonId],
+    queryFn: () => fetchSalonLanes(salonId!),
+    enabled: !!salonId,
+    retry: false,
+  });
 
   async function handleJoin() {
     setSubmitting(true);
     setError(null);
     try {
-      const ticket = await joinSalonQueue(salonId!);
+      const ticket = laneId
+        ? await joinSalonQueue(salonId!, undefined, undefined, laneId)
+        : await joinSalonQueue(salonId!);
       saveTicket({
         ticketId: ticket.ticketId,
         accessToken: ticket.accessToken,
@@ -82,6 +95,7 @@ export default function JoinQueue() {
       <p className="mb-4 text-sm text-gray-600">
         No account, name or phone number needed. Tap once to get your token.
       </p>
+      {lanes.length > 1 && <LanePicker lanes={lanes} value={laneId} onChange={setLaneId} disabled={submitting} />}
       {error && (
         <p id="join-error" role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
           {error}

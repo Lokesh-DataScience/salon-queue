@@ -4,7 +4,7 @@ import { apiFetch } from './client';
 export interface BarberStaff {
   id: string;
   name: string;
-  email: string;
+  email: string | null; // staff added by the owner sign in with a phone number instead
   role: 'OWNER' | 'BARBER' | 'MANAGER';
   salonId: string;
 }
@@ -21,6 +21,16 @@ export interface BarberQueueEntry {
   priority_at: string | null;
 }
 
+// One barber's line, as the owner's switcher shows it.
+export interface BarberLaneSummary {
+  id: string;
+  name: string;
+  isMine: boolean;
+  isPaused: boolean;
+  waitingCount: number;
+  busy: boolean;
+}
+
 export interface BarberQueueSnapshot {
   salonId: string;
   queueStatus: 'ACTIVE' | 'PAUSED' | 'CLOSED';
@@ -28,7 +38,13 @@ export interface BarberQueueSnapshot {
   called: BarberQueueEntry | null;
   serving: BarberQueueEntry | null;
   waiting: BarberQueueEntry[];
+  // Only present when the salon has more than one barber (a one-barber salon never sees these).
+  lane?: { id: string; name: string; isPaused: boolean } | null;
+  lanes?: BarberLaneSummary[] | null; // the owner's switcher; staff never get it
 }
+
+// The owner can look at another barber's line; for staff the server ignores this and uses their own.
+const laneQuery = (laneId?: string) => (laneId ? `?laneId=${encodeURIComponent(laneId)}` : '');
 
 export interface CallNextResult {
   completed_entry_id?: string | null;
@@ -83,10 +99,11 @@ export function updateBarberSalonProfile(changes: SalonProfileUpdate) {
   }).then((r) => r.salon);
 }
 
-export function loginBarber(email: string, password: string) {
+// identifier is an email address or a phone number.
+export function loginBarber(identifier: string, password: string) {
   return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier, password }),
   });
 }
 
@@ -94,12 +111,12 @@ export function logoutBarber() {
   return apiFetch<{ ok: boolean }>('/api/auth/barber/logout', { method: 'POST' });
 }
 
-export function fetchBarberQueue() {
-  return apiFetch<BarberQueueSnapshot>('/api/barber/queue');
+export function fetchBarberQueue(laneId?: string) {
+  return apiFetch<BarberQueueSnapshot>(`/api/barber/queue${laneQuery(laneId)}`);
 }
  
-export function callNextCustomer() {
-  return apiFetch<{ result: CallNextResult }>('/api/barber/queue/next', { method: 'POST' });
+export function callNextCustomer(laneId?: string) {
+  return apiFetch<{ result: CallNextResult }>(`/api/barber/queue/next${laneQuery(laneId)}`, { method: 'POST' });
 }
 
 export function startEntry(entryId: string) {
@@ -120,12 +137,12 @@ export function skipEntry(entryId: string) {
   });
 }
 
-export function pauseQueue() {
-  return apiFetch<{ queue: { status: string } }>('/api/barber/queue/pause', { method: 'POST' });
+export function pauseQueue(laneId?: string) {
+  return apiFetch<{ queue: { status: string } }>(`/api/barber/queue/pause${laneQuery(laneId)}`, { method: 'POST' });
 }
 
-export function resumeQueue() {
-  return apiFetch<{ queue: { status: string } }>('/api/barber/queue/resume', { method: 'POST' });
+export function resumeQueue(laneId?: string) {
+  return apiFetch<{ queue: { status: string } }>(`/api/barber/queue/resume${laneQuery(laneId)}`, { method: 'POST' });
 }
 
 export function fetchBarberSalon() {
@@ -139,10 +156,11 @@ export function registerSalon(input: RegisterSalonInput) {
   });
 }
 
-export function addWalkIn() {
-  return apiFetch<{ entry: { id: string; tokenNumber: number } }>('/api/barber/queue/walk-in', {
-    method: 'POST',
-  });
+export function addWalkIn(laneId?: string) {
+  return apiFetch<{ entry: { id: string; tokenNumber: number; laneName?: string | null } }>(
+    `/api/barber/queue/walk-in${laneQuery(laneId)}`,
+    { method: 'POST' },
+  );
 }
 export interface StatsDay {
   date: string; // YYYY-MM-DD, IST
@@ -210,4 +228,67 @@ export function prioritizeEntry(entryId: string) {
     `/api/barber/queue/${entryId}/prioritize`,
     { method: 'POST' },
   );
+}
+
+// ── Who is signed in, and the owner's team list ───────────────────────────
+export interface BarberMe {
+  id: string;
+  name: string;
+  role: 'OWNER' | 'BARBER' | 'MANAGER';
+  salonId: string;
+  laneId: string | null;
+  laneName: string | null;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  role: 'OWNER' | 'BARBER' | 'MANAGER';
+  isActive: boolean;
+  laneId: string | null;
+}
+
+export interface AddTeamMemberInput {
+  name: string;
+  phone: string;
+  password: string;
+}
+
+export function fetchMe() {
+  return apiFetch<{ staff: BarberMe }>('/api/barber/me').then((r) => r.staff);
+}
+
+export function fetchTeam() {
+  return apiFetch<{ team: TeamMember[] }>('/api/barber/team').then((r) => r.team);
+}
+
+export function addTeamMember(input: AddTeamMemberInput) {
+  return apiFetch<{ member: TeamMember }>('/api/barber/team', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }).then((r) => r.member);
+}
+
+export function resetTeamMemberPassword(staffId: string, password: string) {
+  return apiFetch<{ ok: boolean }>(`/api/barber/team/${staffId}/password`, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function setTeamMemberActive(staffId: string, isActive: boolean) {
+  return apiFetch<{ member: { id: string; isActive: boolean } }>(`/api/barber/team/${staffId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
+  });
+}
+
+// Any signed-in staff member changes their own password.
+export function changeOwnPassword(currentPassword: string, newPassword: string) {
+  return apiFetch<{ ok: boolean }>('/api/barber/me/password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
 }

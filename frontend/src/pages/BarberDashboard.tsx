@@ -12,12 +12,16 @@ import {
   resumeQueue,
   addWalkIn,
   prioritizeEntry,
+  fetchMe,
 } from '../api/barber';
 import { redeemCode } from '../api/offers';
+import BarberLaneSwitcher from '../components/BarberLaneSwitcher';
+import ChangePassword from '../components/ChangePassword';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 
-const QUEUE_KEY = ['barberQueue'];
+const QUEUE_KEY = ['barberQueue']; // other lines use [...QUEUE_KEY, laneId], so invalidating QUEUE_KEY refreshes them all
+const LANE_STORE = 'svq.barber.lane'; // which line the owner was looking at (not personal data)
 
 export default function BarberDashboard() {
   const navigate = useNavigate();
@@ -31,11 +35,39 @@ export default function BarberDashboard() {
     onError: (e: any) => setRedeemMsg({ ok: false, text: e.message ?? 'Could not redeem.' }),
   });
 
-  const { data: queue, isLoading, error } = useQuery({
-    queryKey: QUEUE_KEY,
-    queryFn: fetchBarberQueue,
-    retry: (count, err) => !(err instanceof ApiError && err.status === 401) && count < 2,
+  // The owner can look at any barber's line; null means their own. Staff always get their own.
+  const [selectedLane, setSelectedLane] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(LANE_STORE);
+    } catch {
+      return null;
+    }
   });
+  function chooseLane(id: string | null) {
+    setSelectedLane(id);
+    try {
+      if (id) sessionStorage.setItem(LANE_STORE, id);
+      else sessionStorage.removeItem(LANE_STORE);
+    } catch {
+      /* storage can be unavailable; the choice just will not be remembered */
+    }
+  }
+  const lane = selectedLane ?? undefined;
+
+  const { data: me } = useQuery({ queryKey: ['barberMe'], queryFn: () => fetchMe(), retry: false });
+  const isStaff = me?.role === 'BARBER' || me?.role === 'MANAGER';
+
+  const { data: queue, isLoading, error } = useQuery({
+    queryKey: selectedLane ? [...QUEUE_KEY, selectedLane] : QUEUE_KEY,
+    queryFn: () => (selectedLane ? fetchBarberQueue(selectedLane) : fetchBarberQueue()),
+    retry: (count, err) =>
+      !(err instanceof ApiError && (err.status === 401 || err.status === 404)) && count < 2,
+  });
+
+  // A line that no longer exists (a barber was removed): go back to the owner's own line.
+  useEffect(() => {
+    if (selectedLane && error instanceof ApiError && error.status === 404) chooseLane(null);
+  }, [error, selectedLane]);
   function refetch() {
     return queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
   }
@@ -93,18 +125,20 @@ export default function BarberDashboard() {
         } else if (queue.called) {
           await startEntry(queue.called.id); // CALLED → SERVING
         } else if (queue.queueStatus === 'PAUSED') {
-          await resumeQueue();
+          await (lane ? resumeQueue(lane) : resumeQueue());
         } else {
           // Idle: call the next customer and start them in one tap.
           // If start fails, the customer stays CALLED and the button becomes "Start #N".
-          const { result } = await callNextCustomer();
+          const { result } = await (lane ? callNextCustomer(lane) : callNextCustomer());
           const calledId = (result as { called_entry_id?: string | null } | null)?.called_entry_id;
           if (calledId) await startEntry(calledId);
         }
       }),
   });
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
-  const pauseMutation = useMutation({ mutationFn: () => runAction(pauseQueue) });
+  const pauseMutation = useMutation({
+    mutationFn: () => runAction(() => (lane ? pauseQueue(lane) : pauseQueue())),
+  });
 
   // Emergency: serve a waiting customer right after the current one.
   const [bumpTarget, setBumpTarget] = useState<{ id: string; token_number: number } | null>(null);
@@ -120,13 +154,17 @@ export default function BarberDashboard() {
     return () => clearTimeout(t);
   }, [walkInMsg]);
   const walkInMutation = useMutation({
-    mutationFn: addWalkIn,
+    mutationFn: () => (lane ? addWalkIn(lane) : addWalkIn()),
     onMutate: () => {
       setActionError(null);
       setWalkInMsg(null);
     },
     onSuccess: (r) => {
-      setWalkInMsg(`Token #${r.entry.tokenNumber} added to the queue.`);
+      setWalkInMsg(
+        r.entry.laneName
+          ? `Token #${r.entry.tokenNumber} added to ${r.entry.laneName}'s line.`
+          : `Token #${r.entry.tokenNumber} added to the queue.`,
+      );
       refetch();
     },
     onError: (err: any) => {
@@ -162,6 +200,7 @@ export default function BarberDashboard() {
   }
 
   const isPaused = queue.queueStatus === 'PAUSED';
+  const multi = !!queue.lane; // several barbers: this screen is about one line
   const busy =
     primaryMutation.isPending ||
     skipMutation.isPending ||
@@ -181,7 +220,7 @@ export default function BarberDashboard() {
   } else if (queue.called) {
     label = `START #${queue.called.token_number}`;
   } else if (isPaused) {
-    label = 'RESUME QUEUE';
+    label = multi ? 'RESUME LINE' : 'RESUME QUEUE';
     color = 'bg-amber-700 text-white hover:bg-amber-800';
   } else if (nextWaiting) {
     label = `START NEXT #${nextWaiting.token_number}`;
@@ -212,7 +251,7 @@ export default function BarberDashboard() {
           <div className="flex items-center gap-3">
             <img src="/icon-192.png" alt="" width={44} height={44} className="h-11 w-11 rounded-xl" />
             <div>
-              <h1 className="text-xl font-semibold">Salon queue</h1>
+              <h1 className="text-xl font-semibold">{queue.lane ? `${queue.lane.name}'s line` : 'Salon queue'}</h1>
               <p className="text-sm text-gray-300">Current token #{queue.currentToken}</p>
             </div>
           </div>
@@ -225,9 +264,13 @@ export default function BarberDashboard() {
               aria-hidden="true"
               className={`h-2 w-2 rounded-full ${isPaused ? 'bg-amber-600' : 'bg-green-600'}`}
             />
-            {isPaused ? 'Queue paused' : 'Queue active'}
+            {isPaused ? (multi ? 'Line paused' : 'Queue paused') : multi ? 'Line active' : 'Queue active'}
           </span>
         </header>
+
+        {queue.lanes && queue.lanes.length > 1 && (
+          <BarberLaneSwitcher lanes={queue.lanes} selectedId={selectedLane} onSelect={chooseLane} />
+        )}
 
         {actionError && (
           <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
@@ -267,7 +310,7 @@ export default function BarberDashboard() {
                 disabled={busy}
                 className="min-h-12 rounded-xl border-2 border-ink px-4 text-base font-medium hover:bg-brand-soft disabled:opacity-40"
               >
-                Pause queue
+                {multi ? 'Pause this line' : 'Pause queue'}
               </button>
             )}
           </div>
@@ -318,7 +361,9 @@ export default function BarberDashboard() {
             </button>
           </div>
           {isPaused && (
-            <p className="mb-2 text-sm text-gray-600">Resume the queue to add a walk-in.</p>
+            <p className="mb-2 text-sm text-gray-600">
+              {multi ? 'Resume this line to add a walk-in.' : 'Resume the queue to add a walk-in.'}
+            </p>
           )}
           {walkInMsg && (
             <p role="status" className="mb-3 rounded-lg border border-green-300 bg-green-50 p-3 text-base font-medium text-green-900">
@@ -372,6 +417,8 @@ export default function BarberDashboard() {
             </>
           )}
         </section>
+
+        {isStaff && <ChangePassword />}
       </main>
 
       {/* The one big button sits at the bottom of the screen, within thumb reach. */}

@@ -9,6 +9,7 @@ import * as barber from '../api/barber';
 import type { BarberStats as Stats, StatsDay } from '../api/barber';
 
 vi.mock('../api/barber', () => ({ fetchBarberStats: vi.fn() }));
+vi.mock('../lib/socket', () => ({ socket: { emit: () => {}, on: () => {}, off: () => {} } }));
 
 function makeDays(start: string, n: number, counts: Record<string, number> = {}): StatsDay[] {
   const [y, m, d] = start.split('-').map(Number);
@@ -126,7 +127,7 @@ describe('BarberStats page', () => {
     expect(await screen.findByTestId('served-total')).toHaveTextContent('12');
   });
 
-  it('refetches when the browser tab regains focus (no polling)', async () => {
+  it('refetches when the browser tab regains focus', async () => {
     renderStats();
     await screen.findByTestId('served-total');
     expect(barber.fetchBarberStats).toHaveBeenCalledTimes(1);

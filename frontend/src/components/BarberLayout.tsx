@@ -1,8 +1,8 @@
 // frontend/src/components/BarberLayout.tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchBarberSalon } from '../api/barber';
+import { fetchMe, logoutBarber } from '../api/barber';
 import { SESSION_EXPIRED_EVENT } from '../api/client';
 
 // QR and Offers live under Settings, so the Settings tab stays highlighted on them.
@@ -63,14 +63,25 @@ const tabs = [
   },
 ];
 
+const STAFF_HOME = '/barber/dashboard';
+
 export default function BarberLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  // Auth gate for every barber screen. Only a 401 sends the barber to login;
-  // a network blip should not log anyone out.
-  const { error } = useQuery({ queryKey: ['barberSalon'], queryFn: fetchBarberSalon, retry: false });
+  // Auth gate for every barber screen, and the source of the signed-in person's role.
+  // Only a 401 sends them to login; a network blip should not log anyone out.
+  const { data: me, error } = useQuery({ queryKey: ['barberMe'], queryFn: fetchMe, retry: false });
+  const isOwner = me?.role === 'OWNER';
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    await logoutBarber().catch(() => {});
+    navigate('/barber/login', { replace: true });
+    queryClient.clear();
+  }
 
   useEffect(() => {
     function onExpired() {
@@ -85,6 +96,17 @@ export default function BarberLayout() {
     return <Navigate to="/barber/login" replace state={{ expired: true }} />;
   }
 
+  // Staff accounts only ever see the Dashboard. Owner pages wait for the role to load, so a
+  // staff member never gets a flash of Settings; the server refuses those requests anyway.
+  if (me && !isOwner && !pathname.startsWith(STAFF_HOME)) {
+    return <Navigate to={STAFF_HOME} replace />;
+  }
+  if (!me && !pathname.startsWith(STAFF_HOME)) {
+    return <p role="status" className="p-6 text-gray-600">Loading...</p>;
+  }
+
+  const visibleTabs = me && !isOwner ? tabs.filter((t) => t.to === STAFF_HOME) : tabs;
+
   return (
     <>
       <div className="barber-nav-spacer">
@@ -92,8 +114,12 @@ export default function BarberLayout() {
       </div>
 
       <nav aria-label="Main" className="barber-nav print:hidden">
-        <div className="mx-auto grid h-[var(--barber-nav-h)] max-w-md grid-cols-3 md:max-w-2xl">
-          {tabs.map((t) => {
+        <div
+          className={`mx-auto grid h-[var(--barber-nav-h)] max-w-md md:max-w-2xl ${
+            visibleTabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+          }`}
+        >
+          {visibleTabs.map((t) => {
             const active = t.match(pathname);
             return (
               <Link
@@ -111,6 +137,23 @@ export default function BarberLayout() {
               </Link>
             );
           })}
+          {/* Staff have no Settings page, so sign-out lives here. */}
+          {me && !isOwner && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              aria-busy={loggingOut}
+              className="flex h-full flex-col items-center justify-center gap-0.5 border-t-4 border-transparent text-sm font-bold text-gray-700 hover:bg-brand-soft"
+            >
+              <svg {...iconProps}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              {loggingOut ? 'Logging out...' : 'Log out'}
+            </button>
+          )}
         </div>
       </nav>
     </>

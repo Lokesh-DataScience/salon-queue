@@ -145,6 +145,8 @@ export default function QueueTracking() {
 
       queryClient.setQueryData(queryKey, (prev: any) => {
         if (!prev) return prev;
+        // Several barbers: the broadcast mixes every line, so only the server can count this line.
+        if (prev.lane) return { ...prev, status: mine.status, queueStatus: state.queueStatus };
         const idx = state.entries.findIndex((e) => e.id === ticketId);
         const peopleAhead = state.entries
           .slice(0, idx)
@@ -268,6 +270,7 @@ export default function QueueTracking() {
       <section aria-label="Your token" className="rounded-3xl border-2 border-ink bg-brand px-6 py-8 text-center text-ink shadow-[0_6px_0_0_var(--color-ink)]">
         <p className="text-sm font-bold uppercase tracking-widest">Your token</p>
         <p className="my-1 text-8xl font-extrabold tabular-nums">#{ticket.tokenNumber}</p>
+        {ticket.lane && <p className="text-lg font-bold">with {ticket.lane.name}</p>}
         <div aria-hidden="true" className="mx-auto mt-4 border-t-2 border-dashed border-ink/40" />
       </section>
 

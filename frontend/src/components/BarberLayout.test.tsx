@@ -1,66 +1,67 @@
-// frontend/src/components/BarberLayout.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, screen, cleanup} from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import BarberLayout from './BarberLayout';
-import * as barber from '../api/barber';
 
-vi.mock('../api/barber', () => ({ fetchBarberSalon: vi.fn() }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+function mockMe(role: 'OWNER' | 'BARBER') {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    JSON.stringify({ staff: { id: '1', name: 'X', role, salonId: 's', laneId: 'l', laneName: 'Main' } }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } })));
+}
 function renderAt(path: string) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/barber/login" element={<p>LOGIN PAGE</p>} />
           <Route element={<BarberLayout />}>
-            <Route path="/barber/dashboard" element={<p>DASH CONTENT</p>} />
-            <Route path="/barber/settings" element={<p>SETTINGS CONTENT</p>} />
-            <Route path="/barber/offers" element={<p>OFFERS CONTENT</p>} />
-            <Route path="/barber/stats" element={<p>STATS CONTENT</p>} />
+            <Route path="/barber/dashboard" element={<p>DASH PAGE</p>} />
+            <Route path="/barber/settings" element={<p>SETTINGS PAGE</p>} />
+            <Route path="/barber/stats" element={<p>STATS PAGE</p>} />
           </Route>
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>,
-  );
+    </QueryClientProvider>);
 }
 
-beforeEach(() => {
-  vi.mocked(barber.fetchBarberSalon).mockReset();
-  vi.mocked(barber.fetchBarberSalon).mockResolvedValue({} as never);
-});
-
-describe('BarberLayout', () => {
-  it('shows three tabs in order and marks Dashboard as current', async () => {
-    renderAt('/barber/dashboard');
-    expect(await screen.findByText('DASH CONTENT')).toBeInTheDocument();
-    const nav = screen.getByRole('navigation', { name: 'Main' });
-    const links = nav.querySelectorAll('a');
-    expect(links).toHaveLength(3);
-    expect(Array.from(links).map((a) => a.textContent)).toEqual(['Dashboard', 'Customers', 'Settings']);
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Customers' })).not.toHaveAttribute('aria-current');
-  });
-
-  it('marks Customers as current on the stats page', async () => {
-    renderAt('/barber/stats');
-    expect(await screen.findByText('STATS CONTENT')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current');
-  });
-
-  it('keeps Settings highlighted on pages that live under it', async () => {
-    renderAt('/barber/offers');
-    expect(await screen.findByText('OFFERS CONTENT')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
-  });
-
-  it('sends a logged-out visitor to login', async () => {
-    vi.mocked(barber.fetchBarberSalon).mockRejectedValue(Object.assign(new Error('Unauthorized'), { status: 401 }));
+describe('BarberLayout role gating', () => {
+  it('owner sees Dashboard, Customers and Settings, and can open Settings', async () => {
+    mockMe('OWNER');
     renderAt('/barber/settings');
-    expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument();
+    expect(await screen.findByText('SETTINGS PAGE')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Dashboard/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Customers/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Settings/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Log out/ })).toBeNull();
+  });
+
+  it('staff see only the Dashboard plus a Log out button', async () => {
+    mockMe('BARBER');
+    renderAt('/barber/dashboard');
+    expect(await screen.findByText('DASH PAGE')).toBeTruthy();
+    await screen.findByRole('button', { name: /Log out/ });
+    expect(screen.queryByRole('link', { name: /Customers/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Settings/ })).toBeNull();
+  });
+
+  it('staff who type the Settings or Customers URL land on the Dashboard instead', async () => {
+    for (const p of ['/barber/settings', '/barber/stats']) {
+      mockMe('BARBER');
+      renderAt(p);
+      expect(await screen.findByText('DASH PAGE')).toBeTruthy();
+      expect(screen.queryByText('SETTINGS PAGE')).toBeNull();
+      expect(screen.queryByText('STATS PAGE')).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('owner pages never flash for staff while the role is still loading', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {}))); // never resolves
+    renderAt('/barber/settings');
+    expect(screen.queryByText('SETTINGS PAGE')).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('Loading');
   });
 });

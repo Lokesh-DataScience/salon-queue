@@ -1,10 +1,12 @@
 // frontend/src/api/tickets.ts
 import { apiFetch } from './client';
 
-export function joinSalonQueue(salonId: string, clientKey?: string, serviceIds?: string[]) {
+// laneId = the barber's line. Leave it out for "Any barber" (the server picks the shortest wait).
+export function joinSalonQueue(salonId: string, clientKey?: string, serviceIds?: string[], laneId?: string) {
   const body: Record<string, unknown> = {};
   if (clientKey) body.clientKey = clientKey;
   if (serviceIds?.length) body.serviceIds = serviceIds;
+  if (laneId) body.laneId = laneId;
   return apiFetch<{ ticket: any }>(`/api/queues/${salonId}/join`, {
     method: 'POST',
     body: JSON.stringify(body),

@@ -23,3 +23,16 @@ export function fetchSalonByCode(code: string) {
     `/api/salons/by-code/${encodeURIComponent(code)}`
   ).then((r) => r.salon);
 }
+
+// A barber's line, as a customer sees it. Salons with one barber return one entry.
+export interface PublicLane {
+  id: string;
+  name: string;
+  waitingCount: number;
+  estimatedWaitMinutes: number;
+  isPaused?: boolean; // on a break: listed, but not selectable
+}
+
+export function fetchSalonLanes(salonId: string) {
+  return apiFetch<{ lanes: PublicLane[] }>(`/api/salons/${salonId}/lanes`).then((r) => r.lanes);
+}

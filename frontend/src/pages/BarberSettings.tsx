@@ -11,6 +11,8 @@ import {
   type SalonProfileUpdate,
 } from '../api/barber';
 import ServicesSection from '../components/ServicesSection';
+import TeamSection from '../components/TeamSection';
+import { MULTI_BARBER } from '../lib/multiBarber';
 
 const PROFILE_KEY = ['barberSalonProfile'];
 
@@ -167,6 +169,8 @@ export default function BarberSettings() {
       </section>
 
       <ServicesSection welcome={welcome} />
+
+      {MULTI_BARBER && <TeamSection />}
 
       <section aria-labelledby="more-heading">
         <h2 id="more-heading" className="mb-2 text-sm font-semibold text-gray-700">More</h2>

@@ -15,6 +15,7 @@ vi.mock('../api/barber', () => ({
 vi.mock('../components/ServicesSection', () => ({ 
   default: () => null 
 }));
+vi.mock('../lib/multiBarber', () => ({ MULTI_BARBER: false }));
 const salon: BarberSalonProfile = {
   id: 'salon-1',
   name: 'Style Studio',

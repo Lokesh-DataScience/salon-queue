@@ -9,7 +9,7 @@ export default function BarberLogin() {
   const navigate = useNavigate();
   const location = useLocation();
   const expired = (location.state as { expired?: boolean } | null)?.expired;
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export default function BarberLogin() {
     setSubmitting(true);
     setError(null);
     try {
-      await loginBarber(email, password);
+      await loginBarber(identifier.trim(), password);
       navigate('/barber/dashboard');
     } catch (err: any) {
       setError(err.message);
@@ -42,14 +42,15 @@ export default function BarberLogin() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium">Email</label>
+              <label htmlFor="identifier" className="mb-1 block text-sm font-medium">Email or phone number</label>
               <input
-                id="email"
-                type="email"
+                id="identifier"
+                type="text"
+                inputMode="email"
                 autoComplete="username"
                 className="field"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}

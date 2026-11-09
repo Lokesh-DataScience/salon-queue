@@ -1,10 +1,14 @@
 // frontend/src/pages/BarberStats.tsx
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchBarberStats, type BarberStats, type StatsDay } from '../api/barber';
+import { useEffect, useState } from 'react';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchBarberStats, type BarberMe, type BarberStats, type StatsDay } from '../api/barber';
+import { socket } from '../lib/socket';
 import { ApiError } from '../api/client';
 
 type Period = 'today' | 'week' | 'month';
+
+const LIVE_DEBOUNCE_MS = 2000;
+const BACKUP_REFRESH_MS = 60_000;
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'today', label: 'Today' },
@@ -115,8 +119,8 @@ function DayBars({
 export default function BarberStatsPage() {
   const [period, setPeriod] = useState<Period>('today');
 
-  // No polling and no sockets: refetch when the browser tab regains focus and
-  // whenever the barber comes back to this page.
+  // Fresh numbers when the barber comes back to this page or the browser tab regains focus, plus
+  // live updates (below) when anyone in the salon finishes a customer, and a slow backup refresh.
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['barberStats'],
     queryFn: fetchBarberStats,
@@ -124,9 +128,38 @@ export default function BarberStatsPage() {
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',
     refetchOnReconnect: true,
+    refetchInterval: BACKUP_REFRESH_MS, // only while this tab is visible (the library pauses it in the background)
     retry: (count, err) => !(err instanceof ApiError && err.status === 401) && count < 1,
     retryDelay: 300,
   });
+
+  // The salon id is already loaded by the page layout (/api/barber/me); read it from that cache.
+  const queryClient = useQueryClient();
+  const { data: me } = useQuery<BarberMe>({ queryKey: ['barberMe'], queryFn: skipToken });
+  const salonId = me?.salonId;
+
+  // queue:updated is only a signal (it carries no customer details). It fires when any barber in the
+  // salon completes a customer, so the owner's numbers move without a refresh. Bursts become one fetch.
+  useEffect(() => {
+    if (!salonId) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const joinRoom = () => socket.emit('join:salon', { salonId });
+    const onUpdated = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ['barberStats'] });
+      }, LIVE_DEBOUNCE_MS);
+    };
+    joinRoom();
+    socket.on('connect', joinRoom);
+    socket.on('queue:updated', onUpdated);
+    return () => {
+      clearTimeout(timer);
+      socket.off('connect', joinRoom);
+      socket.off('queue:updated', onUpdated);
+      socket.emit('leave:salon', { salonId });
+    };
+  }, [salonId, queryClient]);
 
   if (isLoading) {
     return (
