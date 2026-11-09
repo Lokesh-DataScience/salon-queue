@@ -4,6 +4,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ScanLanding from './ScanLanding';
 import { renderPage } from '../test/utils';
+import { saveRememberToken } from '../lib/rememberToken';
 import * as salons from '../api/salons';
 import * as tickets from '../api/tickets';
 
@@ -12,6 +13,7 @@ vi.mock('../api/tickets', () => ({ fetchTicketStatus: vi.fn(), joinSalonQueue: v
 vi.mock('../api/publicServices', () => ({ fetchSalonServices: vi.fn().mockResolvedValue([]) }));
 beforeEach(() => {
   localStorage.clear();
+  saveRememberToken('salon-1', 'b'.repeat(64)); // a phone the salon already knows: no details form in the way
   vi.mocked(salons.fetchSalonByCode).mockReset().mockResolvedValue({ id: 'salon-1', name: 'Style Studio' });
   vi.mocked(tickets.fetchTicketStatus).mockReset();
   vi.mocked(tickets.joinSalonQueue).mockReset();

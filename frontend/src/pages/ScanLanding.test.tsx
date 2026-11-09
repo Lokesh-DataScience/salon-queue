@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import ScanLanding from './ScanLanding';
 import { renderPage } from '../test/utils';
 import { saveTicket, getTickets } from '../lib/activeTickets';
+import { saveRememberToken } from '../lib/rememberToken';
 import { ApiError } from '../api/client';
 import * as tickets from '../api/tickets';
 import * as salons from '../api/salons';
@@ -21,11 +22,16 @@ vi.mock('../api/publicServices', () => ({
   fetchSalonServices: vi.fn().mockResolvedValue([]) 
 }));
 const TOKEN = 'a'.repeat(40);
+const REMEMBER = 'b'.repeat(64);
 const newTicket = { ticketId: 't-new', accessToken: TOKEN, salonId: 'salon-1', tokenNumber: 9 };
 const renderScan = (ui = <ScanLanding />) =>
   renderPage(ui, { path: '/q/:code', route: '/q/87bcee043619' });
 
 beforeEach(() => {
+  localStorage.clear();
+  // These tests are about the scan itself, so this phone is already known to the salon.
+  // The first-visit details form is covered in ScanLanding.customer.test.tsx.
+  saveRememberToken('salon-1', REMEMBER);
   vi.mocked(tickets.joinSalonQueue).mockReset();
   vi.mocked(tickets.fetchTicketStatus).mockReset();
   vi.mocked(salons.fetchSalonByCode).mockReset();
@@ -39,7 +45,9 @@ describe('ScanLanding (wall QR)', () => {
 
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
     expect(salons.fetchSalonByCode).toHaveBeenCalledWith('87bcee043619');
-    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', expect.any(String), []);
+    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', expect.any(String), [], undefined, {
+      rememberToken: REMEMBER,
+    });
     const stored = getTickets('salon-1');
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ ticketId: 't-new', tokenNumber: 9, salonId: 'salon-1' });

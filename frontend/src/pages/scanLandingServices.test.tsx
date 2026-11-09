@@ -4,6 +4,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ScanLanding from './ScanLanding';
 import { renderPage } from '../test/utils';
+import { saveRememberToken } from '../lib/rememberToken';
 import * as salons from '../api/salons';
 import * as tickets from '../api/tickets';
 import * as services from '../api/publicServices';
@@ -20,15 +21,21 @@ const SALON = { id: 's1', name: 'Style Studio' };
 const CUT = { id: 'c1', name: 'Haircut', durationMinutes: 20 };
 const BEARD = { id: 'b1', name: 'Beard', durationMinutes: 10 };
 const TICKET = { ticketId: 't1', accessToken: 'a'.repeat(40), salonId: 's1', tokenNumber: 1 };
+const REMEMBER = 'b'.repeat(64);
 const renderScan = () => renderPage(<ScanLanding />, { path: '/q/:code', route: '/q/ABC123' });
 
 beforeEach(() => {
   localStorage.clear();
+  // These tests are about choosing services, so this phone is already known to the salon
+  // (the first-visit details form is covered in ScanLanding.customer.test.tsx).
+  saveRememberToken('s1', REMEMBER);
   vi.mocked(salons.fetchSalonByCode).mockReset().mockResolvedValue(SALON as never);
   vi.mocked(tickets.fetchTicketStatus).mockReset();
   vi.mocked(tickets.joinSalonQueue).mockReset().mockResolvedValue(TICKET);
   vi.mocked(services.fetchSalonServices).mockReset().mockResolvedValue([CUT, BEARD]);
 });
+
+const knownCustomer = expect.objectContaining({ rememberToken: REMEMBER });
 
 describe('ScanLanding with services', () => {
   it('shows the picker and takes no token until the customer taps', async () => {
@@ -47,7 +54,7 @@ describe('ScanLanding with services', () => {
 
     await user.click(screen.getByRole('button', { name: 'Get my token' }));
     await waitFor(() =>
-      expect(tickets.joinSalonQueue).toHaveBeenCalledWith('s1', expect.any(String), ['c1', 'b1']),
+      expect(tickets.joinSalonQueue).toHaveBeenCalledWith('s1', expect.any(String), ['c1', 'b1'], undefined, knownCustomer),
     );
   });
 
@@ -64,13 +71,17 @@ describe('ScanLanding with services', () => {
 
     await user.click(screen.getByRole('button', { name: 'Get my token' }));
     await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await waitFor(() => expect(tickets.joinSalonQueue).toHaveBeenCalledWith('s1', expect.any(String), []));
+    await waitFor(() =>
+      expect(tickets.joinSalonQueue).toHaveBeenCalledWith('s1', expect.any(String), [], undefined, knownCustomer),
+    );
   });
 
   it('a salon with no services joins straight away, no picker', async () => {
     vi.mocked(services.fetchSalonServices).mockResolvedValue([]);
     renderScan();
-    await waitFor(() => expect(tickets.joinSalonQueue).toHaveBeenCalledWith('s1', expect.any(String), []));
+    await waitFor(() =>
+      expect(tickets.joinSalonQueue).toHaveBeenCalledWith('s1', expect.any(String), [], undefined, knownCustomer),
+    );
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 

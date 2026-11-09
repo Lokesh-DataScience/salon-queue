@@ -39,15 +39,26 @@ export async function makeSalon(overrides: Record<string, unknown> = {}) {
   throw new Error('unreachable');
 }
 
-// Deleting the salon cascades to its queues and entries.
+// Deleting the salon cascades to its queues, entries and customer list.
 export async function cleanupSalons() {
   if (createdSalonIds.length === 0) return;
   await supabase.from('salons').delete().in('id', createdSalonIds);
   createdSalonIds.length = 0;
 }
 
-export function joinViaApi(salonId: string) {
-  return request(app).post(`/api/queues/${salonId}/join`).send({});
+// A valid Indian mobile: 10 digits starting with 9. Random, so tests never collide inside a salon.
+export const randomMobile = () => '9' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
+
+// What a customer must send the first time they join a salon (name + phone + consent).
+export function customerDetails(overrides: Record<string, unknown> = {}) {
+  return { name: 'Test Customer', phone: randomMobile(), consent: true, ...overrides };
+}
+
+// Joins through the real API. Every call is a new customer unless you pass the same details.
+export function joinViaApi(salonId: string, body: Record<string, unknown> = {}) {
+  return request(app)
+    .post(`/api/queues/${salonId}/join`)
+    .send({ ...customerDetails(), ...body });
 }
 
 // Simulates a row created before anonymous joins, to prove nothing leaks it.

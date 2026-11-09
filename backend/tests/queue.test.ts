@@ -1,7 +1,7 @@
 // backend/tests/queue.test.ts  (spec §51 tests 1–4, plus pause, last-customer, leave)
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
-import { app, makeSalon, cleanupSalons, joinViaApi } from './helpers';
+import { app, makeSalon, cleanupSalons, joinViaApi, customerDetails } from './helpers';
 import { joinQueue } from '../src/services/queue.service';
 import { callNext, startEntry, pauseQueue, resumeQueue } from '../src/services/barber.service';
 import { supabase } from '../src/config/supabase';
@@ -65,7 +65,7 @@ describe('Test 4: customer tries to change their queue position', () => {
     await joinViaApi(salonId);
     const sneaky = await request(app)
       .post(`/api/queues/${salonId}/join`)
-      .send({ tokenNumber: 1, status: 'CALLED', position: 0 });
+      .send({ ...customerDetails(), tokenNumber: 1, status: 'CALLED', position: 0 });
 
     expect([201, 400]).toContain(sneaky.status); // strict schema rejects, loose schema ignores
     if (sneaky.status === 201) {

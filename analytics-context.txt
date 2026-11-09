@@ -1,0 +1,1989 @@
+##### FILE backend/src/services/barberStats.service.ts
+import { supabase } from '../config/supabase';
+import { AppError } from '../middleware/errorHandler';
+
+interface DayRow {
+  date: string;
+  count: number;
+}
+
+interface PeriodRow {
+  start: string;
+  total: number;
+  walk_in: number;
+  prev_same_period: number;
+  days: DayRow[];
+}
+
+interface StatsRow {
+  today: string;
+  served_today: number;
+  walk_in_today: number;
+  served_yesterday: number;
+  week: PeriodRow;
+  month: PeriodRow;
+}
+
+function toPeriod(p: PeriodRow) {
+  return {
+    start: p.start,
+    total: p.total,
+    walkIn: p.walk_in,
+    qr: p.total - p.walk_in,
+    prevSamePeriod: p.prev_same_period,
+    days: p.days,
+  };
+}
+
+// Counts only: no names, phones or per-customer rows ever leave this function.
+export async function getBarberStats(salonId: string) {
+  const { data, error } = await supabase.rpc('barber_stats', { p_salon_id: salonId });
+  if (error) throw error;
+  if (!data) throw new AppError('Could not load stats.', 500);
+
+  const s = data as StatsRow;
+  return {
+    today: s.today,
+    servedToday: s.served_today,
+    walkInToday: s.walk_in_today,
+    qrToday: s.served_today - s.walk_in_today,
+    servedYesterday: s.served_yesterday,
+    week: toPeriod(s.week),
+    month: toPeriod(s.month),
+  };
+}
+##### FILE backend/src/controllers/barber.controller.ts
+// backend/src/controllers/barber.controller.ts
+import type { Request, Response, NextFunction } from 'express';
+import { entryIdParamSchema, laneQuerySchema } from '../validators/barber.validators';
+import {
+  getBarberQueueSnapshot,
+  callNext,
+  startEntry,
+  completeEntry,
+  skipEntry,
+  pauseForScope,
+  resumeForScope,
+  addWalkIn,
+  moveToFront,
+  assertEntryAccess,
+} from '../services/barber.service';
+import { resolveScope } from '../services/barberScope.service';
+import { broadcastQueueUpdate } from '../services/queue.service';
+import { AppError } from '../middleware/errorHandler';
+import { NotificationService } from '../services/notification.service';
+import { advanceSalonQueue, extendEntry } from '../services/queueAutomation.service';
+import { extendBodySchema } from '../validators/barber.validators';
+
+// Who is asking and which barber's line this is about (see barberScope.service.ts).
+// The line comes from the database for staff; only the owner may name another with ?laneId=.
+async function scopeOf(req: Request) {
+  if (!req.staff) throw new AppError('Not authenticated.', 401);
+  const { laneId } = laneQuerySchema.parse(req.query);
+  return resolveScope(req.staff, laneId);
+}
+
+export async function getQueue(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    await advanceSalonQueue(scope.salonId).catch(() => {});
+    res.json(await getBarberQueueSnapshot(scope));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postNext(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const result = await callNext(scope);
+    await broadcastQueueUpdate(scope.salonId);
+    res.json({ result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postStart(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const entry = await startEntry(scope.salonId, entryId, scope.entryLaneId);
+    await broadcastQueueUpdate(scope.salonId);
+    res.json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postComplete(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const entry = await completeEntry(scope.salonId, entryId, scope.entryLaneId);
+    await advanceSalonQueue(scope.salonId);
+    await broadcastQueueUpdate(scope.salonId);
+    res.json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postSkip(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const { salonId } = scope;
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const entry = await skipEntry(salonId, entryId, scope.entryLaneId);
+    await advanceSalonQueue(salonId);
+    await broadcastQueueUpdate(salonId);
+    if (entry.previousStatus === 'WAITING' || entry.previousStatus === 'CALLED') {
+      await NotificationService.notifyQueueCancelled({
+        entryId, salonId, tokenNumber: entry.tokenNumber,
+      });
+    }
+    res.json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postPause(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const queue = await pauseForScope(scope);
+    await broadcastQueueUpdate(scope.salonId);
+    res.json({ queue });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postResume(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const queue = await resumeForScope(scope);
+    await broadcastQueueUpdate(scope.salonId);
+    res.json({ queue });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postWalkIn(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req); // salon and line come from the session, never the body
+    const entry = await addWalkIn(scope);
+    await advanceSalonQueue(scope.salonId);
+    await broadcastQueueUpdate(scope.salonId); // customers' "people ahead" updates live
+    res.status(201).json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postExtend(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const { salonId } = scope;
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const { minutes } = extendBodySchema.parse(req.body ?? {});
+    await assertEntryAccess(salonId, entryId, scope.entryLaneId); // staff: their own line only
+    const result = await extendEntry(salonId, entryId, minutes);
+    await broadcastQueueUpdate(salonId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postPrioritize(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req); // from the verified session only
+    const { salonId } = scope;
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const entry = await moveToFront(salonId, entryId, scope.entryLaneId);
+    await broadcastQueueUpdate(salonId);
+    res.json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+##### FILE backend/src/routes/barber.routes.ts
+// backend/src/routes/barber.routes.ts
+import { Router } from 'express';
+import { requireAuth, requireOwner } from '../middleware/auth.middleware';
+import {
+  getQueue,
+  postNext,
+  postStart,
+  postComplete,
+  postSkip,
+  postPause,
+  postResume,
+  postWalkIn,
+  postExtend,
+  postPrioritize,
+} from '../controllers/barber.controller';
+import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
+import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
+import { getStats } from '../controllers/barberStats.controller';
+import { getServices, postService, patchService, removeService } from '../controllers/salonServices.controller';
+import {
+  getMe,
+  postChangePassword,
+  getTeam,
+  postTeamMember,
+  postTeamMemberPassword,
+  patchTeamMember,
+} from '../controllers/team.controller';
+
+const router = Router();
+
+router.use(requireAuth); // every route below requires a logged-in staff member
+
+router.get('/me', getMe);
+router.post('/me/password', postChangePassword);
+
+// ── Owner only: salon settings, services, stats, offers, team ──
+router.get('/salon', requireOwner, getProfile);
+router.patch('/salon', requireOwner, patchProfile);
+router.get('/stats', requireOwner, getStats);
+router.get('/services', requireOwner, getServices);
+router.post('/services', requireOwner, postService);
+router.patch('/services/:serviceId', requireOwner, patchService);
+router.delete('/services/:serviceId', requireOwner, removeService);
+router.get('/team', requireOwner, getTeam);
+router.post('/team', requireOwner, postTeamMember);
+router.post('/team/:staffId/password', requireOwner, postTeamMemberPassword);
+router.patch('/team/:staffId', requireOwner, patchTeamMember);
+
+// ── Any signed-in staff member: running the queue ──
+router.get('/queue', getQueue);
+router.post('/queue/next', postNext);
+router.post('/queue/:entryId/start', postStart);
+router.post('/queue/:entryId/complete', postComplete);
+router.post('/queue/:entryId/extend', postExtend);
+router.post('/queue/:entryId/skip', postSkip);
+router.post('/queue/:entryId/prioritize', postPrioritize);
+router.post('/queue/pause', postPause);
+router.post('/queue/resume', postResume);
+router.post('/queue/walk-in', postWalkIn);
+// Redeeming a customer's prize code happens at the counter, so any staff member can do it.
+router.post('/offers/redeem', postRedeem);
+router.get('/offers', requireOwner, getOffers);
+router.post('/offers', requireOwner, postOffer);
+router.patch('/offers/expected', requireOwner, patchExpected);
+router.patch('/offers/:offerId', requireOwner, patchOffer);
+router.delete('/offers/:offerId', requireOwner, removeOffer);
+export default router;
+
+##### FILE backend/src/services/queueAutomation.service.ts
+// backend/src/services/queueAutomation.service.ts
+import { supabase } from '../config/supabase';
+import { AppError } from '../middleware/errorHandler';
+import { todayISODate } from '../utils/date';
+
+// Completes due entries and promotes the next WAITING one. The SQL function is idempotent
+// and locks the queue row. Returns how many changes happened (completions + starts).
+// It does not broadcast or notify: callers broadcast, and the broadcast evaluates notifications.
+export async function advanceQueue(_salonId: string, queueId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('advance_queue', { p_queue_id: queueId });
+  if (error) throw error;
+  return ((data ?? []) as unknown[]).length;
+}
+
+async function todayQueueId(salonId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('queues')
+    .select('id')
+    .eq('salon_id', salonId)
+    .eq('date', todayISODate())
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
+export async function advanceSalonQueue(salonId: string): Promise<number> {
+  const queueId = await todayQueueId(salonId);
+  return queueId ? advanceQueue(salonId, queueId) : 0;
+}
+
+export async function extendEntry(salonId: string, entryId: string, minutes: number) {
+  const { data, error } = await supabase.rpc('extend_entry', {
+    p_salon_id: salonId,
+    p_entry_id: entryId,
+    p_minutes: minutes,
+  });
+
+  if (error) {
+    const msg = error.message ?? '';
+    if (msg.includes('ENTRY_NOT_FOUND')) throw new AppError('Queue entry not found.', 404);
+    if (msg.includes('NOT_SERVING')) {
+      throw new AppError('This customer is not being served, or their time is already up.', 409);
+    }
+    throw error;
+  }
+  return { endsAt: data as string };
+}
+##### FILE backend/src/services/queue.service.ts
+// backend/src/services/queue.service.ts
+import { supabase } from '../config/supabase';
+import { getIO } from '../sockets/io';
+import { AppError } from '../middleware/errorHandler';
+import { todayISODate } from '../utils/date';
+import { evaluateNotifications } from './queueNotifications.service';
+import { advanceQueue } from './queueAutomation.service';
+import { compareServeOrder } from '../utils/serveOrder';
+export class QueueJoinError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+  }
+}
+const JOIN_ERROR_MESSAGES: Record<string, string> = {
+  SALON_NOT_FOUND: 'Salon not found.',
+  SALON_CLOSED: 'Salon is currently closed.',
+  QUEUE_NOT_ACTIVE: 'Queue is paused.',
+  INVALID_SERVICES: 'One of the services you chose is no longer available. Please choose again.',
+  LANE_NOT_FOUND: "That barber isn't available right now. Please choose again.",
+  LANE_INACTIVE: "That barber isn't available right now. Please choose again.",
+  LANE_PAUSED: 'That barber is on a break right now. Please choose another barber, or pick Any barber.',
+};
+
+export async function joinQueue(
+  salonId: string,
+  clientKey?: string,
+  serviceIds?: string[],
+  laneId?: string,
+) {
+  // laneId undefined = "Any barber": the database picks the line with the shortest wait.
+  const { data, error } = serviceIds?.length
+    ? await supabase.rpc('join_queue_with_services', {
+        p_salon_id: salonId,
+        p_service_ids: serviceIds,
+        p_client_key: clientKey ?? null,
+        p_lane_id: laneId ?? null,
+      })
+    : await supabase.rpc('join_queue', {
+        p_salon_id: salonId,
+        p_client_key: clientKey ?? null,
+        p_lane_id: laneId ?? null,
+      });
+  if (error) {
+    const code = error.message?.split(':')[0]?.trim();
+    if (code && JOIN_ERROR_MESSAGES[code]) {
+      throw new QueueJoinError(code, JOIN_ERROR_MESSAGES[code]);
+    }
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    ticketId: row.entry_id,
+    salonId, // NEW — already known from the param, no extra query needed
+    queueId: row.queue_id,
+    tokenNumber: row.token_number,
+    accessToken: row.access_token,
+    status: row.status,
+    joinedAt: row.joined_at,
+  };
+}
+
+export async function getTicketStatus(ticketId: string, accessToken: string) {
+  const { data: entry, error } = await supabase
+    .from('queue_entries')
+    .select('*, queues(current_token, salon_id, status)')
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .maybeSingle();
+
+  if (error || !entry) return null;
+    // Time is up: complete (and promote the next customer) now, instead of waiting for the sweeper.
+  if (entry.status === 'SERVING' && entry.ends_at && Date.parse(entry.ends_at) <= Date.now()) {
+    const changes = await advanceQueue(entry.queues.salon_id, entry.queue_id).catch(() => 0);
+    if (changes > 0) {
+      await broadcastQueueUpdate(entry.queues.salon_id).catch(() => {});
+      return getTicketStatus(ticketId, accessToken); // read it again, now completed
+    }
+  }
+    // Who is ahead, in SERVE order (the barber can move an urgent customer to the front).
+  const { data: active } = await supabase
+    .from('queue_entries')
+    .select('id, status, token_number, priority_at, duration_minutes, ends_at')
+    .eq('queue_id', entry.queue_id)
+    .eq('lane_id', entry.lane_id) // only this customer's own barber line counts
+    .in('status', ['SERVING', 'CALLED', 'WAITING']);
+
+  const ahead = ['WAITING', 'CALLED', 'SERVING'].includes(entry.status)
+    ? (active ?? []).filter((a) => a.id !== entry.id && compareServeOrder(a, entry) < 0)
+    : [];
+  const peopleAhead = ahead.filter((a) => a.status === 'WAITING').length;
+  const movedAhead =
+    entry.status === 'WAITING' &&
+    !entry.priority_at &&
+    ahead.some((a) => a.priority_at && a.token_number > entry.token_number);
+
+  const { data: salon } = await supabase
+    .from('salons')
+    .select('average_service_minutes')
+    .eq('id', entry.queues.salon_id)
+    .single();
+  // Several barbers: show whose line this is, and "now serving" for that line only.
+  const { data: laneRows } = await supabase
+    .from('lanes')
+    .select('id, name, is_active')
+    .eq('salon_id', entry.queues.salon_id);
+  const multiLane = (laneRows ?? []).filter((l) => l.is_active).length > 1;
+  const myLane = (laneRows ?? []).find((l) => l.id === entry.lane_id);
+  let currentToken: number = entry.queues.current_token;
+  if (multiLane) {
+    const live = (active ?? []).find((a) => a.status === 'SERVING' || a.status === 'CALLED');
+    if (live) {
+      currentToken = live.token_number;
+    } else {
+      const { data: last } = await supabase
+        .from('queue_entries')
+        .select('token_number')
+        .eq('queue_id', entry.queue_id)
+        .eq('lane_id', entry.lane_id)
+        .not('started_at', 'is', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      currentToken = last?.token_number ?? 0;
+    }
+  }
+    let prize: { name: string; code: string; redeemed: boolean } | null = null;
+  if (entry.offer_id && !['CANCELLED', 'SKIPPED'].includes(entry.status)) {
+    const { data: offer } = await supabase
+      .from('salon_offers')
+      .select('name')
+      .eq('id', entry.offer_id)
+      .maybeSingle();
+    prize = { name: offer?.name ?? 'Reward', code: entry.prize_code, redeemed: !!entry.prize_redeemed_at };
+  }
+  const avg = salon?.average_service_minutes ?? 15;
+  let estimatedWait = 0;
+
+  if (entry.status === 'WAITING') {
+    const nowMs = Date.now();
+    for (const a of ahead) {
+      if (a.status === 'SERVING' && a.ends_at) {
+        estimatedWait += Math.max(0, Math.ceil((Date.parse(a.ends_at) - nowMs) / 60000));
+      } else {
+        estimatedWait += a.duration_minutes ?? avg;
+      }
+    }
+  }
+
+  const { data: chosen } = await supabase
+    .from('queue_entry_services')
+    .select('name, duration_minutes')
+    .eq('queue_entry_id', entry.id)
+    .order('created_at', { ascending: true });
+  return {
+    ticketId: entry.id,
+    salonId: entry.queues.salon_id,
+    tokenNumber: entry.token_number,
+    status: entry.status,
+    currentToken,
+    peopleAhead,            // was: peopleAhead ?? 0
+    movedAhead,             // NEW: drives the "urgent customer was moved ahead of you" notice
+    estimatedWaitMinutes: estimatedWait,
+    endsAt: entry.status === 'SERVING' ? entry.ends_at : null, // for the countdown
+    remainingSeconds:
+      entry.status === 'SERVING' && entry.ends_at
+        ? Math.max(0, Math.ceil((Date.parse(entry.ends_at) - Date.now()) / 1000))
+        : null,
+    durationMinutes: entry.duration_minutes ?? avg,
+    services: (chosen ?? []).map((s) => ({ name: s.name, durationMinutes: s.duration_minutes })),
+    queueStatus: entry.queues.status,
+    lane: multiLane && myLane ? { id: myLane.id as string, name: myLane.name as string } : null, // null when the salon has one line
+    notificationsOn: !!entry.push_subscription, // a flag only, never the subscription itself
+    prize,
+  };
+}
+
+// --- Milestone 4: real-time ---
+
+export async function getSanitizedQueueState(salonId: string) {
+  const { data: queue, error: queueErr } = await supabase
+    .from('queues')
+    .select('id, current_token, status')
+    .eq('salon_id', salonId)
+    .eq('date', todayISODate()) // FIXED — this filter was missing
+    .maybeSingle(); // also switched from .single() to .maybeSingle() so a
+                     // genuinely-missing today's queue doesn't throw, it
+                     // just returns null cleanly
+
+  if (queueErr || !queue) return null;
+
+  const { data: entries } = await supabase
+    .from('queue_entries')
+    .select('id, token_number, status, priority_at')
+    .eq('queue_id', queue.id)
+    .in('status', ['WAITING', 'CALLED', 'SERVING']);
+
+  const { data: salon } = await supabase
+    .from('salons')
+    .select('average_service_minutes')
+    .eq('id', salonId)
+    .single();
+
+  return {
+    salonId,
+    currentToken: queue.current_token,
+    queueStatus: queue.status,
+    averageServiceMinutes: salon?.average_service_minutes ?? 15,
+    entries: (entries ?? []).sort(compareServeOrder).map((e) => ({
+      id: e.id,
+      tokenNumber: e.token_number,
+      status: e.status,
+    })),
+  };
+}
+
+export async function broadcastQueueUpdate(
+  salonId: string,
+  opts: { silentEntryId?: string } = {},
+) {
+  const state = await getSanitizedQueueState(salonId);
+  if (!state) return;
+  getIO().to(`salon:${salonId}`).emit('queue:updated', state);
+  await evaluateNotifications(salonId, opts);
+}
+export async function leaveTicket(ticketId: string, accessToken: string) {
+  const { data: entry, error } = await supabase
+    .from('queue_entries')
+    .select('id, status, queues!inner(salon_id)')
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .maybeSingle();
+
+  if (error || !entry) return null; // wrong id and wrong token look identical
+
+  if (entry.status !== 'WAITING') {
+    throw new AppError(
+      "You can only leave the queue while you're waiting. If you've been called, please let the salon know.",
+      409,
+    );
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from('queue_entries')
+    .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() })
+    .eq('id', ticketId)
+    .eq('status', 'WAITING') // compare-and-swap: loses cleanly to a concurrent barber action
+    .select('id')
+    .maybeSingle();
+
+  if (updateError) throw updateError;
+  if (!updated) throw new AppError('This ticket was just updated. Please refresh.', 409);
+
+  return { salonId: (entry.queues as unknown as { salon_id: string }).salon_id };
+}
+
+const ACTIVE_STATUSES = ['WAITING', 'CALLED', 'SERVING'];
+
+// Same "wrong id and wrong token look identical" rule as the other ticket actions.
+export async function savePushSubscription(ticketId: string, accessToken: string, subscription: unknown) {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .update({ push_subscription: subscription })
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .in('status', ACTIVE_STATUSES) // nothing to notify about on a finished ticket
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+export async function removePushSubscription(ticketId: string, accessToken: string) {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .update({ push_subscription: null })
+    .eq('id', ticketId)
+    .eq('access_token', accessToken)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+##### FILE backend/tests/barberStats.test.ts
+// backend/tests/barberStats.test.ts
+import { describe, it, expect, afterAll } from 'vitest';
+import request from 'supertest';
+import bcrypt from 'bcrypt';
+import { randomUUID, randomBytes } from 'crypto';
+import { app, makeSalon, cleanupSalons } from './helpers';
+import { supabase } from '../src/config/supabase';
+
+afterAll(cleanupSalons);
+
+const PASSWORD = 'testpass123';
+
+// ── date helpers (all IST, so the tests don't depend on when they run) ──
+function istToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+function shiftDay(ymd: string, n: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+const at = (ymd: string, hhmm: string) => `${ymd}T${hhmm}:00+05:30`;
+const monthStartOf = (ymd: string) => `${ymd.slice(0, 8)}01`;
+const prevMonthStartOf = (ymd: string) => monthStartOf(shiftDay(monthStartOf(ymd), -1));
+function daysInMonthOf(ymd: string): number {
+  const [y, m] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+// ── fixtures ──
+async function makeBarber() {
+  const salonId = await makeSalon();
+  const email = `stats-${randomUUID()}@example.test`;
+  const { error } = await supabase.from('salon_staff').insert({
+    salon_id: salonId,
+    name: 'Stats Barber',
+    email,
+    password_hash: await bcrypt.hash(PASSWORD, 4),
+    role: 'OWNER',
+  });
+  if (error) throw new Error(`makeBarber failed: ${error.message}`);
+
+  const res = await request(app).post('/api/auth/barber/login').send({ email, password: PASSWORD });
+  expect(res.status).toBe(200);
+  const raw = ([] as string[]).concat((res.headers['set-cookie'] as string[] | string | undefined) ?? []);
+  const cookie = raw.find((c) => c.startsWith('access_token='))!.split(';')[0];
+
+  const { data: q, error: qErr } = await supabase
+    .from('queues')
+    .insert({ salon_id: salonId, date: istToday(), current_token: 0, next_token: 1, status: 'ACTIVE' })
+    .select('id')
+    .single();
+  if (qErr || !q) throw new Error(`queue insert failed: ${qErr?.message}`);
+
+  return { salonId, cookie, queueId: q.id as string };
+}
+
+let nextToken = 1;
+async function addEntry(
+  queueId: string,
+  o: { status?: string; completedAt?: string; walkIn?: boolean; name?: string; phone?: string },
+) {
+  const { error } = await supabase.from('queue_entries').insert({
+    queue_id: queueId,
+    token_number: nextToken++,
+    status: o.status ?? 'COMPLETED',
+    joined_at: new Date().toISOString(),
+    access_token: randomBytes(32).toString('hex'),
+    completed_at: o.completedAt ?? null,
+    is_walk_in: o.walkIn ?? false,
+    customer_name: o.name ?? null,
+    customer_phone: o.phone ?? null,
+  });
+  if (error) throw new Error(`addEntry failed: ${error.message}`);
+}
+
+const getStats = (cookie: string) => request(app).get('/api/barber/stats').set('Cookie', cookie);
+
+describe('GET /api/barber/stats', () => {
+  it('rejects a request with no session', async () => {
+    expect((await request(app).get('/api/barber/stats')).status).toBe(401);
+  });
+
+  it('a salon with no data returns zeros and full-length day arrays', async () => {
+    const { cookie } = await makeBarber();
+    const res = await getStats(cookie);
+    expect(res.status).toBe(200);
+    const s = res.body.stats;
+    const today = istToday();
+
+    expect(s.today).toBe(today);
+    expect(s.servedToday).toBe(0);
+    expect(s.servedYesterday).toBe(0);
+    expect(s.week.total).toBe(0);
+    expect(s.month.total).toBe(0);
+    expect(s.week.days).toHaveLength(7);
+    expect(s.month.days).toHaveLength(daysInMonthOf(today));
+    expect(s.week.days[0].date <= today).toBe(true); // week starts on or before today
+    expect(s.month.days[0].date).toBe(monthStartOf(today));
+  });
+
+  it('counts only COMPLETED entries, and splits QR from walk-in', async () => {
+    const { cookie, queueId } = await makeBarber();
+    const today = istToday();
+
+    await addEntry(queueId, { completedAt: at(today, '12:00') });
+    await addEntry(queueId, { completedAt: at(today, '12:30') });
+    await addEntry(queueId, { completedAt: at(today, '13:00'), walkIn: true });
+    // Never counted, even with a completed_at set: wrong status.
+    await addEntry(queueId, { status: 'CANCELLED', completedAt: at(today, '14:00') });
+    await addEntry(queueId, { status: 'SKIPPED', completedAt: at(today, '14:10') });
+    await addEntry(queueId, { status: 'WAITING' });
+
+    const s = (await getStats(cookie)).body.stats;
+    expect(s.servedToday).toBe(3);
+    expect(s.walkInToday).toBe(1);
+    expect(s.qrToday).toBe(2);
+    expect(s.week.total).toBe(3);
+    expect(s.week.walkIn).toBe(1);
+    expect(s.week.qr).toBe(2);
+    expect(s.month.total).toBe(3);
+  });
+
+  it('only counts the logged-in barber\'s own salon', async () => {
+    const a = await makeBarber();
+    const b = await makeBarber();
+    const today = istToday();
+
+    await addEntry(a.queueId, { completedAt: at(today, '11:00') });
+    await addEntry(b.queueId, { completedAt: at(today, '11:00') });
+    await addEntry(b.queueId, { completedAt: at(today, '11:30') });
+    await addEntry(b.queueId, { completedAt: at(today, '12:00'), walkIn: true });
+
+    const sa = (await getStats(a.cookie)).body.stats;
+    const sb = (await getStats(b.cookie)).body.stats;
+    expect(sa.servedToday).toBe(1);
+    expect(sb.servedToday).toBe(3);
+    expect(sb.walkInToday).toBe(1);
+  });
+
+  it('assigns days by IST, not UTC (00:15 IST is still the previous UTC day)', async () => {
+    const { cookie, queueId } = await makeBarber();
+    const today = istToday();
+    const yesterday = shiftDay(today, -1);
+
+    await addEntry(queueId, { completedAt: at(today, '00:15') }); // UTC date = yesterday
+    await addEntry(queueId, { completedAt: at(yesterday, '23:45') }); // UTC date = yesterday too, IST = yesterday
+
+    const s = (await getStats(cookie)).body.stats;
+    expect(s.servedToday).toBe(1);
+    expect(s.servedYesterday).toBe(1);
+  });
+
+  it('compares the same elapsed period of the previous week and month', async () => {
+    const { cookie, queueId } = await makeBarber();
+    const today = istToday();
+
+    await addEntry(queueId, { completedAt: at(shiftDay(today, -7), '12:00') }); // same weekday last week
+    await addEntry(queueId, { completedAt: at(prevMonthStartOf(today), '12:00') }); // 1st of last month
+    await addEntry(queueId, { completedAt: at(shiftDay(prevMonthStartOf(today), -1), '12:00') }); // too old
+    await addEntry(queueId, { completedAt: at(today, '12:00') });
+
+    const s = (await getStats(cookie)).body.stats;
+    expect(s.week.prevSamePeriod).toBe(1);
+    expect(s.week.total).toBe(1); // last week's entry is not in this week
+    expect(s.month.prevSamePeriod).toBe(1); // the too-old entry is not counted anywhere
+    expect(s.month.total).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns counts only, with no customer data, and is unaffected by data cleanup', async () => {
+    const { cookie, queueId } = await makeBarber();
+    const today = istToday();
+    await addEntry(queueId, { completedAt: at(today, '10:00'), name: 'Test Customer', phone: '9876543210' });
+
+    const before = await getStats(cookie);
+    expect(JSON.stringify(before.body)).not.toMatch(/9876543210|Test Customer|phone|name|token|access/i);
+    expect(before.body.stats.servedToday).toBe(1);
+
+    // What the retention job does to an entry: the personal fields are nulled, the row stays.
+    await supabase
+      .from('queue_entries')
+      .update({ customer_name: null, customer_phone: null })
+      .eq('queue_id', queueId);
+
+    const after = await getStats(cookie);
+    expect(after.body.stats.servedToday).toBe(1);
+  });
+});
+##### FILE backend/supabase/step9b_lane_functions.sql
+(missing)
+
+##### FILE frontend/src/pages/BarberStats.tsx
+// frontend/src/pages/BarberStats.tsx
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchBarberStats, type BarberStats, type StatsDay } from '../api/barber';
+import { ApiError } from '../api/client';
+
+type Period = 'today' | 'week' | 'month';
+
+const PERIODS: { id: Period; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'This week' },
+  { id: 'month', label: 'This month' },
+];
+
+// Dates arrive as IST calendar days (YYYY-MM-DD). Build them from parts so the
+// phone's own timezone can never shift the day.
+function parseYmd(ymd: string) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+const fmtWeekday = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-IN', { weekday: 'short' });
+const fmtShort = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+const fmtFull = (ymd: string) =>
+  parseYmd(ymd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+const customers = (n: number) => `${n} ${n === 1 ? 'customer' : 'customers'}`;
+
+function viewFor(stats: BarberStats, period: Period) {
+  if (period === 'today') {
+    return {
+      total: stats.servedToday,
+      qr: stats.qrToday,
+      walkIn: stats.walkInToday,
+      prev: stats.servedYesterday,
+      noun: 'today',
+      vs: 'yesterday',
+      days: null as StatsDay[] | null,
+    };
+  }
+  const p = period === 'week' ? stats.week : stats.month;
+  return {
+    total: p.total,
+    qr: p.qr,
+    walkIn: p.walkIn,
+    prev: p.prevSamePeriod,
+    noun: period === 'week' ? 'this week' : 'this month',
+    vs: period === 'week' ? 'the same days last week' : 'the same days last month',
+    days: p.days,
+  };
+}
+
+// Words and a symbol, never colour alone.
+function deltaOf(total: number, prev: number, vs: string) {
+  const d = total - prev;
+  if (d === 0) return { symbol: '=', text: `Same as ${vs}`, tone: 'text-gray-700' };
+  if (d > 0) return { symbol: '▲', text: `${d} more than ${vs}`, tone: 'text-green-800' };
+  return { symbol: '▼', text: `${Math.abs(d)} fewer than ${vs}`, tone: 'text-gray-700' };
+}
+
+function DayBars({
+  days,
+  today,
+  showCounts,
+  label,
+}: {
+  days: StatsDay[];
+  today: string;
+  showCounts: boolean;
+  label: string;
+}) {
+  const max = Math.max(1, ...days.map((d) => d.count));
+  return (
+    <>
+      <ul role="list" aria-label={label} className={`flex items-end ${showCounts ? 'gap-2' : 'gap-0.5'}`}>
+        {days.map((d) => {
+          const future = d.date > today;
+          const isToday = d.date === today;
+          const pct = d.count > 0 ? Math.max(6, Math.round((d.count / max) * 100)) : 0;
+          const fill = future ? 'bg-gray-200' : isToday ? 'bg-brand border-2 border-ink' : 'bg-ink';
+          return (
+            <li key={d.date} aria-current={isToday ? 'date' : undefined} className="flex min-w-0 flex-1 flex-col items-center">
+              {showCounts && (
+                <span aria-hidden="true" className="mb-1 h-4 text-xs font-bold tabular-nums text-ink">
+                  {future ? '' : d.count}
+                </span>
+              )}
+              <div aria-hidden="true" className="flex h-32 w-full items-end">
+                <div className={`w-full rounded-t ${fill}`} style={{ height: `${pct}%`, minHeight: 3 }} />
+              </div>
+              {showCounts && (
+                <span
+                  aria-hidden="true"
+                  className={`mt-1 text-xs ${isToday ? 'font-bold text-ink' : 'text-gray-600'}`}
+                >
+                  {fmtWeekday(d.date)}
+                </span>
+              )}
+              <span className="sr-only">
+                {fmtFull(d.date)}
+                {isToday ? ' (today)' : ''}: {future ? 'upcoming' : customers(d.count)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {!showCounts && days.length > 0 && (
+        <div aria-hidden="true" className="mt-1 flex justify-between text-xs text-gray-600">
+          <span>{fmtShort(days[0].date)}</span>
+          <span>{fmtShort(days[days.length - 1].date)}</span>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function BarberStatsPage() {
+  const [period, setPeriod] = useState<Period>('today');
+
+  // No polling and no sockets: refetch when the browser tab regains focus and
+  // whenever the barber comes back to this page.
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: ['barberStats'],
+    queryFn: fetchBarberStats,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
+    retry: (count, err) => !(err instanceof ApiError && err.status === 401) && count < 1,
+    retryDelay: 300,
+  });
+
+  if (isLoading) {
+    return (
+      <main className="mx-auto w-full max-w-md p-4 md:max-w-2xl">
+        <div className="animate-pulse space-y-4" aria-hidden="true">
+          <div className="h-16 rounded-2xl bg-gray-200" />
+          <div className="h-12 rounded-xl bg-gray-200" />
+          <div className="h-44 rounded-2xl bg-gray-200" />
+        </div>
+        <p role="status" className="mt-4 text-center text-gray-600">Loading customers...</p>
+      </main>
+    );
+  }
+
+  if (!data) {
+    return (
+      <main className="mx-auto max-w-md p-6">
+        <div className="card p-6 text-center">
+          <p role="alert" className="mb-4 text-red-700">
+            Could not load your numbers. Check your connection and try again.
+          </p>
+          <button type="button" onClick={() => refetch()} className="btn-primary">
+            Try again
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  const v = viewFor(data, period);
+  const delta = deltaOf(v.total, v.prev, v.vs);
+
+  return (
+    <main className="mx-auto w-full max-w-md p-4 md:max-w-2xl">
+      <header className="mb-3 flex items-center gap-3 rounded-2xl bg-ink p-4 text-white">
+        <img src="/icon-192.png" alt="" width={44} height={44} className="h-11 w-11 rounded-xl" />
+        <div>
+          <h1 className="text-xl font-semibold">Customers</h1>
+          <p className="text-sm text-gray-300">Customers you have served</p>
+        </div>
+      </header>
+
+      <div role="group" aria-label="Period" className="mb-4 grid grid-cols-3 gap-2">
+        {PERIODS.map((p) => {
+          const on = p.id === period;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setPeriod(p.id)}
+              className={`min-h-12 rounded-xl px-2 text-base ${
+                on ? 'border-4 border-ink bg-brand font-bold text-ink' : 'border-2 border-gray-300 bg-white font-medium text-gray-700'
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {isFetching && (
+        <p role="status" className="mb-2 text-center text-xs text-gray-600">Updating...</p>
+      )}
+      {isError && (
+        <p role="alert" className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-center text-sm text-amber-900">
+          Could not refresh. Showing the last numbers.
+        </p>
+      )}
+
+      <section aria-label="Customers served" className="mb-4 rounded-2xl border-2 border-ink bg-brand-soft p-6 text-center">
+        <p className="text-sm font-bold uppercase tracking-wide text-gray-700">Customers served {v.noun}</p>
+        <p data-testid="served-total" className="my-2 text-8xl font-extrabold tabular-nums text-ink">
+          {v.total}
+        </p>
+        {v.total === 0 ? (
+          <p className="text-sm text-gray-700">
+            No customers served yet {v.noun}. Numbers appear here as you complete customers.
+          </p>
+        ) : null}
+        <p className={`mt-1 text-base font-semibold ${delta.tone}`}>
+          <span aria-hidden="true">{delta.symbol} </span>
+          {delta.text}
+        </p>
+      </section>
+
+      <section aria-label="Where they came from" className="mb-4 grid grid-cols-2 gap-3">
+        <div className="rounded-xl border-2 border-gray-200 bg-white p-3 text-center">
+          <p className="text-sm font-semibold text-gray-700">Via QR</p>
+          <p data-testid="qr-count" className="text-3xl font-bold tabular-nums text-ink">{v.qr}</p>
+        </div>
+        <div className="rounded-xl border-2 border-gray-200 bg-white p-3 text-center">
+          <p className="text-sm font-semibold text-gray-700">Walk-ins</p>
+          <p data-testid="walkin-count" className="text-3xl font-bold tabular-nums text-ink">{v.walkIn}</p>
+        </div>
+      </section>
+
+      {v.days && (
+        <section aria-label="Daily breakdown" className="rounded-2xl border-2 border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-semibold text-gray-700">
+            {period === 'week' ? 'Each day this week' : 'Each day this month'}
+          </h2>
+          <DayBars
+            days={v.days}
+            today={data.today}
+            showCounts={period === 'week'}
+            label={period === 'week' ? 'Customers served per day this week' : 'Customers served per day this month'}
+          />
+        </section>
+      )}
+    </main>
+  );
+}
+##### FILE frontend/src/api/barber.ts
+// frontend/src/api/barber.ts
+import { apiFetch } from './client';
+
+export interface BarberStaff {
+  id: string;
+  name: string;
+  email: string | null; // staff added by the owner sign in with a phone number instead
+  role: 'OWNER' | 'BARBER' | 'MANAGER';
+  salonId: string;
+}
+
+export interface BarberQueueEntry {
+  id: string;
+  token_number: number;
+  status: 'CALLED' | 'SERVING' | 'WAITING';
+  joined_at: string;
+  called_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  skipped_at: string | null;
+  priority_at: string | null;
+}
+
+// One barber's line, as the owner's switcher shows it.
+export interface BarberLaneSummary {
+  id: string;
+  name: string;
+  isMine: boolean;
+  isPaused: boolean;
+  waitingCount: number;
+  busy: boolean;
+}
+
+export interface BarberQueueSnapshot {
+  salonId: string;
+  queueStatus: 'ACTIVE' | 'PAUSED' | 'CLOSED';
+  currentToken: number;
+  called: BarberQueueEntry | null;
+  serving: BarberQueueEntry | null;
+  waiting: BarberQueueEntry[];
+  // Only present when the salon has more than one barber (a one-barber salon never sees these).
+  lane?: { id: string; name: string; isPaused: boolean } | null;
+  lanes?: BarberLaneSummary[] | null; // the owner's switcher; staff never get it
+}
+
+// The owner can look at another barber's line; for staff the server ignores this and uses their own.
+const laneQuery = (laneId?: string) => (laneId ? `?laneId=${encodeURIComponent(laneId)}` : '');
+
+export interface CallNextResult {
+  completed_entry_id?: string | null;
+  called_entry_id?: string | null;
+  called_token_number?: number | null;
+  nothingWaiting?: boolean;
+}
+
+export interface BarberSalon {
+  id: string;
+  name: string;
+  qrCode: string;
+}
+
+export interface RegisterSalonInput {
+  salonName: string;
+  phone: string;
+  address: string;
+  area?: string;
+  district?: string;
+  state?: string;
+  latitude: number;
+  longitude: number;
+  ownerName: string;
+  email: string;
+  password: string;
+  openingTime: string;
+  closingTime: string;
+  averageServiceMinutes: number;
+}
+
+export interface BarberSalonProfile extends BarberSalon {
+  phone: string;
+  address: string;
+  openingTime: string;
+  closingTime: string;
+  averageServiceMinutes: number;
+}
+
+export type SalonProfileUpdate = Partial<
+  Pick<BarberSalonProfile, 'name' | 'phone' | 'address' | 'openingTime' | 'closingTime' | 'averageServiceMinutes'>
+>;
+
+export function fetchBarberSalonProfile() {
+  return apiFetch<{ salon: BarberSalonProfile }>('/api/barber/salon').then((r) => r.salon);
+}
+
+export function updateBarberSalonProfile(changes: SalonProfileUpdate) {
+  return apiFetch<{ salon: BarberSalonProfile }>('/api/barber/salon', {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  }).then((r) => r.salon);
+}
+
+// identifier is an email address or a phone number.
+export function loginBarber(identifier: string, password: string) {
+  return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password }),
+  });
+}
+
+export function logoutBarber() {
+  return apiFetch<{ ok: boolean }>('/api/auth/barber/logout', { method: 'POST' });
+}
+
+export function fetchBarberQueue(laneId?: string) {
+  return apiFetch<BarberQueueSnapshot>(`/api/barber/queue${laneQuery(laneId)}`);
+}
+ 
+export function callNextCustomer(laneId?: string) {
+  return apiFetch<{ result: CallNextResult }>(`/api/barber/queue/next${laneQuery(laneId)}`, { method: 'POST' });
+}
+
+export function startEntry(entryId: string) {
+  return apiFetch<{ entry: { id: string; status: string } }>(`/api/barber/queue/${entryId}/start`, {
+    method: 'POST',
+  });
+}
+
+export function completeEntry(entryId: string) {
+  return apiFetch<{ entry: { id: string; status: string } }>(`/api/barber/queue/${entryId}/complete`, {
+    method: 'POST',
+  });
+}
+
+export function skipEntry(entryId: string) {
+  return apiFetch<{ entry: { id: string; status: string } }>(`/api/barber/queue/${entryId}/skip`, {
+    method: 'POST',
+  });
+}
+
+export function pauseQueue(laneId?: string) {
+  return apiFetch<{ queue: { status: string } }>(`/api/barber/queue/pause${laneQuery(laneId)}`, { method: 'POST' });
+}
+
+export function resumeQueue(laneId?: string) {
+  return apiFetch<{ queue: { status: string } }>(`/api/barber/queue/resume${laneQuery(laneId)}`, { method: 'POST' });
+}
+
+export function fetchBarberSalon() {
+  return apiFetch<{ salon: BarberSalon }>('/api/barber/salon').then((r) => r.salon);
+}
+
+export function registerSalon(input: RegisterSalonInput) {
+  return apiFetch<{ staff: BarberStaff }>('/api/auth/barber/register', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function addWalkIn(laneId?: string) {
+  return apiFetch<{ entry: { id: string; tokenNumber: number; laneName?: string | null } }>(
+    `/api/barber/queue/walk-in${laneQuery(laneId)}`,
+    { method: 'POST' },
+  );
+}
+export interface StatsDay {
+  date: string; // YYYY-MM-DD, IST
+  count: number;
+}
+
+export interface StatsPeriod {
+  start: string;
+  total: number;
+  walkIn: number;
+  qr: number;
+  prevSamePeriod: number;
+  days: StatsDay[];
+}
+
+export interface BarberStats {
+  today: string;
+  servedToday: number;
+  walkInToday: number;
+  qrToday: number;
+  servedYesterday: number;
+  week: StatsPeriod;
+  month: StatsPeriod;
+}
+
+export function fetchBarberStats() {
+  return apiFetch<{ stats: BarberStats }>('/api/barber/stats').then((r) => r.stats);
+}
+
+export interface SalonService {
+  id: string;
+  name: string;
+  durationMinutes: number;
+}
+
+export interface ServiceInput {
+  name: string;
+  durationMinutes: number;
+}
+
+export function fetchServices() {
+  return apiFetch<{ services: SalonService[] }>('/api/barber/services').then((r) => r.services);
+}
+
+export function createService(input: ServiceInput) {
+  return apiFetch<{ service: SalonService }>('/api/barber/services', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }).then((r) => r.service);
+}
+
+export function updateService(id: string, changes: Partial<ServiceInput>) {
+  return apiFetch<{ service: SalonService }>(`/api/barber/services/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  }).then((r) => r.service);
+}
+
+export function deleteService(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/barber/services/${id}`, { method: 'DELETE' });
+}
+
+export function prioritizeEntry(entryId: string) {
+  return apiFetch<{ entry: { id: string; tokenNumber: number } }>(
+    `/api/barber/queue/${entryId}/prioritize`,
+    { method: 'POST' },
+  );
+}
+
+// ── Who is signed in, and the owner's team list ───────────────────────────
+export interface BarberMe {
+  id: string;
+  name: string;
+  role: 'OWNER' | 'BARBER' | 'MANAGER';
+  salonId: string;
+  laneId: string | null;
+  laneName: string | null;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  role: 'OWNER' | 'BARBER' | 'MANAGER';
+  isActive: boolean;
+  laneId: string | null;
+}
+
+export interface AddTeamMemberInput {
+  name: string;
+  phone: string;
+  password: string;
+}
+
+export function fetchMe() {
+  return apiFetch<{ staff: BarberMe }>('/api/barber/me').then((r) => r.staff);
+}
+
+export function fetchTeam() {
+  return apiFetch<{ team: TeamMember[] }>('/api/barber/team').then((r) => r.team);
+}
+
+export function addTeamMember(input: AddTeamMemberInput) {
+  return apiFetch<{ member: TeamMember }>('/api/barber/team', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }).then((r) => r.member);
+}
+
+export function resetTeamMemberPassword(staffId: string, password: string) {
+  return apiFetch<{ ok: boolean }>(`/api/barber/team/${staffId}/password`, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function setTeamMemberActive(staffId: string, isActive: boolean) {
+  return apiFetch<{ member: { id: string; isActive: boolean } }>(`/api/barber/team/${staffId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
+  });
+}
+
+// Any signed-in staff member changes their own password.
+export function changeOwnPassword(currentPassword: string, newPassword: string) {
+  return apiFetch<{ ok: boolean }>('/api/barber/me/password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+##### FILE frontend/src/components/BarberLayout.tsx
+// frontend/src/components/BarberLayout.tsx
+import { useEffect, useState } from 'react';
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchMe, logoutBarber } from '../api/barber';
+import { SESSION_EXPIRED_EVENT } from '../api/client';
+
+// QR and Offers live under Settings, so the Settings tab stays highlighted on them.
+const SETTINGS_PATHS = ['/barber/settings', '/barber/qr', '/barber/offers'];
+
+const iconProps = {
+  'aria-hidden': true,
+  viewBox: '0 0 24 24',
+  width: 24,
+  height: 24,
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const;
+
+const tabs = [
+  {
+    to: '/barber/dashboard',
+    label: 'Dashboard',
+    match: (p: string) => p.startsWith('/barber/dashboard'),
+    icon: (
+      <svg {...iconProps}>
+        <rect x="3" y="3" width="7" height="9" rx="1" />
+        <rect x="14" y="3" width="7" height="5" rx="1" />
+        <rect x="14" y="12" width="7" height="9" rx="1" />
+        <rect x="3" y="16" width="7" height="5" rx="1" />
+      </svg>
+    ),
+  },
+  {
+  to: '/barber/stats',
+    label: 'Customers',
+    match: (p: string) => p.startsWith('/barber/stats'),
+    icon: (
+      <svg {...iconProps}>
+        <line x1="6" y1="20" x2="6" y2="12" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="18" y1="20" x2="18" y2="9" />
+      </svg>
+    ),
+  },
+  {
+    to: '/barber/settings',
+    label: 'Settings',
+    match: (p: string) => SETTINGS_PATHS.some((s) => p.startsWith(s)),
+    icon: (
+      <svg {...iconProps}>
+        <line x1="4" y1="6" x2="20" y2="6" />
+        <line x1="4" y1="12" x2="20" y2="12" />
+        <line x1="4" y1="18" x2="20" y2="18" />
+        <circle cx="9" cy="6" r="2.5" fill="currentColor" />
+        <circle cx="15" cy="12" r="2.5" fill="currentColor" />
+        <circle cx="8" cy="18" r="2.5" fill="currentColor" />
+      </svg>
+    ),
+  },
+];
+
+const STAFF_HOME = '/barber/dashboard';
+
+export default function BarberLayout() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // Auth gate for every barber screen, and the source of the signed-in person's role.
+  // Only a 401 sends them to login; a network blip should not log anyone out.
+  const { data: me, error } = useQuery({ queryKey: ['barberMe'], queryFn: fetchMe, retry: false });
+  const isOwner = me?.role === 'OWNER';
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    await logoutBarber().catch(() => {});
+    navigate('/barber/login', { replace: true });
+    queryClient.clear();
+  }
+
+  useEffect(() => {
+    function onExpired() {
+      queryClient.clear();
+      navigate('/barber/login', { replace: true, state: { expired: true } });
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [navigate, queryClient]);
+
+  if ((error as { status?: number } | null)?.status === 401) {
+    return <Navigate to="/barber/login" replace state={{ expired: true }} />;
+  }
+
+  // Staff accounts only ever see the Dashboard. Owner pages wait for the role to load, so a
+  // staff member never gets a flash of Settings; the server refuses those requests anyway.
+  if (me && !isOwner && !pathname.startsWith(STAFF_HOME)) {
+    return <Navigate to={STAFF_HOME} replace />;
+  }
+  if (!me && !pathname.startsWith(STAFF_HOME)) {
+    return <p role="status" className="p-6 text-gray-600">Loading...</p>;
+  }
+
+  const visibleTabs = me && !isOwner ? tabs.filter((t) => t.to === STAFF_HOME) : tabs;
+
+  return (
+    <>
+      <div className="barber-nav-spacer">
+        <Outlet />
+      </div>
+
+      <nav aria-label="Main" className="barber-nav print:hidden">
+        <div
+          className={`mx-auto grid h-[var(--barber-nav-h)] max-w-md md:max-w-2xl ${
+            visibleTabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+          }`}
+        >
+          {visibleTabs.map((t) => {
+            const active = t.match(pathname);
+            return (
+              <Link
+                key={t.to}
+                to={t.to}
+                aria-current={active ? 'page' : undefined}
+                className={`flex h-full flex-col items-center justify-center gap-0.5 border-t-4 text-sm font-bold ${
+                  active
+                    ? 'border-ink bg-brand text-ink'
+                    : 'border-transparent text-gray-700 hover:bg-brand-soft'
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </Link>
+            );
+          })}
+          {/* Staff have no Settings page, so sign-out lives here. */}
+          {me && !isOwner && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              aria-busy={loggingOut}
+              className="flex h-full flex-col items-center justify-center gap-0.5 border-t-4 border-transparent text-sm font-bold text-gray-700 hover:bg-brand-soft"
+            >
+              <svg {...iconProps}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              {loggingOut ? 'Logging out...' : 'Log out'}
+            </button>
+          )}
+        </div>
+      </nav>
+    </>
+  );
+}
+##### FILE frontend/src/pages/BarberDashboard.tsx
+// frontend/src/pages/BarberDashboard.tsx
+import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import {
+  fetchBarberQueue,
+  callNextCustomer,
+  startEntry,
+  completeEntry,
+  skipEntry,
+  pauseQueue,
+  resumeQueue,
+  addWalkIn,
+  prioritizeEntry,
+  fetchMe,
+} from '../api/barber';
+import { redeemCode } from '../api/offers';
+import BarberLaneSwitcher from '../components/BarberLaneSwitcher';
+import ChangePassword from '../components/ChangePassword';
+import { socket } from '../lib/socket';
+import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
+
+const QUEUE_KEY = ['barberQueue']; // other lines use [...QUEUE_KEY, laneId], so invalidating QUEUE_KEY refreshes them all
+const LANE_STORE = 'svq.barber.lane'; // which line the owner was looking at (not personal data)
+
+export default function BarberDashboard() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const redeem = useMutation({
+    mutationFn: () => redeemCode(redeemInput),
+    onSuccess: (r) => { setRedeemMsg({ ok: true, text: `Redeemed: ${r.prizeName}. Give it to the customer.` }); setRedeemInput(''); },
+    onError: (e: any) => setRedeemMsg({ ok: false, text: e.message ?? 'Could not redeem.' }),
+  });
+
+  // The owner can look at any barber's line; null means their own. Staff always get their own.
+  const [selectedLane, setSelectedLane] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(LANE_STORE);
+    } catch {
+      return null;
+    }
+  });
+  function chooseLane(id: string | null) {
+    setSelectedLane(id);
+    try {
+      if (id) sessionStorage.setItem(LANE_STORE, id);
+      else sessionStorage.removeItem(LANE_STORE);
+    } catch {
+      /* storage can be unavailable; the choice just will not be remembered */
+    }
+  }
+  const lane = selectedLane ?? undefined;
+
+  const { data: me } = useQuery({ queryKey: ['barberMe'], queryFn: () => fetchMe(), retry: false });
+  const isStaff = me?.role === 'BARBER' || me?.role === 'MANAGER';
+
+  const { data: queue, isLoading, error } = useQuery({
+    queryKey: selectedLane ? [...QUEUE_KEY, selectedLane] : QUEUE_KEY,
+    queryFn: () => (selectedLane ? fetchBarberQueue(selectedLane) : fetchBarberQueue()),
+    retry: (count, err) =>
+      !(err instanceof ApiError && (err.status === 401 || err.status === 404)) && count < 2,
+  });
+
+  // A line that no longer exists (a barber was removed): go back to the owner's own line.
+  useEffect(() => {
+    if (selectedLane && error instanceof ApiError && error.status === 404) chooseLane(null);
+  }, [error, selectedLane]);
+  function refetch() {
+    return queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+  }
+
+  // The API client emits this only after a silent refresh has failed.
+  useEffect(() => {
+    function onExpired() {
+      queryClient.clear();
+      navigate('/barber/login', { replace: true, state: { expired: true } });
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [navigate, queryClient]);
+
+  // queue:updated is only a signal to re-fetch the full snapshot; the broadcast
+  // payload is sanitized and deliberately carries no customer details.
+  useEffect(() => {
+    if (!queue?.salonId) return;
+    const salonId = queue.salonId;
+
+    function joinRoom() {
+      socket.emit('join:salon', { salonId });
+      refetch();
+    }
+
+    joinRoom();
+    socket.on('connect', joinRoom);
+    socket.on('queue:updated', refetch);
+
+    return () => {
+      socket.off('connect', joinRoom);
+      socket.off('queue:updated', refetch);
+      socket.emit('leave:salon', { salonId });
+    };
+  }, [queue?.salonId]);
+
+  function runAction<T>(action: () => Promise<T>) {
+    setActionError(null);
+    return action()
+      .then(() => refetch())
+      .catch((err: any) => {
+        setActionError(err.message);
+        return refetch(); // re-sync so the button reflects what really happened
+      });
+  }
+
+  // ── The one primary action ─────────────────────────────────────────────
+  // The server still enforces every transition; this only picks which call to make.
+  const primaryMutation = useMutation({
+    mutationFn: () =>
+      runAction(async () => {
+        if (!queue) return;
+        if (queue.serving) {
+          await completeEntry(queue.serving.id); // SERVING → COMPLETED
+        } else if (queue.called) {
+          await startEntry(queue.called.id); // CALLED → SERVING
+        } else if (queue.queueStatus === 'PAUSED') {
+          await (lane ? resumeQueue(lane) : resumeQueue());
+        } else {
+          // Idle: call the next customer and start them in one tap.
+          // If start fails, the customer stays CALLED and the button becomes "Start #N".
+          const { result } = await (lane ? callNextCustomer(lane) : callNextCustomer());
+          const calledId = (result as { called_entry_id?: string | null } | null)?.called_entry_id;
+          if (calledId) await startEntry(calledId);
+        }
+      }),
+  });
+  const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
+  const pauseMutation = useMutation({
+    mutationFn: () => runAction(() => (lane ? pauseQueue(lane) : pauseQueue())),
+  });
+
+  // Emergency: serve a waiting customer right after the current one.
+  const [bumpTarget, setBumpTarget] = useState<{ id: string; token_number: number } | null>(null);
+  const bumpMutation = useMutation({
+    mutationFn: (id: string) => runAction(() => prioritizeEntry(id)),
+    onSettled: () => setBumpTarget(null),
+  });
+
+  const [walkInMsg, setWalkInMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!walkInMsg) return;
+    const t = setTimeout(() => setWalkInMsg(null), 6000);
+    return () => clearTimeout(t);
+  }, [walkInMsg]);
+  const walkInMutation = useMutation({
+    mutationFn: () => (lane ? addWalkIn(lane) : addWalkIn()),
+    onMutate: () => {
+      setActionError(null);
+      setWalkInMsg(null);
+    },
+    onSuccess: (r) => {
+      setWalkInMsg(
+        r.entry.laneName
+          ? `Token #${r.entry.tokenNumber} added to ${r.entry.laneName}'s line.`
+          : `Token #${r.entry.tokenNumber} added to the queue.`,
+      );
+      refetch();
+    },
+    onError: (err: any) => {
+      setActionError(err.message);
+      refetch();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <main className="mx-auto w-full max-w-md p-4 md:max-w-2xl">
+        <div className="animate-pulse space-y-4" aria-hidden="true">
+          <div className="h-20 rounded-2xl bg-gray-200" />
+          <div className="h-44 rounded-2xl bg-gray-200" />
+          <div className="h-20 rounded-2xl bg-gray-200" />
+        </div>
+        <p role="status" className="mt-4 text-center text-gray-600">Loading queue...</p>
+      </main>
+    );
+  }
+
+  if (error || !queue) {
+    return (
+      <main className="mx-auto max-w-md p-6">
+        <div className="card p-6 text-center">
+          <p role="alert" className="mb-4 text-red-700">Not signed in, or your session expired.</p>
+          <button onClick={() => navigate('/barber/login')} className="btn-primary">
+            Go to Login
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  const isPaused = queue.queueStatus === 'PAUSED';
+  const multi = !!queue.lane; // several barbers: this screen is about one line
+  const busy =
+    primaryMutation.isPending ||
+    skipMutation.isPending ||
+    pauseMutation.isPending ||
+    walkInMutation.isPending ||
+    bumpMutation.isPending;
+  const nextWaiting = queue.waiting[0] ?? null;
+  const active = queue.serving ?? queue.called; // whoever is at the chair / being called
+
+  // What the one button says and does right now.
+  let label: string;
+  let color = 'bg-brand text-ink hover:bg-brand-dark';
+  let disabled = busy;
+  if (queue.serving) {
+    label = `COMPLETE #${queue.serving.token_number}`;
+    color = 'bg-green-700 text-white hover:bg-green-800';
+  } else if (queue.called) {
+    label = `START #${queue.called.token_number}`;
+  } else if (isPaused) {
+    label = multi ? 'RESUME LINE' : 'RESUME QUEUE';
+    color = 'bg-amber-700 text-white hover:bg-amber-800';
+  } else if (nextWaiting) {
+    label = `START NEXT #${nextWaiting.token_number}`;
+  } else {
+    label = 'NO ONE WAITING';
+    disabled = true;
+  }
+  if (primaryMutation.isPending) label = 'Working...';
+
+  const statusLine = queue.serving
+    ? 'Serving now'
+    : queue.called
+      ? 'Called — waiting to start'
+      : isPaused
+        ? 'On a break'
+        : 'Ready';
+
+  const cardTone = queue.serving
+    ? 'border-green-600 bg-green-50'
+    : queue.called
+      ? 'border-ink bg-brand-soft'
+      : 'border-gray-300 bg-white';
+
+  return (
+    <>
+      <main className="mx-auto w-full max-w-md p-4 pb-36 md:max-w-2xl">
+        <header className="mb-3 flex items-start justify-between gap-3 rounded-2xl bg-ink p-4 text-white">
+          <div className="flex items-center gap-3">
+            <img src="/icon-192.png" alt="" width={44} height={44} className="h-11 w-11 rounded-xl" />
+            <div>
+              <h1 className="text-xl font-semibold">{queue.lane ? `${queue.lane.name}'s line` : 'Salon queue'}</h1>
+              <p className="text-sm text-gray-300">Current token #{queue.currentToken}</p>
+            </div>
+          </div>
+          <span
+            className={`pill shrink-0 ${
+              isPaused ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-green-300 bg-green-50 text-green-900'
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 rounded-full ${isPaused ? 'bg-amber-600' : 'bg-green-600'}`}
+            />
+            {isPaused ? (multi ? 'Line paused' : 'Queue paused') : multi ? 'Line active' : 'Queue active'}
+          </span>
+        </header>
+
+        {queue.lanes && queue.lanes.length > 1 && (
+          <BarberLaneSwitcher lanes={queue.lanes} selectedId={selectedLane} onSelect={chooseLane} />
+        )}
+
+        {actionError && (
+          <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            {actionError}
+          </p>
+        )}
+
+        <section
+          aria-label="Current customer"
+          className={`mb-4 rounded-2xl border-2 p-6 text-center ${cardTone}`}
+        >
+          <p className="text-sm font-bold uppercase tracking-wide text-gray-700">{statusLine}</p>
+          <p className="my-2 text-8xl font-extrabold tabular-nums text-ink">{active ? `#${active.token_number}` : '—'}</p>
+          {!active && nextWaiting && !isPaused && (
+            <p className="text-sm text-gray-700">Next up: #{nextWaiting.token_number}</p>
+          )}
+        </section>
+
+        {/* Rare actions stay out of the way. Skip is here so a no-show can never block the queue. */}
+        <details className="mb-6 rounded-xl border-2 border-gray-300 bg-white px-3">
+          <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-gray-700">More actions</summary>
+          <div className="grid gap-3 pb-3">
+            {active && (
+              <button
+                type="button"
+                onClick={() => skipMutation.mutate(active.id)}
+                disabled={busy}
+                className="min-h-12 rounded-xl border-2 border-red-300 px-4 text-base font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+              >
+                {`Skip #${active.token_number}`}
+              </button>
+            )}
+            {!isPaused && (
+              <button
+                type="button"
+                onClick={() => pauseMutation.mutate()}
+                disabled={busy}
+                className="min-h-12 rounded-xl border-2 border-ink px-4 text-base font-medium hover:bg-brand-soft disabled:opacity-40"
+              >
+                {multi ? 'Pause this line' : 'Pause queue'}
+              </button>
+            )}
+          </div>
+        </details>
+
+        <section aria-label="Redeem a reward" className="mb-6 rounded-2xl border-2 border-ink bg-brand-soft p-3">
+          <label htmlFor="redeem-code" className="mb-1 block text-sm font-semibold text-ink">
+            Customer showed a reward code?
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="redeem-code"
+              className="field uppercase tracking-widest"
+              value={redeemInput}
+              maxLength={7}
+              autoCapitalize="characters"
+              autoComplete="off"
+              placeholder="ABC234"
+              onChange={(e) => { setRedeemInput(e.target.value); setRedeemMsg(null); }}
+            />
+            <button
+              type="button"
+              className="btn-primary !w-auto"
+              disabled={redeem.isPending || redeemInput.replace(/[\s-]/g, '').length < 6}
+              onClick={() => redeem.mutate()}
+            >
+              Redeem
+            </button>
+          </div>
+          {redeemMsg && (
+            <p role="status" className={`mt-2 text-sm font-medium ${redeemMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
+              {redeemMsg.text}
+            </p>
+          )}
+        </section>
+
+        <section>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-gray-700">Waiting ({queue.waiting.length})</h2>
+            <button
+              type="button"
+              onClick={() => walkInMutation.mutate()}
+              disabled={busy || isPaused}
+              aria-busy={walkInMutation.isPending}
+              className="min-h-12 rounded-xl border-2 border-ink bg-white px-5 text-lg font-bold text-ink hover:bg-brand-soft disabled:border-gray-300 disabled:text-gray-500"
+            >
+              {walkInMutation.isPending ? 'Adding...' : '+1 Add walk-in'}
+            </button>
+          </div>
+          {isPaused && (
+            <p className="mb-2 text-sm text-gray-600">
+              {multi ? 'Resume this line to add a walk-in.' : 'Resume the queue to add a walk-in.'}
+            </p>
+          )}
+          {walkInMsg && (
+            <p role="status" className="mb-3 rounded-lg border border-green-300 bg-green-50 p-3 text-base font-medium text-green-900">
+              {walkInMsg}
+            </p>
+          )}
+          {queue.waiting.length === 0 ? (
+            <p className="rounded-xl border-2 border-dashed border-gray-300 p-4 text-center text-gray-600">
+              No one waiting.
+            </p>
+          ) : (
+            <>
+              {queue.waiting.length > 1 && (
+                <p className="mb-2 text-sm text-gray-600">Emergency? Tap a token to serve it next.</p>
+              )}
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {queue.waiting.map((entry, i) => {
+                  const isPriority = !!entry.priority_at;
+                  const base =
+                    'flex w-full flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink';
+                  const tone =
+                    i === 0
+                      ? 'border-ink bg-brand'
+                      : isPriority
+                        ? 'border-ink bg-brand-soft'
+                        : 'border-gray-200 bg-white';
+                  return (
+                    <li key={entry.id}>
+                      {i === 0 || isPriority ? (
+                        <div className={`${base} ${tone}`}>
+                          #{entry.token_number}
+                          <span className="text-xs font-semibold">
+                            {isPriority ? (i === 0 ? '⚡ Priority · Next' : '⚡ Priority') : 'Next'}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Serve #${entry.token_number} next`}
+                          disabled={busy}
+                          onClick={() => setBumpTarget({ id: entry.id, token_number: entry.token_number })}
+                          className={`${base} ${tone} min-h-14 hover:bg-brand-soft disabled:opacity-40`}
+                        >
+                          #{entry.token_number}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </section>
+
+        {isStaff && <ChangePassword />}
+      </main>
+
+      {/* The one big button sits at the bottom of the screen, within thumb reach. */}
+      <div className="above-barber-nav fixed inset-x-0 z-10 border-t-2 border-ink bg-paper/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto max-w-md md:max-w-2xl">
+          <button
+            type="button"
+            onClick={() => primaryMutation.mutate()}
+            disabled={disabled}
+            aria-busy={primaryMutation.isPending}
+            className={`${color} min-h-20 w-full rounded-2xl border-2 border-ink py-5 text-xl font-bold shadow-[0_4px_0_0_var(--color-ink)] active:translate-y-[2px] active:shadow-none disabled:border-gray-300 disabled:bg-gray-200 disabled:text-gray-600 disabled:shadow-none disabled:hover:bg-gray-200`}
+          >
+            {label}
+          </button>
+        </div>
+      </div>
+
+      {/* Emergency confirm sheet: one extra tap so a stray touch can never reorder the queue. */}
+      {bumpTarget && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/50 p-4"
+          onClick={() => !bumpMutation.isPending && setBumpTarget(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="bump-title"
+            className="mx-auto w-full max-w-md rounded-2xl border-2 border-ink bg-white p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="bump-title" className="text-xl font-bold text-ink">
+              Serve #{bumpTarget.token_number} next?
+            </h2>
+            <p className="mt-1 text-sm text-gray-700">
+              They go right after the current customer. Everyone else keeps their order.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={bumpMutation.isPending}
+                onClick={() => bumpMutation.mutate(bumpTarget.id)}
+              >
+                {bumpMutation.isPending ? 'Moving...' : 'Yes, serve next'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={bumpMutation.isPending}
+                onClick={() => setBumpTarget(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+

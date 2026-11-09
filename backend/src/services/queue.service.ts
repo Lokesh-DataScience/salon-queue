@@ -19,27 +19,48 @@ const JOIN_ERROR_MESSAGES: Record<string, string> = {
   LANE_NOT_FOUND: "That barber isn't available right now. Please choose again.",
   LANE_INACTIVE: "That barber isn't available right now. Please choose again.",
   LANE_PAUSED: 'That barber is on a break right now. Please choose another barber, or pick Any barber.',
+  CUSTOMER_DETAILS_REQUIRED: 'Please enter your name and mobile number.',
+  CONSENT_REQUIRED: 'Please tick the box to let the salon save your details.',
 };
+
+export interface JoinCustomerInput {
+  name?: string;
+  phone?: string;
+  consent?: boolean;
+  rememberToken?: string;
+}
 
 export async function joinQueue(
   salonId: string,
   clientKey?: string,
   serviceIds?: string[],
   laneId?: string,
+  customer?: JoinCustomerInput, // the HTTP route always passes this; older direct callers (tests) may leave it out
 ) {
   // laneId undefined = "Any barber": the database picks the line with the shortest wait.
-  const { data, error } = serviceIds?.length
-    ? await supabase.rpc('join_queue_with_services', {
+  const { data, error } = customer
+    ? await supabase.rpc('join_queue_for_customer', {
         p_salon_id: salonId,
-        p_service_ids: serviceIds,
+        p_service_ids: serviceIds ?? [],
         p_client_key: clientKey ?? null,
         p_lane_id: laneId ?? null,
+        p_name: customer.name ?? null,
+        p_phone: customer.phone ?? null,
+        p_consent: customer.consent ?? false,
+        p_remember_token: customer.rememberToken ?? null,
       })
-    : await supabase.rpc('join_queue', {
-        p_salon_id: salonId,
-        p_client_key: clientKey ?? null,
-        p_lane_id: laneId ?? null,
-      });
+    : serviceIds?.length
+      ? await supabase.rpc('join_queue_with_services', {
+          p_salon_id: salonId,
+          p_service_ids: serviceIds,
+          p_client_key: clientKey ?? null,
+          p_lane_id: laneId ?? null,
+        })
+      : await supabase.rpc('join_queue', {
+          p_salon_id: salonId,
+          p_client_key: clientKey ?? null,
+          p_lane_id: laneId ?? null,
+        });
   if (error) {
     const code = error.message?.split(':')[0]?.trim();
     if (code && JOIN_ERROR_MESSAGES[code]) {
@@ -51,12 +72,14 @@ export async function joinQueue(
   const row = Array.isArray(data) ? data[0] : data;
   return {
     ticketId: row.entry_id,
-    salonId, // NEW — already known from the param, no extra query needed
+    salonId,
     queueId: row.queue_id,
     tokenNumber: row.token_number,
     accessToken: row.access_token,
     status: row.status,
     joinedAt: row.joined_at,
+    // Only present when a NEW remember token was issued (first join at this salon, or a new device).
+    ...(row.remember_token ? { rememberToken: row.remember_token as string } : {}),
   };
 }
 
@@ -280,4 +303,14 @@ export async function removePushSubscription(ticketId: string, accessToken: stri
     .maybeSingle();
   if (error) throw error;
   return !!data;
+}
+
+// Customer removes their own details from this salon's list. Returns the salon id, or null if nothing matched.
+export async function forgetMyDetails(ticketId: string, accessToken: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('forget_my_details', {
+    p_ticket_id: ticketId,
+    p_access_token: accessToken,
+  });
+  if (error) throw error;
+  return (data as string | null) ?? null;
 }

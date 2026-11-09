@@ -11,6 +11,7 @@ import PageShell from '../components/PageShell';
 import { CUSTOMER_DISCOVERY } from '../lib/features';
 import LocalNews from '../components/LocalNews';
 import Countdown from '../components/Countdown';
+import ForgetMe from '../components/ForgetMe';
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -243,6 +244,9 @@ export default function QueueTracking() {
           {ticket.status === 'COMPLETED' && ticket.prize && (
             <PrizeCard prize={ticket.prize} status={ticket.status} />
           )}
+          <div className="mt-6">
+            <ForgetMe ticketId={ticket.ticketId} accessToken={accessToken} salonId={ticket.salonId} />
+          </div>
           <Link to="/" className="btn-secondary mt-6">{homeLabel}</Link>
         </div>
       </PageShell>
@@ -394,6 +398,9 @@ export default function QueueTracking() {
           {leaveError && <p className="mt-3 text-sm text-red-700" role="alert">{leaveError}</p>}
         </div>
       )}
+      <div className="mt-6">
+        <ForgetMe ticketId={ticket.ticketId} accessToken={accessToken} salonId={ticket.salonId} />
+      </div>
       {ticket.status === 'WAITING' && <LocalNews salonId={ticket.salonId} />}
     </PageShell>
   );

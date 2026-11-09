@@ -4,7 +4,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
-import { app, makeSalon, cleanupSalons } from './helpers';
+import { app, makeSalon, cleanupSalons, customerDetails } from './helpers';
 import { supabase } from '../src/config/supabase';
 
 afterAll(cleanupSalons);
@@ -28,7 +28,7 @@ async function makeSalonWithLanes(extraBarbers = 1) {
 }
 
 const join = (salonId: string, body: Record<string, unknown> = {}) =>
-  request(app).post(`/api/queues/${salonId}/join`).send(body);
+  request(app).post(`/api/queues/${salonId}/join`).send({ ...customerDetails(), ...body });
 
 async function joinOk(salonId: string, body: Record<string, unknown> = {}): Promise<Ticket> {
   const res = await join(salonId, body);
@@ -150,8 +150,9 @@ describe('Customers choose a barber (Slice H)', () => {
   it('a retried scan (same key) returns the same ticket, whichever barber the retry asks for', async () => {
     const { salonId, mainId, rahulId } = await makeSalonWithLanes();
     const clientKey = randomUUID().replace(/-/g, '');
-    const first = await joinOk(salonId, { clientKey, laneId: rahulId });
-    const second = await joinOk(salonId, { clientKey, laneId: mainId });
+    const d = customerDetails();
+    const first = await joinOk(salonId, { ...d, clientKey, laneId: rahulId });
+    const second = await joinOk(salonId, { ...d, clientKey, laneId: mainId });
     expect(second.ticketId).toBe(first.ticketId);
     expect(await laneOf(first.ticketId)).toBe(rahulId);
   }, 60_000);

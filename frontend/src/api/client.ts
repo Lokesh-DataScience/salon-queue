@@ -7,10 +7,12 @@ export const SESSION_EXPIRED_EVENT = 'barber:session-expired';
 export class ApiError extends Error {
   status: number;
   fieldErrors?: Record<string, string[] | undefined>;
-  constructor(message: string, status: number, fieldErrors?: Record<string, string[] | undefined>) {
+  code?: string; // e.g. CUSTOMER_DETAILS_REQUIRED
+  constructor(message: string, status: number, fieldErrors?: Record<string, string[] | undefined>, code?: string) {
     super(message);
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.code = code;
   }
 }
 
@@ -56,7 +58,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: 'Something went wrong.' }));
-    throw new ApiError(body.message ?? `Request failed with status ${res.status}`, res.status, body.errors);
+    throw new ApiError(body.message ?? `Request failed with status ${res.status}`, res.status, body.errors, body.code);
   }
 
   return res.json() as Promise<T>;

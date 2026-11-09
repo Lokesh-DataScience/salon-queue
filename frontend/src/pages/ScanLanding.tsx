@@ -1,6 +1,8 @@
 // frontend/src/pages/ScanLanding.tsx
 // Where a salon's wall QR lands (/q/:code). Resume this phone's active ticket if it has one.
-// Salons with services show a picker first; salons without join straight away.
+// First visit to a salon: ask for name + number + consent once. After that this phone is remembered
+// for THAT salon only, and the details step is skipped.
+// Salons with services (or several barbers) show a picker next; salons without join straight away.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchSalonByCode, fetchSalonLanes, type PublicLane } from '../api/salons';
@@ -9,12 +11,18 @@ import { fetchTicketStatus, joinSalonQueue } from '../api/tickets';
 import { ApiError } from '../api/client';
 import { getTickets, removeTicket, saveTicket } from '../lib/activeTickets';
 import { clearJoinKey, getJoinKey } from '../lib/joinKey';
+import { clearRememberToken, getRememberToken, saveRememberToken } from '../lib/rememberToken';
 import { askPushPermission, enablePushAfterJoin } from '../lib/push';
 import PageShell from '../components/PageShell';
 import ServicePicker from '../components/ServicePicker';
 import LanePicker from '../components/LanePicker';
+import CustomerDetailsForm, { type CustomerDetails } from '../components/CustomerDetailsForm';
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
+
+// The salon does not know this phone (new here, or the customer/barber removed them): ask for details again.
+const DETAILS_CODES = ['CUSTOMER_DETAILS_REQUIRED', 'CONSENT_REQUIRED'];
+const needsDetails = (err: unknown) => err instanceof ApiError && !!err.code && DETAILS_CODES.includes(err.code);
 
 // The barber list must never get in the way of taking a token: any failure just means "no choice".
 async function loadLanes(salonId: string): Promise<PublicLane[]> {
@@ -25,9 +33,12 @@ async function loadLanes(salonId: string): Promise<PublicLane[]> {
   }
 }
 
+type SalonInfo = { id: string; name: string };
+
 type View =
   | { kind: 'working'; salonName?: string }
-  | { kind: 'choose'; salon: { id: string; name: string }; services: PublicService[]; lanes: PublicLane[]; error?: string }
+  | { kind: 'details'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; notice?: string; error?: string }
+  | { kind: 'choose'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; error?: string }
   | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean };
 
 const ticketUrl = (ticketId: string, accessToken: string) =>
@@ -45,6 +56,8 @@ export default function ScanLanding() {
   const [view, setView] = useState<View>({ kind: 'working' });
   const [joining, setJoining] = useState(false);
   const [laneId, setLaneId] = useState<string | null>(null); // null = Any barber
+  // What the customer typed on this visit. Memory only: never written to storage.
+  const [details, setDetails] = useState<CustomerDetails | null>(null);
   // React StrictMode runs effects twice in development. This makes sure a scan can never take two tokens.
   const started = useRef(false);
   // A second tap on "Try again" while a request is in flight does nothing.
@@ -52,12 +65,14 @@ export default function ScanLanding() {
 
   // The same key for every attempt of this scan, so the server never creates a second ticket for it.
   const joinNow = useCallback(
-    async (salonId: string, serviceIds: string[], chosenLaneId?: string) => {
-      // Exactly the call it always was, unless the customer picked a barber.
+    async (salonId: string, serviceIds: string[], chosenLaneId?: string, who?: CustomerDetails) => {
       const key = getJoinKey(salonId);
-      const ticket = chosenLaneId
-        ? await joinSalonQueue(salonId, key, serviceIds, chosenLaneId)
-        : await joinSalonQueue(salonId, key, serviceIds);
+      const ticket = await joinSalonQueue(salonId, key, serviceIds, chosenLaneId, {
+        ...(who ? { name: who.name, phone: who.phone, consent: true } : {}),
+        rememberToken: getRememberToken(salonId) ?? undefined,
+      });
+      // The server hands out a token only when this phone is new to the salon (or on a new device).
+      if (ticket.rememberToken) saveRememberToken(salonId, ticket.rememberToken);
       saveTicket({
         ticketId: ticket.ticketId,
         accessToken: ticket.accessToken,
@@ -101,17 +116,35 @@ export default function ScanLanding() {
         ]);
         // The barber choice only appears when the salon has more than one barber.
         const pickBarber = lanes.length > 1;
+        const info: SalonInfo = { id: salon.id, name: salon.name };
+
+        // First visit to this salon from this phone: details first.
+        if (!getRememberToken(salon.id)) {
+          setDetails(null);
+          setLaneId(null);
+          setView({ kind: 'details', salon: info, services, lanes: pickBarber ? lanes : [] });
+          return; // the lock is released while the customer types
+        }
+
         if (services.length > 0 || pickBarber) {
           setLaneId(null);
-          setView({
-            kind: 'choose',
-            salon: { id: salon.id, name: salon.name },
-            services,
-            lanes: pickBarber ? lanes : [],
-          });
+          setView({ kind: 'choose', salon: info, services, lanes: pickBarber ? lanes : [] });
           return; // the lock is released while the customer chooses
         }
-        await joinNow(salon.id, []);
+        try {
+          await joinNow(salon.id, []);
+        } catch (err) {
+          if (!needsDetails(err)) throw err;
+          // This phone's token is no longer known to the salon: forget it and ask again.
+          clearRememberToken(salon.id);
+          setView({
+            kind: 'details',
+            salon: info,
+            services,
+            lanes: [],
+            notice: 'Please enter your details again.',
+          });
+        }
       });
     } catch (err) {
       if (!salonName && err instanceof ApiError && err.status === 404) {
@@ -152,15 +185,21 @@ export default function ScanLanding() {
     void run();
   }, [run]);
 
-  function onChoose(serviceIds: string[]) {
-    if (view.kind !== 'choose' || joining) return;
+  // Takes the token. Used by the details form (no services, one barber) and by the picker.
+  function startJoin(
+    salon: SalonInfo,
+    services: PublicService[],
+    lanes: PublicLane[],
+    serviceIds: string[],
+    who?: CustomerDetails,
+  ) {
+    if (joining) return;
     const alerts = askPushPermission(); // must start straight from the tap, before any await
-    const { salon, services, lanes } = view;
     setJoining(true);
 
     void (async () => {
       try {
-        const ticket = await withSalonLock(salon.id, () => joinNow(salon.id, serviceIds, laneId ?? undefined));
+        const ticket = await withSalonLock(salon.id, () => joinNow(salon.id, serviceIds, laneId ?? undefined, who));
         void alerts
           .then((p) => {
             if (p === 'granted') return enablePushAfterJoin(ticket.ticketId, ticket.accessToken);
@@ -171,6 +210,19 @@ export default function ScanLanding() {
           err instanceof ApiError
             ? err.message
             : 'We could not reach the server. Please check your internet connection and try again.';
+        if (needsDetails(err)) {
+          clearRememberToken(salon.id);
+          setDetails(null);
+          setView({
+            kind: 'details',
+            salon,
+            services,
+            lanes,
+            notice: who ? undefined : 'Please enter your details again.',
+            error: who ? message : undefined,
+          });
+          return;
+        }
         // A service or a barber may have been removed meanwhile: show the current lists with the message.
         let fresh = services;
         let freshLanes = lanes;
@@ -196,6 +248,45 @@ export default function ScanLanding() {
         setJoining(false);
       }
     })();
+  }
+
+  function onDetails(d: CustomerDetails) {
+    if (view.kind !== 'details' || joining) return;
+    const { salon, services, lanes } = view;
+    setDetails(d);
+    if (services.length > 0 || lanes.length > 1) {
+      setLaneId(null);
+      setView({ kind: 'choose', salon, services, lanes });
+      return;
+    }
+    startJoin(salon, services, lanes, [], d); // nothing more to choose: take the token now
+  }
+
+  function onChoose(serviceIds: string[]) {
+    if (view.kind !== 'choose') return;
+    startJoin(view.salon, view.services, view.lanes, serviceIds, details ?? undefined);
+  }
+
+  if (view.kind === 'details') {
+    const more = view.services.length > 0 || view.lanes.length > 1;
+    return (
+      <PageShell title="Get your token">
+        <p className="mb-1 text-sm text-gray-600">{view.salon.name}</p>
+        <h1 className="mb-3 text-xl font-semibold">Your details</h1>
+        {view.notice && (
+          <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {view.notice}
+          </p>
+        )}
+        <CustomerDetailsForm
+          salonName={view.salon.name}
+          busy={joining}
+          error={view.error}
+          submitLabel={more ? 'Continue' : 'Get my token'}
+          onSubmit={onDetails}
+        />
+      </PageShell>
+    );
   }
 
   if (view.kind === 'choose') {

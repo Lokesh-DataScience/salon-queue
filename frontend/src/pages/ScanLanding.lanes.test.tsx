@@ -4,6 +4,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ScanLanding from './ScanLanding';
+import { saveRememberToken } from '../lib/rememberToken';
 
 vi.mock('../lib/push', () => ({
   askPushPermission: () => Promise.resolve('denied'),
@@ -46,7 +47,12 @@ function renderScan() {
   );
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  // These tests are about choosing a barber, so this phone is already known to the salon
+  // (the first-visit details form is covered in ScanLanding.customer.test.tsx).
+  saveRememberToken('s1', 'f'.repeat(64));
+});
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('ScanLanding with several barbers', () => {

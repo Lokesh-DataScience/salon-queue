@@ -25,6 +25,7 @@ import {
   postTeamMemberPassword,
   patchTeamMember,
 } from '../controllers/team.controller';
+import { getCustomers, removeCustomer } from '../controllers/customers.controller';
 
 const router = Router();
 
@@ -37,6 +38,8 @@ router.post('/me/password', postChangePassword);
 router.get('/salon', requireOwner, getProfile);
 router.patch('/salon', requireOwner, patchProfile);
 router.get('/stats', requireOwner, getStats);
+router.get('/customers', requireOwner, getCustomers);
+router.delete('/customers/:customerId', requireOwner, removeCustomer);
 router.get('/services', requireOwner, getServices);
 router.post('/services', requireOwner, postService);
 router.patch('/services/:serviceId', requireOwner, patchService);

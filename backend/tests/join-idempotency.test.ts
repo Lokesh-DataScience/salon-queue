@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
-import { app, makeSalon, cleanupSalons, barberCookieFor } from './helpers';
+import { app, makeSalon, cleanupSalons, barberCookieFor, customerDetails } from './helpers';
 import { joinQueue } from '../src/services/queue.service';
 import { supabase } from '../src/config/supabase';
 
@@ -60,8 +60,9 @@ describe('A scan never creates two tickets', () => {
   it('the API accepts a key, ignores other fields, and refuses a malformed key', async () => {
     const salonId = await makeSalon();
     const k = key();
-    const first = await request(app).post(`/api/queues/${salonId}/join`).send({ clientKey: k, tokenNumber: 99 });
-    const second = await request(app).post(`/api/queues/${salonId}/join`).send({ clientKey: k });
+    const d = customerDetails();
+    const first = await request(app).post(`/api/queues/${salonId}/join`).send({ ...d, clientKey: k, tokenNumber: 99 });
+    const second = await request(app).post(`/api/queues/${salonId}/join`).send({ ...d, clientKey: k });
     expect(first.status).toBe(201);
     expect(first.body.ticket.tokenNumber).toBe(1);
     expect(second.body.ticket.ticketId).toBe(first.body.ticket.ticketId);

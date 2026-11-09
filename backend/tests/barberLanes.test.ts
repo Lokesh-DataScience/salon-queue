@@ -6,7 +6,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
-import { app, makeSalon, cleanupSalons } from './helpers';
+import { app, makeSalon, cleanupSalons, customerDetails } from './helpers';
 import { supabase } from '../src/config/supabase';
 
 afterAll(cleanupSalons);
@@ -57,7 +57,7 @@ const get = (cookie: string, url: string) => request(app).get(url).set('Cookie',
 const post = (cookie: string, url: string, body: Record<string, unknown> = {}) =>
   request(app).post(url).set('Cookie', cookie).send(body);
 const join = (salonId: string, laneId?: string) =>
-  request(app).post(`/api/queues/${salonId}/join`).send(laneId ? { laneId } : {});
+  request(app).post(`/api/queues/${salonId}/join`).send({ ...customerDetails(), ...(laneId ? { laneId } : {}) });
 async function joinOk(salonId: string, laneId?: string) {
   const res = await join(salonId, laneId);
   expect(res.status, JSON.stringify(res.body)).toBe(201);
