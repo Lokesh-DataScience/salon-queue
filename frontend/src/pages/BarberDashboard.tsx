@@ -122,7 +122,7 @@ export default function BarberDashboard() {
   function runAction<T>(action: () => Promise<T>) {
     setActionError(null);
     return action()
-      .then(() => { void refetch(); })
+      .then(() => { if (!socket.connected) void refetch(); })
       .catch((err: any) => {
         setActionError(err.message);
         void refetch(); // re-sync so the screen shows what really happened
@@ -190,11 +190,27 @@ export default function BarberDashboard() {
           ? `Token #${r.entry.tokenNumber} added to ${r.entry.laneName}'s line.`
           : `Token #${r.entry.tokenNumber} added to the queue.`,
       );
-      refetch();
+      queryClient.setQueryData<BarberQueueSnapshot>(queueKey, (old) =>
+        old && !old.waiting.some((e) => e.id === r.entry.id)
+          ? {
+              ...old,
+              waiting: [
+                ...old.waiting,
+                {
+                  id: r.entry.id, token_number: r.entry.tokenNumber, status: 'WAITING',
+                  joined_at: new Date().toISOString(), called_at: null, started_at: null,
+                  completed_at: null, skipped_at: null, priority_at: null,
+                  customer_name: null, customer_phone: null,
+                },
+              ],
+            }
+          : old,
+      );
+      if (!socket.connected) void refetch();
     },
     onError: (err: any) => {
       setActionError(err.message);
-      refetch();
+      void refetch();
     },
   });
 
