@@ -1,5 +1,5 @@
 // frontend/src/pages/BarberDashboard.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -20,7 +20,7 @@ import ChangePassword from '../components/ChangePassword';
 import CustomerLine from '../components/CustomerLine';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
-
+import type { BarberQueueSnapshot } from '../api/barber';
 const QUEUE_KEY = ['barberQueue']; // other lines use [...QUEUE_KEY, laneId], so invalidating QUEUE_KEY refreshes them all
 const LANE_STORE = 'svq.barber.lane'; // which line the owner was looking at (not personal data)
 
@@ -69,8 +69,22 @@ export default function BarberDashboard() {
   useEffect(() => {
     if (selectedLane && error instanceof ApiError && error.status === 404) chooseLane(null);
   }, [error, selectedLane]);
-  function refetch() {
-    return queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+  const refetching = useRef(false);
+  const refetchAgain = useRef(false);
+  async function refetch() {
+    if (refetching.current) {
+      refetchAgain.current = true;
+      return;
+    }
+    refetching.current = true;
+    try {
+      do {
+        refetchAgain.current = false;
+        await queryClient.refetchQueries({ queryKey: QUEUE_KEY, type: 'active' }, { cancelRefetch: false });
+      } while (refetchAgain.current);
+    } finally {
+      refetching.current = false;
+    }
   }
 
   // The API client emits this only after a silent refresh has failed.
@@ -108,13 +122,17 @@ export default function BarberDashboard() {
   function runAction<T>(action: () => Promise<T>) {
     setActionError(null);
     return action()
-      .then(() => refetch())
+      .then(() => { void refetch(); })
       .catch((err: any) => {
         setActionError(err.message);
-        return refetch(); // re-sync so the button reflects what really happened
+        void refetch(); // re-sync so the screen shows what really happened
       });
   }
-
+  const queueKey = selectedLane ? [...QUEUE_KEY, selectedLane] : QUEUE_KEY;
+  async function showNow(change: (q: BarberQueueSnapshot) => BarberQueueSnapshot) {
+    await queryClient.cancelQueries({ queryKey: QUEUE_KEY }); // an older fetch must not overwrite this
+    queryClient.setQueryData<BarberQueueSnapshot>(queueKey, (old) => (old ? change(old) : old));
+  }
   // ── The one primary action ─────────────────────────────────────────────
   // The server still enforces every transition; this only picks which call to make.
   const primaryMutation = useMutation({
@@ -122,9 +140,15 @@ export default function BarberDashboard() {
       runAction(async () => {
         if (!queue) return;
         if (queue.serving) {
-          await completeEntry(queue.serving.id); // SERVING → COMPLETED
+          await showNow((q) => {
+            const [next, ...rest] = q.waiting; // the server starts the next customer after a complete
+            return { ...q, serving: next ? { ...next, status: 'SERVING' } : null, waiting: rest,
+                     currentToken: next ? next.token_number : q.currentToken };
+          });
+          await completeEntry(queue.serving.id);
         } else if (queue.called) {
-          await startEntry(queue.called.id); // CALLED → SERVING
+          await showNow((q) => ({ ...q, serving: q.called ? { ...q.called, status: 'SERVING' } : null, called: null }));
+          await startEntry(queue.called.id);
         } else if (queue.queueStatus === 'PAUSED') {
           await (lane ? resumeQueue(lane) : resumeQueue());
         } else {
