@@ -27,8 +27,8 @@ function asScope(input: ScopeOrSalonId): BarberScope {
 interface QueueEntryRow {
   id: string;
   token_number: number;
-  // customer_name: string | null;
-  // customer_phone: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
   status: string;
   joined_at: string;
   called_at: string | null;
@@ -101,7 +101,7 @@ export async function getBarberQueueSnapshot(input: ScopeOrSalonId) {
   const { data: entries, error: entriesError } = await supabase
     .from('queue_entries')
     .select(
-      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at, priority_at, lane_id'
+      'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at, priority_at, lane_id, salon_customers(name, phone)'
     )
     .eq('queue_id', queue.id)
     .in('status', ['CALLED', 'SERVING', 'WAITING'])
@@ -109,7 +109,14 @@ export async function getBarberQueueSnapshot(input: ScopeOrSalonId) {
 
   if (entriesError) throw entriesError;
 
-  const all = (entries ?? []) as QueueEntryRow[];
+  type RawEntry = Omit<QueueEntryRow, 'customer_name' | 'customer_phone'> & {
+    salon_customers: { name: string; phone: string } | null;
+  };
+  const all: QueueEntryRow[] = ((entries ?? []) as unknown as RawEntry[]).map(({ salon_customers, ...e }) => ({
+    ...e,
+    customer_name: salon_customers?.name ?? null, // walk-ins have no customer row
+    customer_phone: salon_customers?.phone ?? null,
+  }));
   const rows = scope.multi ? all.filter((e) => e.lane_id === scope.laneId) : all;
   const called = rows.find((e) => e.status === 'CALLED') ?? null;
   const serving = rows.find((e) => e.status === 'SERVING') ?? null;

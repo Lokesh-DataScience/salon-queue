@@ -7,6 +7,7 @@ import {
   fetchBarberSalonProfile,
   updateBarberSalonProfile,
   logoutBarber,
+  fetchMe,
   type BarberSalonProfile,
   type SalonProfileUpdate,
 } from '../api/barber';
@@ -149,6 +150,12 @@ export default function BarberSettings() {
     queryFn: fetchBarberSalonProfile,
     retry: false,
   });
+  const { data: me } = useQuery({ queryKey: ['barberMe'], queryFn: fetchMe, retry: false });
+  // The customer list is the owner's. Staff never see the row.
+  const moreRows =
+    me?.role === 'OWNER'
+      ? [{ to: '/barber/customers', title: 'Customers', hint: 'Everyone who joined your queue, with their numbers' }, ...rows]
+      : rows;
 
   return (
     <PageShell title="Settings">
@@ -175,7 +182,7 @@ export default function BarberSettings() {
       <section aria-labelledby="more-heading">
         <h2 id="more-heading" className="mb-2 text-sm font-semibold text-gray-700">More</h2>
         <ul className="grid gap-3">
-          {rows.map((r) => (
+          {moreRows.map((r) => (
             <li key={r.to}>
               <Link to={r.to} className="card flex min-h-14 items-center justify-between gap-3 hover:bg-brand-soft">
                 <span>

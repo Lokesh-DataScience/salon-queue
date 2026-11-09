@@ -11,6 +11,7 @@ vi.mock('../api/barber', () => ({
   fetchBarberSalonProfile: vi.fn(),
   updateBarberSalonProfile: vi.fn(),
   logoutBarber: vi.fn(),
+  fetchMe: vi.fn(),
 }));
 vi.mock('../components/ServicesSection', () => ({ 
   default: () => null 
@@ -27,12 +28,15 @@ const salon: BarberSalonProfile = {
   averageServiceMinutes: 15,
 };
 
+const OWNER = { id: 'staff-1', name: 'Owner', role: 'OWNER' as const, salonId: 'salon-1', laneId: null, laneName: null };
+
 const renderSettings = () => renderPage(<BarberSettings />, { path: '/barber/settings', route: '/barber/settings' });
 
 beforeEach(() => {
   vi.mocked(barber.fetchBarberSalonProfile).mockReset().mockResolvedValue(salon);
   vi.mocked(barber.updateBarberSalonProfile).mockReset();
   vi.mocked(barber.logoutBarber).mockReset();
+  vi.mocked(barber.fetchMe).mockReset().mockResolvedValue(OWNER);
 });
 
 describe('BarberSettings profile form', () => {
@@ -97,5 +101,17 @@ describe('BarberSettings profile form', () => {
     renderSettings();
     expect(await screen.findByRole('link', { name: /salon qr code/i })).toHaveAttribute('href', '/barber/qr');
     expect(screen.getByRole('link', { name: /offers/i })).toHaveAttribute('href', '/barber/offers');
+  });
+
+  it('shows the Customers list link to the owner', async () => {
+    renderSettings();
+    expect(await screen.findByRole('link', { name: /^customers/i })).toHaveAttribute('href', '/barber/customers');
+  });
+
+  it('does not show the Customers link to a staff barber', async () => {
+    vi.mocked(barber.fetchMe).mockResolvedValue({ ...OWNER, role: 'BARBER' });
+    renderSettings();
+    await screen.findByRole('link', { name: /salon qr code/i });
+    expect(screen.queryByRole('link', { name: /^customers/i })).not.toBeInTheDocument();
   });
 });

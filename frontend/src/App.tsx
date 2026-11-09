@@ -18,6 +18,7 @@ import { CUSTOMER_DISCOVERY } from './lib/features';
 import BarberSettings from './pages/BarberSettings';
 import BarberLayout from './components/BarberLayout';
 import BarberStats from './pages/BarberStats';
+import BarberCustomers from './pages/BarberCustomers';
 
 function NotFound() {
   return (
@@ -57,6 +58,7 @@ function App() {
         <Route path="/barber/settings" element={<BarberSettings />} />
         <Route path="/barber/qr" element={<BarberQr />} />
         <Route path="/barber/offers" element={<BarberOffers />} />
+        <Route path="/barber/customers" element={<BarberCustomers />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

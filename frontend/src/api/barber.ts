@@ -19,6 +19,9 @@ export interface BarberQueueEntry {
   completed_at: string | null;
   skipped_at: string | null;
   priority_at: string | null;
+  // From this salon's own customer list. null for a walk-in, or if the customer was removed.
+  customer_name: string | null;
+  customer_phone: string | null;
 }
 
 // One barber's line, as the owner's switcher shows it.
@@ -57,6 +60,7 @@ export interface BarberSalon {
   id: string;
   name: string;
   qrCode: string;
+  phone?: string; // add this line
 }
 
 export interface RegisterSalonInput {
@@ -291,4 +295,22 @@ export function changeOwnPassword(currentPassword: string, newPassword: string) 
     method: 'POST',
     body: JSON.stringify({ currentPassword, newPassword }),
   });
+}
+// ── The salon's own customer list (owner only) ───────────────────────────
+export interface SalonCustomer {
+  id: string;
+  name: string;
+  phone: string; // 10 digits
+  firstVisitAt: string;
+  lastVisitAt: string;
+  visitCount: number;
+}
+
+export function fetchCustomers(search?: string) {
+  const q = search ? `?search=${encodeURIComponent(search)}` : '';
+  return apiFetch<{ customers: SalonCustomer[] }>(`/api/barber/customers${q}`).then((r) => r.customers);
+}
+
+export function deleteCustomer(customerId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/barber/customers/${customerId}`, { method: 'DELETE' });
 }

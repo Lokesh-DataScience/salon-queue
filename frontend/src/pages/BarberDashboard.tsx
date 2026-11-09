@@ -17,6 +17,7 @@ import {
 import { redeemCode } from '../api/offers';
 import BarberLaneSwitcher from '../components/BarberLaneSwitcher';
 import ChangePassword from '../components/ChangePassword';
+import CustomerLine from '../components/CustomerLine';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 
@@ -284,6 +285,7 @@ export default function BarberDashboard() {
         >
           <p className="text-sm font-bold uppercase tracking-wide text-gray-700">{statusLine}</p>
           <p className="my-2 text-8xl font-extrabold tabular-nums text-ink">{active ? `#${active.token_number}` : '—'}</p>
+          {active && <CustomerLine name={active.customer_name} phone={active.customer_phone} center />}
           {!active && nextWaiting && !isPaused && (
             <p className="text-sm text-gray-700">Next up: #{nextWaiting.token_number}</p>
           )}
@@ -379,11 +381,11 @@ export default function BarberDashboard() {
               {queue.waiting.length > 1 && (
                 <p className="mb-2 text-sm text-gray-600">Emergency? Tap a token to serve it next.</p>
               )}
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <ul className="grid gap-2">
                 {queue.waiting.map((entry, i) => {
                   const isPriority = !!entry.priority_at;
                   const base =
-                    'flex w-full flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink';
+                    'flex w-24 shrink-0 flex-col items-center rounded-xl border-2 py-3 text-xl font-bold tabular-nums text-ink';
                   const tone =
                     i === 0
                       ? 'border-ink bg-brand'
@@ -391,7 +393,7 @@ export default function BarberDashboard() {
                         ? 'border-ink bg-brand-soft'
                         : 'border-gray-200 bg-white';
                   return (
-                    <li key={entry.id}>
+                    <li key={entry.id} className="flex items-center gap-3">
                       {i === 0 || isPriority ? (
                         <div className={`${base} ${tone}`}>
                           #{entry.token_number}
@@ -410,6 +412,7 @@ export default function BarberDashboard() {
                           #{entry.token_number}
                         </button>
                       )}
+                      <CustomerLine name={entry.customer_name} phone={entry.customer_phone} />
                     </li>
                   );
                 })}

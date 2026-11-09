@@ -35,6 +35,8 @@ const entry = (
   completed_at: null,
   skipped_at: null,
   priority_at: null,
+  customer_name: null,
+  customer_phone: null,
 });
 
 const snapshot = (overrides: Partial<BarberQueueSnapshot> = {}): BarberQueueSnapshot => ({
@@ -225,5 +227,35 @@ describe('BarberDashboard (one-button)', () => {
     expect(screen.queryByRole('button', { name: 'Serve #8 next' })).not.toBeInTheDocument();
     expect(screen.getByText('⚡ Priority · Next')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Serve #3 next' })).toBeInTheDocument();
+  });
+
+  it('shows each waiting customer with a tap-to-call number, and "No details saved" for a walk-in', async () => {
+    given({
+      waiting: [
+        { ...entry(4), customer_name: 'Ravi Kumar', customer_phone: '9876543210' },
+        { ...entry(5), customer_name: 'Meena Iyer', customer_phone: '9123456780' },
+        entry(6), // a walk-in has no saved details
+      ],
+    });
+    renderDashboard();
+
+    expect(await screen.findByText('Ravi Kumar')).toBeInTheDocument();
+    expect(screen.getByText('Meena Iyer')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Call 98765 43210' })).toHaveAttribute('href', 'tel:+919876543210');
+    expect(screen.getByRole('link', { name: 'Call 91234 56780' })).toHaveAttribute('href', 'tel:+919123456780');
+    expect(screen.getAllByText('No details saved')).toHaveLength(1);
+    // The token buttons still work as before.
+    expect(screen.getByRole('button', { name: 'Serve #5 next' })).toBeInTheDocument();
+  });
+
+  it('shows the name and call link of the customer being served', async () => {
+    given({
+      serving: { ...entry(4, 'SERVING'), customer_name: 'Asha Rao', customer_phone: '9988776655' },
+      waiting: [],
+    });
+    renderDashboard();
+
+    expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Call 99887 76655' })).toHaveAttribute('href', 'tel:+919988776655');
   });
 });

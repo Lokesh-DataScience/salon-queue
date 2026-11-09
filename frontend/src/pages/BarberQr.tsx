@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { fetchBarberSalon } from '../api/barber';
 import PageShell from '../components/PageShell';
+import { displayPhone } from '../lib/phoneLink';
 
 // Repeating comb + scissors pattern drawn in the logo's navy. Transparent, so the yellow shows through.
 const scissors = (x: number, y: number, rot: number) => `
@@ -103,6 +104,12 @@ export default function BarberQr() {
           <h1 className="mt-4 text-3xl font-extrabold uppercase tracking-tight text-ink print:text-5xl">
             {salon.name}
           </h1>
+          {/* Plain text under the QR for customers who want to call. The QR itself only holds the join link. */}
+          {salon.phone && (
+            <p className="mt-1 text-lg font-bold text-ink print:mt-3 print:text-4xl">
+              Call: <span className="tabular-nums">{displayPhone(salon.phone)}</span>
+            </p>
+          )}
           <p className="mt-2 text-lg font-semibold text-ink print:text-3xl">Scan to get your queue token</p>
           <p className="text-base text-gray-700 print:text-2xl">QR स्कैन करें, अपना टोकन नंबर पाएं</p>
 
