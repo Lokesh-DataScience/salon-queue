@@ -19,6 +19,9 @@ import BarberSettings from './pages/BarberSettings';
 import BarberLayout from './components/BarberLayout';
 import BarberStats from './pages/BarberStats';
 import BarberCustomers from './pages/BarberCustomers';
+import BarberProfile from './pages/BarberProfile';
+import BarberServices from './pages/BarberServices';
+import BarberTeam from './pages/BarberTeam';
 
 function NotFound() {
   return (
@@ -56,6 +59,9 @@ function App() {
         <Route path="/barber/dashboard" element={<BarberDashboard />} />
         <Route path="/barber/stats" element={<BarberStats />} />
         <Route path="/barber/settings" element={<BarberSettings />} />
+        <Route path="/barber/settings/profile" element={<BarberProfile />} />
+        <Route path="/barber/settings/services" element={<BarberServices />} />
+        <Route path="/barber/settings/team" element={<BarberTeam />} />
         <Route path="/barber/qr" element={<BarberQr />} />
         <Route path="/barber/offers" element={<BarberOffers />} />
         <Route path="/barber/customers" element={<BarberCustomers />} />

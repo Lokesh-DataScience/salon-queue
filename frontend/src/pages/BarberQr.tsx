@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { fetchBarberSalon } from '../api/barber';
 import PageShell from '../components/PageShell';
+import BackLink from '../components/BackLink';
 import { displayPhone } from '../lib/phoneLink';
 
 // Repeating comb + scissors pattern drawn in the logo's navy. Transparent, so the yellow shows through.
@@ -70,9 +71,7 @@ export default function BarberQr() {
       <style>{`@page { margin: 0; }`}</style>
 
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <Link to="/barber/settings" className="inline-block min-h-11 py-2 text-sm text-gray-600 underline">
-          ← Back to settings
-        </Link>
+        <BackLink />
       </div>
       {welcome && (
         <p role="status" className="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-900 print:hidden">

@@ -47,8 +47,8 @@ function AddBarberForm() {
   }
 
   return (
-    <form onSubmit={submit} className="card grid gap-3">
-      <h3 className="text-base font-semibold">Add a barber</h3>
+    <form onSubmit={submit} className="grid gap-3 border-t border-gray-200 bg-gray-50 px-4 py-4 sm:grid-cols-2">
+      <h3 className="text-sm font-semibold text-gray-700 sm:col-span-2">Add a barber</h3>
       <div>
         <label htmlFor="team-name" className="mb-1 block text-sm font-medium">Name</label>
         <input id="team-name" className="field" value={name} maxLength={60} autoComplete="off"
@@ -60,18 +60,19 @@ function AddBarberForm() {
           onChange={(e) => { setPhone(e.target.value); setMsg(null); }} />
         <p className="mt-1 text-sm text-gray-600">They will sign in with this number.</p>
       </div>
-      <div>
+      <div className="sm:col-span-2">
         <label htmlFor="team-password" className="mb-1 block text-sm font-medium">Password</label>
         <input id="team-password" type="password" className="field" autoComplete="new-password" value={password}
           maxLength={72} onChange={(e) => { setPassword(e.target.value); setMsg(null); }} />
         <p className="mt-1 text-sm text-gray-600">At least 8 characters. Tell it to your barber.</p>
       </div>
       {msg && (
-        <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-green-800' : 'text-red-700'}`}>
+        <p role={msg.ok ? 'status' : 'alert'}
+          className={`text-sm sm:col-span-2 ${msg.ok ? 'text-green-800' : 'text-red-700'}`}>
           {msg.text}
         </p>
       )}
-      <button type="submit" className="btn-primary"
+      <button type="submit" className="btn-primary sm:col-span-2 sm:w-auto sm:justify-self-end sm:px-10"
         disabled={add.isPending || !name.trim() || !phone.trim() || password.length < 8}>
         {add.isPending ? 'Adding...' : 'Add barber'}
       </button>
@@ -106,17 +107,17 @@ function MemberRow({ member }: { member: TeamMember }) {
   });
 
   return (
-    <li className="card grid gap-2">
+    <li className="grid gap-2 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-base font-semibold">
+        <div className="min-w-0">
+          <p className="break-words text-base font-semibold">
             {member.name}
             {isOwner && <span className="ml-2 text-sm font-normal text-gray-600">(Owner)</span>}
           </p>
           {!isOwner && <p className="text-sm text-gray-600">{member.phone}</p>}
         </div>
         {!isOwner && (
-          <span className={`text-sm font-semibold ${member.isActive ? 'text-green-800' : 'text-gray-600'}`}>
+          <span className={`pill shrink-0 ${member.isActive ? 'border-green-300 bg-green-50 text-green-900' : 'border-gray-300 bg-gray-50 text-gray-700'}`}>
             {member.isActive ? 'Active' : 'Switched off'}
           </span>
         )}
@@ -124,10 +125,10 @@ function MemberRow({ member }: { member: TeamMember }) {
 
       {!isOwner && (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={() => toggle.mutate()} disabled={toggle.isPending}>
+          <button type="button" className="btn-sm" onClick={() => toggle.mutate()} disabled={toggle.isPending}>
             {member.isActive ? 'Switch off' : 'Switch on'}
           </button>
-          <button type="button" className="btn-secondary" onClick={() => { setResetting((v) => !v); setMsg(null); }}>
+          <button type="button" className="btn-sm" onClick={() => { setResetting((v) => !v); setMsg(null); }}>
             Change password
           </button>
         </div>
@@ -154,7 +155,8 @@ function MemberRow({ member }: { member: TeamMember }) {
   );
 }
 
-export default function TeamSection() {
+export default function TeamSection({ asPage = false }: { asPage?: boolean }) {
+  const Heading = asPage ? 'h1' : 'h2';
   const { data: team, isLoading, error, refetch } = useQuery({
     queryKey: TEAM_KEY,
     queryFn: fetchTeam,
@@ -162,11 +164,13 @@ export default function TeamSection() {
   });
 
   return (
-    <section aria-labelledby="team-heading" className="mb-6">
-      <h2 id="team-heading" className="mb-2 text-sm font-semibold text-gray-700">Barbers</h2>
-      <p className="mb-3 text-sm text-gray-600">
-        Add each barber so you can serve more than one customer at a time. Each barber signs in with their own mobile number.
-      </p>
+    <section aria-labelledby="team-heading" className="mb-8">
+      <div className="mb-3">
+        <Heading id="team-heading" className={asPage ? 'text-2xl font-bold' : 'text-base font-bold'}>Barbers</Heading>
+        <p className="text-sm text-gray-600">
+          Add each barber so you can serve more than one customer at a time. Each barber signs in with their own mobile number.
+        </p>
+      </div>
 
       {isLoading ? (
         <p role="status" className="text-gray-600">Loading your team...</p>
@@ -176,14 +180,15 @@ export default function TeamSection() {
           <button type="button" className="btn-secondary" onClick={() => refetch()}>Try again</button>
         </div>
       ) : (
-        <ul className="mb-4 grid gap-3">
-          {team.map((m) => (
-            <MemberRow key={m.id} member={m} />
-          ))}
-        </ul>
+        <div className="card overflow-hidden p-0">
+          <ul className="divide-y divide-gray-200">
+            {team.map((m) => (
+              <MemberRow key={m.id} member={m} />
+            ))}
+          </ul>
+          <AddBarberForm />
+        </div>
       )}
-
-      <AddBarberForm />
     </section>
   );
 }

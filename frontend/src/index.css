@@ -92,3 +92,8 @@ html {
     transition-duration: 0.01ms !important;
   }
 }
+@layer components {
+  .btn-sm {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-ink bg-white px-3 text-sm font-semibold text-ink hover:bg-brand-soft disabled:opacity-50;
+  }
+}

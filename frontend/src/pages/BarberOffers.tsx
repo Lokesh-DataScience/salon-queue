@@ -1,7 +1,8 @@
 // frontend/src/pages/BarberOffers.tsx
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import BackLink from '../components/BackLink';
 import {setExpectedCustomers, fetchOffers, createOffer, updateOffer, deleteOffer, type Offer } from '../api/offers';
 import { ApiError, SESSION_EXPIRED_EVENT } from '../api/client';
 
@@ -106,7 +107,7 @@ export default function BarberOffers() {
   return (
     <main className="mx-auto w-full max-w-md p-4 pb-12 md:max-w-2xl">
       <header className="mb-4">
-        <Link to="/barber/settings" className="inline-block min-h-11 py-2 text-sm font-medium text-gray-700 underline">← Back to settings</Link>
+        <BackLink />
         <h1 className="mt-2 text-xl font-semibold">Customer offers</h1>
         <p className="text-sm text-gray-600">
           Customers who scan your QR may win a surprise reward. You pick the offers and how many

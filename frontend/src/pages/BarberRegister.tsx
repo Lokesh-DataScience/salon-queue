@@ -99,7 +99,7 @@ export default function BarberRegister() {
         closingTime: f.closingTime,
         averageServiceMinutes: Number(f.averageServiceMinutes),
       });
-      navigate('/barber/settings', { replace: true, state: { welcome: true } });
+      navigate('/barber/settings/services', { replace: true, state: { welcome: true } });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

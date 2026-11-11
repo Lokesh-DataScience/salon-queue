@@ -46,7 +46,12 @@ function AddServiceForm() {
   }
 
   return (
-    <form onSubmit={submit} className="card grid gap-3" noValidate>
+    <form
+      onSubmit={submit}
+      noValidate
+      className="grid grid-cols-[1fr_6rem] gap-3 border-t border-gray-200 bg-gray-50 px-4 py-4 sm:grid-cols-[1fr_7rem_auto] sm:items-end"
+    >
+      <p className="col-span-full text-sm font-semibold text-gray-700">Add a service</p>
       <div>
         <label htmlFor="new-service-name" className="mb-1 block text-sm font-medium">Service name</label>
         <input id="new-service-name" className="field" value={name} maxLength={60}
@@ -59,8 +64,8 @@ function AddServiceForm() {
           placeholder="e.g. 20"
           onChange={(e) => { setMinutes(e.target.value.replace(/\D/g, '').slice(0, 3)); setError(null); }} />
       </div>
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <button type="submit" className="btn-primary" disabled={add.isPending}>
+      {error && <p role="alert" className="col-span-full text-sm text-red-700">{error}</p>}
+      <button type="submit" className="btn-primary col-span-2 sm:col-span-1 sm:w-auto" disabled={add.isPending}>
         {add.isPending ? 'Adding...' : 'Add service'}
       </button>
     </form>
@@ -103,17 +108,19 @@ function ServiceRow({ service }: { service: SalonService }) {
 
   if (mode === 'edit') {
     return (
-      <li className="card">
+      <li className="bg-brand-soft/40 px-4 py-4">
         <form onSubmit={submit} className="grid gap-3" noValidate>
-          <div>
-            <label htmlFor={`name-${service.id}`} className="mb-1 block text-sm font-medium">Service name</label>
-            <input id={`name-${service.id}`} className="field" value={name} maxLength={60}
-              onChange={(e) => { setName(e.target.value); setError(null); }} />
-          </div>
-          <div>
-            <label htmlFor={`min-${service.id}`} className="mb-1 block text-sm font-medium">Time (minutes)</label>
-            <input id={`min-${service.id}`} className="field" inputMode="numeric" value={minutes}
-              onChange={(e) => { setMinutes(e.target.value.replace(/\D/g, '').slice(0, 3)); setError(null); }} />
+          <div className="grid grid-cols-[1fr_6rem] gap-3">
+            <div>
+              <label htmlFor={`name-${service.id}`} className="mb-1 block text-sm font-medium">Service name</label>
+              <input id={`name-${service.id}`} className="field" value={name} maxLength={60}
+                onChange={(e) => { setName(e.target.value); setError(null); }} />
+            </div>
+            <div>
+              <label htmlFor={`min-${service.id}`} className="mb-1 block text-sm font-medium">Time (minutes)</label>
+              <input id={`min-${service.id}`} className="field" inputMode="numeric" value={minutes}
+                onChange={(e) => { setMinutes(e.target.value.replace(/\D/g, '').slice(0, 3)); setError(null); }} />
+            </div>
           </div>
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
@@ -131,24 +138,25 @@ function ServiceRow({ service }: { service: SalonService }) {
   }
 
   return (
-    <li className="card">
+    <li className="px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-base font-semibold">{service.name}</p>
+        <div className="min-w-0">
+          <p className="break-words text-base font-semibold">{service.name}</p>
           <p className="text-sm text-gray-600">{service.durationMinutes} min</p>
         </div>
         {mode === 'view' && (
-          <div className="flex gap-2">
-            <button type="button" className="btn-secondary" onClick={() => setMode('edit')}
+          <div className="flex shrink-0 gap-2">
+            <button type="button" className="btn-sm" onClick={() => setMode('edit')}
               aria-label={`Edit ${service.name}`}>Edit</button>
-            <button type="button" className="btn-secondary" onClick={() => setMode('confirmDelete')}
+            <button type="button" className="btn-sm !border-red-300 !text-red-700 hover:!bg-red-50"
+              onClick={() => setMode('confirmDelete')}
               aria-label={`Delete ${service.name}`}>Delete</button>
           </div>
         )}
       </div>
       {mode === 'confirmDelete' && (
-        <div className="mt-3 grid gap-2">
-          <p className="text-sm">Delete this service? Customers will no longer be able to pick it.</p>
+        <div className="mt-3 grid gap-2 rounded-xl border border-red-200 bg-red-50 p-3">
+          <p className="text-sm text-red-900">Delete this service? Customers will no longer be able to pick it.</p>
           <div className="grid grid-cols-2 gap-3">
             <button type="button" className="btn-primary" disabled={remove.isPending}
               onClick={() => remove.mutate()}>
@@ -164,7 +172,8 @@ function ServiceRow({ service }: { service: SalonService }) {
   );
 }
 
-export default function ServicesSection({ welcome = false }: { welcome?: boolean }) {
+export default function ServicesSection({ welcome = false, asPage = false }: { welcome?: boolean; asPage?: boolean }) {
+  const Heading = asPage ? 'h1' : 'h2';
   const ref = useRef<HTMLElement>(null);
   const { data: services, isLoading, error, refetch } = useQuery({
     queryKey: SERVICES_KEY,
@@ -177,11 +186,16 @@ export default function ServicesSection({ welcome = false }: { welcome?: boolean
   }, [welcome]);
 
   return (
-    <section ref={ref} id="services" aria-labelledby="services-heading" className="mb-6">
-      <h2 id="services-heading" className="mb-2 text-sm font-semibold text-gray-700">Services</h2>
+    <section ref={ref} id="services" aria-labelledby="services-heading" className="mb-8 scroll-mt-4">
+      <div className="mb-3">
+        <Heading id="services-heading" className={asPage ? 'text-2xl font-bold' : 'text-base font-bold'}>
+          Services{services && services.length > 0 ? ` (${services.length})` : ''}
+        </Heading>
+        <p className="text-sm text-gray-600">What customers pick from when they join your queue.</p>
+      </div>
 
       {welcome && (
-        <div role="status" className="card mb-3 grid gap-3 text-sm">
+        <div role="status" className="card mb-3 grid gap-3 border-brand bg-brand-soft text-sm">
           <p>
             Add the services you offer and how long each takes. Customers will pick from these when they scan your QR.
           </p>
@@ -199,18 +213,18 @@ export default function ServicesSection({ welcome = false }: { welcome?: boolean
           <button type="button" className="btn-secondary" onClick={() => refetch()}>Try again</button>
         </div>
       ) : (
-        <>
+        <div className="card overflow-hidden p-0">
           {services.length === 0 ? (
-            <p className="mb-3 text-sm text-gray-600">
+            <p className="px-4 py-3 text-sm text-gray-600">
               No services yet. Customers can still join, using your average time per customer.
             </p>
           ) : (
-            <ul className="mb-3 grid gap-3">
+            <ul className="divide-y divide-gray-200">
               {services.map((s) => <ServiceRow key={s.id} service={s} />)}
             </ul>
           )}
           <AddServiceForm />
-        </>
+        </div>
       )}
     </section>
   );

@@ -1,9 +1,9 @@
 // frontend/src/pages/BarberCustomers.tsx
 // The salon's own customer list (owner only). Everyone here joined THIS salon's queue and ticked the consent line.
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import PageShell from '../components/PageShell';
+import BackLink from '../components/BackLink';
 import CustomerLine from '../components/CustomerLine';
 import { deleteCustomer, fetchCustomers, type SalonCustomer } from '../api/barber';
 import { ApiError } from '../api/client';
@@ -49,9 +49,7 @@ export default function BarberCustomers() {
 
   return (
     <PageShell title="Customers">
-      <Link to="/barber/settings" className="mb-3 inline-block min-h-11 py-2 text-sm text-gray-600 underline">
-        ← Back to settings
-      </Link>
+      <BackLink />
       <h1 className="mb-1 text-xl font-semibold">Customers</h1>
       <p className="mb-4 text-sm text-gray-600">
         People who joined your queue and agreed to be saved. Only you can see this list.
