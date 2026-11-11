@@ -13,7 +13,7 @@ import {
   postExtend,
   postPrioritize,
 } from '../controllers/barber.controller';
-import { getOffers, postOffer, patchOffer, removeOffer, postRedeem, patchExpected } from '../controllers/offers.controller';
+import { getOffers, postOffer, patchOffer, removeOffer, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
 import { getStats } from '../controllers/barberStats.controller';
 import { getServices, postService, patchService, removeService } from '../controllers/salonServices.controller';
@@ -26,7 +26,7 @@ import {
   patchTeamMember,
 } from '../controllers/team.controller';
 import { getCustomers, removeCustomer } from '../controllers/customers.controller';
-
+import { postRedeemPrize } from '../controllers/barber.controller'
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in staff member
@@ -60,8 +60,8 @@ router.post('/queue/:entryId/prioritize', postPrioritize);
 router.post('/queue/pause', postPause);
 router.post('/queue/resume', postResume);
 router.post('/queue/walk-in', postWalkIn);
-// Redeeming a customer's prize code happens at the counter, so any staff member can do it.
-router.post('/offers/redeem', postRedeem);
+// Redeeming a customer's prize happens at the counter, so any staff member can do it.
+router.post('/queue/:entryId/redeem-prize', postRedeemPrize);
 router.get('/offers', requireOwner, getOffers);
 router.post('/offers', requireOwner, postOffer);
 router.patch('/offers/expected', requireOwner, patchExpected);

@@ -13,14 +13,14 @@ import {
   addWalkIn,
   prioritizeEntry,
   fetchMe,
+  redeemPrizeForEntry,
 } from '../api/barber';
-import { redeemCode } from '../api/offers';
 import BarberLaneSwitcher from '../components/BarberLaneSwitcher';
 import ChangePassword from '../components/ChangePassword';
 import CustomerLine from '../components/CustomerLine';
 import { socket } from '../lib/socket';
 import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
-import type { BarberQueueSnapshot } from '../api/barber';
+import type { BarberQueueEntry, BarberQueueSnapshot } from '../api/barber';
 const QUEUE_KEY = ['barberQueue']; // other lines use [...QUEUE_KEY, laneId], so invalidating QUEUE_KEY refreshes them all
 const LANE_STORE = 'svq.barber.lane'; // which line the owner was looking at (not personal data)
 
@@ -28,13 +28,6 @@ export default function BarberDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [redeemInput, setRedeemInput] = useState('');
-  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const redeem = useMutation({
-    mutationFn: () => redeemCode(redeemInput),
-    onSuccess: (r) => { setRedeemMsg({ ok: true, text: `Redeemed: ${r.prizeName}. Give it to the customer.` }); setRedeemInput(''); },
-    onError: (e: any) => setRedeemMsg({ ok: false, text: e.message ?? 'Could not redeem.' }),
-  });
 
   // The owner can look at any barber's line; null means their own. Staff always get their own.
   const [selectedLane, setSelectedLane] = useState<string | null>(() => {
@@ -163,6 +156,17 @@ export default function BarberDashboard() {
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
   const pauseMutation = useMutation({
     mutationFn: () => runAction(() => (lane ? pauseQueue(lane) : pauseQueue())),
+  });
+
+    // One tap gives the winner their prize. The server checks the customer is at this barber's chair.
+  const redeemMutation = useMutation({
+    mutationFn: (entryId: string) =>
+      runAction(async () => {
+        const given = (e: BarberQueueEntry | null) =>
+          e && e.id === entryId && e.prize ? { ...e, prize: { ...e.prize, redeemed: true } } : e;
+        await showNow((q) => ({ ...q, called: given(q.called), serving: given(q.serving) }));
+        await redeemPrizeForEntry(entryId);
+      }),
   });
 
   // Emergency: serve a waiting customer right after the current one.
@@ -326,6 +330,24 @@ export default function BarberDashboard() {
           <p className="text-sm font-bold uppercase tracking-wide text-gray-700">{statusLine}</p>
           <p className="my-2 text-8xl font-extrabold tabular-nums text-ink">{active ? `#${active.token_number}` : '—'}</p>
           {active && <CustomerLine name={active.customer_name} phone={active.customer_phone} center />}
+          {queue.serving?.prize &&
+            (queue.serving.prize.redeemed ? (
+              <p role="status" className="mt-3 text-base font-semibold text-green-800">
+                {`🎁 ${queue.serving.prize.name} — given ✓`}
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => redeemMutation.mutate(queue.serving!.id)}
+                disabled={redeemMutation.isPending}
+                className="mt-4 min-h-14 w-full rounded-xl border-2 border-ink bg-brand px-4 text-lg font-bold text-ink hover:bg-brand-dark disabled:opacity-40"
+              >
+                {`🎁 Redeem prize: ${queue.serving.prize.name}`}
+              </button>
+            ))}
+          {!queue.serving && queue.called?.prize && (
+            <p className="mt-3 text-sm font-semibold text-ink">🎁 Has a reward. You can give it once service starts.</p>
+          )}
           {!active && nextWaiting && !isPaused && (
             <p className="text-sm text-gray-700">Next up: #{nextWaiting.token_number}</p>
           )}
@@ -357,37 +379,6 @@ export default function BarberDashboard() {
             )}
           </div>
         </details>
-
-        <section aria-label="Redeem a reward" className="mb-6 rounded-2xl border-2 border-ink bg-brand-soft p-3">
-          <label htmlFor="redeem-code" className="mb-1 block text-sm font-semibold text-ink">
-            Customer showed a reward code?
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="redeem-code"
-              className="field uppercase tracking-widest"
-              value={redeemInput}
-              maxLength={7}
-              autoCapitalize="characters"
-              autoComplete="off"
-              placeholder="ABC234"
-              onChange={(e) => { setRedeemInput(e.target.value); setRedeemMsg(null); }}
-            />
-            <button
-              type="button"
-              className="btn-primary !w-auto"
-              disabled={redeem.isPending || redeemInput.replace(/[\s-]/g, '').length < 6}
-              onClick={() => redeem.mutate()}
-            >
-              Redeem
-            </button>
-          </div>
-          {redeemMsg && (
-            <p role="status" className={`mt-2 text-sm font-medium ${redeemMsg.ok ? 'text-green-800' : 'text-red-700'}`}>
-              {redeemMsg.text}
-            </p>
-          )}
-        </section>
 
         <section>
           <div className="mb-2 flex items-center justify-between gap-3">

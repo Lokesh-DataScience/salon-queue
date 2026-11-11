@@ -96,7 +96,7 @@ describe('Team (Slice G)', () => {
     }
     expect((await as('get', '/api/barber/queue')).status).toBe(200);
     expect((await as('get', '/api/barber/me')).status).toBe(200);
-    expect((await as('post', '/api/barber/offers/redeem')).status).not.toBe(403); // redeeming is a counter job
+    expect((await as('post', `/api/barber/queue/${randomUUID()}/redeem-prize`)).status).toBe(404); // staff may reach it (not 403); no such entry
   }, 60_000);
 
   it('refuses a phone number that is already registered, in this salon or any other', async () => {

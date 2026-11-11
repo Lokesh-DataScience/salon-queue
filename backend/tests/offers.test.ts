@@ -1,4 +1,5 @@
 // backend/tests/offers.test.ts
+import { randomUUID } from 'crypto';
 import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import { app, makeSalon, cleanupSalons, joinViaApi, barberCookieFor } from './helpers';
@@ -69,7 +70,7 @@ describe('Offers CRUD and ownership', () => {
       expect((await request(app).post('/api/barber/offers').set('Cookie', cookie).send(body)).status).toBe(400);
     }
     expect((await request(app).get('/api/barber/offers')).status).toBe(401);
-    expect((await request(app).post('/api/barber/offers/redeem').send({ code: 'ABC234' })).status).toBe(401);
+    expect((await request(app).post(`/api/barber/queue/${randomUUID()}/redeem-prize`)).status).toBe(401);
   });
 });
 
@@ -107,49 +108,70 @@ describe('Prize draw', () => {
 
 describe('Reveal, redeem and secrecy', () => {
   // dailyCount 50 makes the chance 1.0 for the first customers, so the winner is certain.
-  it('winner sees the prize on their own ticket; barber redeems once, only after service, only for their salon', async () => {
+  it('winner sees the prize (no code) on their ticket; barber redeems with one tap, once, only when served, only for their own salon', async () => {
     const salonId = await makeSalon();
     const other = await makeSalon();
     const { cookie } = await addOffer(salonId, 'Head massage', 50);
-    const t = (await joinQueue(salonId));
+    const t = await joinQueue(salonId);
 
     const mine = await ticket(t.ticketId, t.accessToken);
-    expect(mine.prize).toMatchObject({ name: 'Head massage', redeemed: false });
-    expect(mine.prize.code).toMatch(/^[A-Z0-9]{6}$/);
-    const code = mine.prize.code;
+    expect(mine.prize).toEqual({ name: 'Head massage', redeemed: false }); // no code is exposed
 
-    const redeem = (c: string, ck = cookie) =>
-      request(app).post('/api/barber/offers/redeem').set('Cookie', ck).send({ code: c });
+    const redeem = (id: string, ck = cookie) =>
+      request(app).post(`/api/barber/queue/${id}/redeem-prize`).set('Cookie', ck);
 
-    expect((await redeem(code)).status).toBe(409); // still WAITING
+    expect((await redeem(t.ticketId)).status).toBe(409); // still WAITING
     await callNext(salonId);
+    expect((await redeem(t.ticketId)).status).toBe(409); // CALLED, not served yet
     await startEntry(salonId, t.ticketId);
 
-    expect((await redeem(code, await barberCookieFor(other))).status).toBe(404); // someone else's salon
-    const ok = await redeem(code.toLowerCase()); // case-insensitive
+    expect((await redeem(t.ticketId, await barberCookieFor(other))).status).toBe(404); // someone else's salon
+    const ok = await redeem(t.ticketId);
     expect(ok.status).toBe(200);
     expect(ok.body.prizeName).toBe('Head massage');
-    expect((await redeem(code)).status).toBe(409); // single use
-    expect((await redeem('ZZZZZZ')).status).toBe(404);
+    expect((await redeem(t.ticketId)).status).toBe(409); // single use
+    expect((await redeem(randomUUID())).status).toBe(404);
 
     const list = await request(app).get('/api/barber/offers').set('Cookie', cookie);
     expect(list.body.totalRedeemedToday).toBe(1);
-  });
+  }, 60_000);
 
-  it('the barber snapshot and the live broadcast never reveal who won', async () => {
+  it('the barber snapshot never shows a prize on a waiting row, and no prize code anywhere', async () => {
     const salonId = await makeSalon();
     const { cookie } = await addOffer(salonId, 'Scrub', 50);
-    const t = (await joinQueue(salonId));
-    const code = (await ticket(t.ticketId, t.accessToken)).prize.code;
+    const a = await joinQueue(salonId);
+    await joinQueue(salonId);
 
     const snap = await request(app).get('/api/barber/queue').set('Cookie', cookie);
+    expect(snap.status).toBe(200);
+    expect(snap.body.waiting.every((e: { prize: unknown }) => e.prize === null)).toBe(true);
+
     const text = JSON.stringify(snap.body);
-    expect(text).not.toContain(code);
-    expect(text).not.toMatch(/offer_id|prize/);
+    expect(text).not.toMatch(/offer_id|prize_code|prize_redeemed_at/);
+    const { data } = await supabase.from('queue_entries').select('prize_code').eq('queue_id', a.queueId);
+    const codes = (data ?? []).map((r) => r.prize_code).filter(Boolean) as string[];
+    for (const code of codes) expect(text).not.toContain(code);
 
     const status = await request(app).get(`/api/salons/${salonId}/queue`);
-    expect(JSON.stringify(status.body)).not.toContain(code);
-  });
+    for (const code of codes) expect(JSON.stringify(status.body)).not.toContain(code);
+  }, 60_000);
+
+  it('the customer at the chair shows their prize to the barber, and it flips to redeemed after the tap', async () => {
+    const salonId = await makeSalon();
+    const { cookie } = await addOffer(salonId, 'Scrub', 50);
+    const t = await joinQueue(salonId);
+    await callNext(salonId);
+    await startEntry(salonId, t.ticketId);
+
+    const before = await request(app).get('/api/barber/queue').set('Cookie', cookie);
+    expect(before.body.serving.prize).toEqual({ name: 'Scrub', redeemed: false });
+
+    const tap = await request(app).post(`/api/barber/queue/${t.ticketId}/redeem-prize`).set('Cookie', cookie);
+    expect(tap.status).toBe(200);
+
+    const after = await request(app).get('/api/barber/queue').set('Cookie', cookie);
+    expect(after.body.serving.prize).toEqual({ name: 'Scrub', redeemed: true });
+  }, 60_000);
 
   it("another customer's token cannot read the prize", async () => {
     const salonId = await makeSalon();

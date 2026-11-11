@@ -2,6 +2,7 @@
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 import { todayISODate } from '../utils/date';
+import { assertEntryAccess } from './barber.service';
 
 const MAX_OFFERS = 10;
 
@@ -114,26 +115,29 @@ export async function deleteOffer(salonId: string, offerId: string) {
   if (!data) throw new AppError('Offer not found.', 404);
 }
 
-export async function redeemPrize(salonId: string, code: string) {
+// Redeem the prize of the customer the barber is looking at. No code is typed:
+// the salon and line come from the session, the entry must belong to them.
+export async function redeemPrizeForEntry(salonId: string, entryId: string, entryLaneId?: string | null) {
+  await assertEntryAccess(salonId, entryId, entryLaneId); // other salon / other barber's line -> 404
+
   const { data, error } = await supabase
     .from('queue_entries')
-    .select('id, status, prize_redeemed_at, salon_offers(name), queues!inner(salon_id, date)')
-    .eq('prize_code', code)
-    .eq('queues.salon_id', salonId)
-    .eq('queues.date', todayISODate())
+    .select('id, status, offer_id, prize_redeemed_at, salon_offers(name)')
+    .eq('id', entryId)
     .maybeSingle();
   if (error) throw error;
-  if (!data) throw new AppError('Code not found for today.', 404);
+  if (!data) throw new AppError('Queue entry not found.', 404);
 
+  if (!data.offer_id) throw new AppError('This customer has no prize.', 409);
   if (data.prize_redeemed_at) throw new AppError('This prize was already redeemed.', 409);
   if (!['SERVING', 'COMPLETED'].includes(data.status)) {
-    throw new AppError('Redeem after the customer has been served.', 409);
+    throw new AppError('Redeem once the customer is being served.', 409);
   }
 
   const { data: updated, error: upErr } = await supabase
     .from('queue_entries')
     .update({ prize_redeemed_at: new Date().toISOString() })
-    .eq('id', data.id)
+    .eq('id', entryId)
     .is('prize_redeemed_at', null) // compare-and-swap: a double tap redeems once
     .in('status', ['SERVING', 'COMPLETED'])
     .select('id')

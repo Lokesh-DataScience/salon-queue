@@ -159,8 +159,9 @@ describe('Ownership: a barber can only touch their own salon', () => {
     expect(snap.body.waiting).toHaveLength(1);
     expect(snap.body.waiting[0].token_number).toBe(2);
     const text = JSON.stringify(snap.body);
-    expect(text).not.toContain('customer_name');
-    expect(text).not.toContain('customer_phone');
+    // Customer-list amendment: this salon's barber sees its own customers' name and phone.
+    expect(snap.body.serving.customer_phone).toMatch(/^\d{10}$/);
+    expect(snap.body.waiting[0].customer_phone).toMatch(/^\d{10}$/);
   });
 
   it("pausing affects only the caller's own queue", async () => {

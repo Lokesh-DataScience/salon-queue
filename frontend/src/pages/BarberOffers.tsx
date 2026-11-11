@@ -110,7 +110,7 @@ export default function BarberOffers() {
         <h1 className="mt-2 text-xl font-semibold">Customer offers</h1>
         <p className="text-sm text-gray-600">
           Customers who scan your QR may win a surprise reward. You pick the offers and how many
-          per day. Winners are chosen at random, so even you won't know who wins until they show you their code.
+          per day. Winners are chosen at random, so even you won't know who wins until that customer's turn comes.
         </p>
       </header>
 

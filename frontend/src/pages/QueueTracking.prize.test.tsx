@@ -24,7 +24,7 @@ const ticket = (over: Record<string, unknown> = {}) => ({
   prize: null,
   ...over,
 });
-const PRIZE = { name: 'Head massage', code: 'K7M2QX', redeemed: false };
+const PRIZE = { name: 'Head massage', redeemed: false };
 
 const given = (over: Record<string, unknown> = {}) =>
   vi.mocked(tickets.fetchTicketStatus).mockResolvedValue(ticket(over));
@@ -37,28 +37,27 @@ beforeEach(() => {
 });
 
 describe('QueueTracking: surprise reward', () => {
-  it('keeps the prize and code hidden until the customer taps to reveal', async () => {
+  it('keeps the prize hidden until the customer taps to reveal, and never shows a code', async () => {
     given({ prize: PRIZE });
     const user = userEvent.setup();
     renderTicket();
 
     expect(await screen.findByText(/you have a surprise reward/i)).toBeInTheDocument();
-    expect(screen.queryByText('K7M2QX')).not.toBeInTheDocument();
     expect(screen.queryByText(/Head massage/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /tap to reveal/i }));
-    expect(screen.getByText('K7M2QX')).toBeInTheDocument();
     expect(screen.getByText(/Head massage/)).toBeInTheDocument();
     expect(screen.getByText(/once your service starts/i)).toBeInTheDocument();
+    expect(screen.queryByText(/your code/i)).not.toBeInTheDocument();
   });
 
-  it('tells a customer who is being served to show the code now', async () => {
+  it('tells a customer who is being served that the barber will give it', async () => {
     given({ status: 'SERVING', prize: PRIZE });
     const user = userEvent.setup();
     renderTicket();
 
     await user.click(await screen.findByRole('button', { name: /tap to reveal/i }));
-    expect(screen.getByText(/show this code to the barber now/i)).toBeInTheDocument();
+    expect(screen.getByText(/will give it to you during your service/i)).toBeInTheDocument();
   });
 
   it('shows no reward section when there is no prize', async () => {
@@ -73,16 +72,15 @@ describe('QueueTracking: surprise reward', () => {
     renderTicket();
 
     expect(await screen.findByText('Reward claimed')).toBeInTheDocument();
-    expect(screen.queryByText('K7M2QX')).not.toBeInTheDocument();
   });
 
-  it('still offers the code on a completed ticket so it is not lost', async () => {
+  it('on a completed ticket with an unclaimed prize, asks the customer to tell the barber', async () => {
     given({ status: 'COMPLETED', prize: PRIZE });
     const user = userEvent.setup();
     renderTicket();
 
     expect(await screen.findByText(/your service is complete/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /tap to reveal/i }));
-    expect(screen.getByText('K7M2QX')).toBeInTheDocument();
+    expect(screen.getByText(/tell the barber/i)).toBeInTheDocument();
   });
 });

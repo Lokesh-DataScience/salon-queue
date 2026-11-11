@@ -22,6 +22,7 @@ export interface BarberQueueEntry {
   // From this salon's own customer list. null for a walk-in, or if the customer was removed.
   customer_name: string | null;
   customer_phone: string | null;
+  prize?: { name: string; redeemed: boolean } | null; // only on the called/serving customer
 }
 
 // One barber's line, as the owner's switcher shows it.
@@ -313,4 +314,8 @@ export function fetchCustomers(search?: string) {
 
 export function deleteCustomer(customerId: string) {
   return apiFetch<{ ok: boolean }>(`/api/barber/customers/${customerId}`, { method: 'DELETE' });
+}
+
+export function redeemPrizeForEntry(entryId: string) {
+  return apiFetch<{ prizeName: string }>(`/api/barber/queue/${entryId}/redeem-prize`, { method: 'POST' });
 }

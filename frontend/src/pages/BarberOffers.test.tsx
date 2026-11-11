@@ -13,7 +13,6 @@ vi.mock('../api/offers', () => ({
   createOffer: vi.fn(),
   updateOffer: vi.fn(),
   deleteOffer: vi.fn(),
-  redeemCode: vi.fn(),
 }));
 
 const offer = (over: Partial<Offer> = {}): Offer => ({

@@ -19,6 +19,7 @@ import { AppError } from '../middleware/errorHandler';
 import { NotificationService } from '../services/notification.service';
 import { advanceSalonQueue, extendEntry } from '../services/queueAutomation.service';
 import { extendBodySchema } from '../validators/barber.validators';
+import { redeemPrizeForEntry } from '../services/offers.service';
 
 // Who is asking and which barber's line this is about (see barberScope.service.ts).
 // The line comes from the database for staff; only the owner may name another with ?laneId=.
@@ -150,6 +151,18 @@ export async function postPrioritize(req: Request, res: Response, next: NextFunc
     const entry = await moveToFront(salonId, entryId, scope.entryLaneId);
     await broadcastQueueUpdate(salonId);
     res.json({ entry });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postRedeemPrize(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req);
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const result = await redeemPrizeForEntry(scope.salonId, entryId, scope.entryLaneId);
+    await broadcastQueueUpdate(scope.salonId); // the customer's prize card flips to "Redeemed"
+    res.json(result);
   } catch (err) {
     next(err);
   }

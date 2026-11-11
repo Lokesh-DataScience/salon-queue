@@ -24,9 +24,8 @@ type SanitizedQueueState = {
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
 
-function PrizeCard({ prize, status }: { prize: { name: string; code: string; redeemed: boolean }; status: string }) {
+function PrizeCard({ prize, status }: { prize: { name: string; redeemed: boolean }; status: string }) {
   const [revealed, setRevealed] = useState(false);
-  const served = status === 'SERVING' || status === 'COMPLETED';
 
   if (prize.redeemed) {
     return (
@@ -39,6 +38,13 @@ function PrizeCard({ prize, status }: { prize: { name: string; code: string; red
       </section>
     );
   }
+
+  const note =
+    status === 'COMPLETED'
+      ? 'If you did not get your reward, please tell the barber.'
+      : status === 'SERVING' || status === 'CALLED'
+        ? 'Your barber can see your reward and will give it to you during your service.'
+        : 'Your barber will see this reward once your service starts. It is valid today only.';
 
   return (
     <section
@@ -61,18 +67,8 @@ function PrizeCard({ prize, status }: { prize: { name: string; code: string; red
         <>
           <p className="text-sm font-bold uppercase tracking-widest text-ink">You won</p>
           <p className="mt-1 text-2xl font-extrabold text-ink">🎉 {prize.name}</p>
-
           <div aria-hidden="true" className="mx-auto my-4 border-t-2 border-dashed border-ink/40" />
-
-          <p className="text-sm font-medium text-ink">Your code</p>
-          <p className="mx-auto mt-1 inline-block rounded-xl bg-ink px-5 py-3 text-4xl font-extrabold tracking-[0.3em] tabular-nums text-brand">
-            {prize.code}
-          </p>
-          <p className="mt-4 text-sm text-ink">
-            {served
-              ? 'Show this code to the barber now.'
-              : 'Show this code to the barber once your service starts. It is valid today only.'}
-          </p>
+          <p className="text-sm text-ink">{note}</p>
         </>
       )}
     </section>

@@ -6,9 +6,8 @@ import {
   expectedBodySchema,
   offerPatchSchema,
   offerIdParamSchema,
-  redeemBodySchema,
 } from '../validators/offer.validators';
-import {setExpectedCustomers, listOffers, createOffer, updateOffer, deleteOffer, redeemPrize } from '../services/offers.service';
+import {setExpectedCustomers, listOffers, createOffer, updateOffer, deleteOffer } from '../services/offers.service';
 
 export async function patchExpected(req: Request, res: Response, next: NextFunction) {
   try {
@@ -48,12 +47,5 @@ export async function removeOffer(req: Request, res: Response, next: NextFunctio
     const { offerId } = offerIdParamSchema.parse(req.params);
     await deleteOffer(salonIdOf(req), offerId);
     res.json({ ok: true });
-  } catch (err) { next(err); }
-}
-
-export async function postRedeem(req: Request, res: Response, next: NextFunction) {
-  try {
-    const { code } = redeemBodySchema.parse(req.body);
-    res.json(await redeemPrize(salonIdOf(req), code));
   } catch (err) { next(err); }
 }

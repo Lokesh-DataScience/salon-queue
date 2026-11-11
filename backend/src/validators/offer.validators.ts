@@ -18,10 +18,3 @@ export const offerPatchSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update.' });
 
 export const offerIdParamSchema = z.object({ offerId: z.string().uuid() });
-
-export const redeemBodySchema = z.object({
-  code: z
-    .string()
-    .transform((s) => s.replace(/[\s-]/g, '').toUpperCase())
-    .pipe(z.string().regex(/^[A-Z0-9]{6}$/, 'Enter the 6-character code.')),
-});

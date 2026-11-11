@@ -147,14 +147,14 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
       currentToken = last?.token_number ?? 0;
     }
   }
-    let prize: { name: string; code: string; redeemed: boolean } | null = null;
+    let prize: { name: string; redeemed: boolean } | null = null;
   if (entry.offer_id && !['CANCELLED', 'SKIPPED'].includes(entry.status)) {
     const { data: offer } = await supabase
       .from('salon_offers')
       .select('name')
       .eq('id', entry.offer_id)
       .maybeSingle();
-    prize = { name: offer?.name ?? 'Reward', code: entry.prize_code, redeemed: !!entry.prize_redeemed_at };
+    prize = { name: offer?.name ?? 'Reward', redeemed: !!entry.prize_redeemed_at };
   }
   const avg = salon?.average_service_minutes ?? 15;
   let estimatedWait = 0;

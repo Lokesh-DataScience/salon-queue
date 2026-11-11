@@ -42,10 +42,3 @@ export function updateOffer(
 export function deleteOffer(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/barber/offers/${id}`, { method: 'DELETE' });
 }
-
-export function redeemCode(code: string) {
-  return apiFetch<{ prizeName: string }>('/api/barber/offers/redeem', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  });
-}
