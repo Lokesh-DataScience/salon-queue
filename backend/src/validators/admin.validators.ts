@@ -43,3 +43,6 @@ export const auditQuerySchema = z.object({
   group: z.enum(['salon', 'staff', 'sales', 'admin']).optional(),
   before: z.coerce.number().int().positive().optional(), // id cursor for "Load more"
 });
+
+// Slice 5: onboarding period
+export const onboardingQuerySchema = z.object({ period: z.enum(['30', '90', 'all']).default('30') });

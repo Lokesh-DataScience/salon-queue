@@ -290,3 +290,31 @@ export function fetchAudit(opts: { group?: AuditGroup; before?: number } = {}) {
   const s = q.toString();
   return apiFetch<{ entries: AuditEntry[]; nextBefore: number | null }>(`/api/admin/founder/audit${s ? `?${s}` : ''}`);
 }
+
+// ── Sales: onboarding funnel (Slice 5) ────────────────────────────────────
+export type OnboardingPeriod = '30' | '90' | 'all';
+export type OnboardingStepId = 'services' | 'first_ticket' | 'first_qr' | 'active';
+
+export interface OnboardingSalon {
+  id: string;
+  name: string;
+  area: string;
+  createdAt: string;
+  isSuspended: boolean;
+  owner: { name: string | null; phone: string | null; email: string | null };
+  reached: Record<OnboardingStepId, boolean>;
+  eligibleForActive: boolean; // registered at least 7 days ago
+  nextStep: OnboardingStepId | null; // null = nothing missing (or too new to judge "active")
+}
+
+export interface OnboardingFunnel {
+  period: OnboardingPeriod;
+  registered: number;
+  steps: { id: OnboardingStepId; label: string; count: number; outOf: number }[];
+  medianDaysToFirstTicket: number | null;
+  salons: OnboardingSalon[];
+}
+
+export function fetchSalesOnboarding(period: OnboardingPeriod) {
+  return apiFetch<OnboardingFunnel>(`/api/admin/sales/onboarding?period=${period}`);
+}

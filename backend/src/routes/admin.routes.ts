@@ -14,6 +14,7 @@ import {
   removeSalon,
 } from '../controllers/founderSalons.controller';
 import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
+import { getOnboardingFunnel } from '../controllers/onboarding.controller';
 import { getHealth } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
 import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
@@ -50,6 +51,7 @@ sales.get('/', getSectionStatus('sales'));
 // Slice 4: salon activity, churn risk, areas, partner flag + notes
 sales.get('/activity', getActivity);
 sales.patch('/salons/:salonId/info', patchSalesInfo);
+sales.get('/onboarding', getOnboardingFunnel); // Slice 5
 
 const tech = Router();
 tech.use(requireAdminRole('TECH'));
