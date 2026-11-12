@@ -4,6 +4,15 @@ import { requireAuth } from '../middleware/auth.middleware';
 import { requireAdminRole } from '../middleware/admin.middleware';
 import { getAdminMe, getSectionStatus } from '../controllers/admin.controller';
 import { getOverview } from '../controllers/founder.controller';
+import {
+  getSalons,
+  getSalonDetail,
+  postSalon,
+  postSuspension,
+  postInternal,
+  postStaffPassword,
+  removeSalon,
+} from '../controllers/founderSalons.controller';
 
 const router = Router();
 
@@ -17,6 +26,14 @@ const founder = Router();
 founder.use(requireAdminRole('FOUNDER'));
 founder.get('/', getSectionStatus('founder'));
 founder.get('/overview', getOverview); // Slice 1
+// Slice 2: salon management
+founder.get('/salons', getSalons);
+founder.post('/salons', postSalon);
+founder.get('/salons/:salonId', getSalonDetail);
+founder.post('/salons/:salonId/suspension', postSuspension);
+founder.post('/salons/:salonId/internal', postInternal);
+founder.delete('/salons/:salonId', removeSalon);
+founder.post('/staff/:staffId/password', postStaffPassword);
 
 const sales = Router();
 sales.use(requireAdminRole('SALES'));

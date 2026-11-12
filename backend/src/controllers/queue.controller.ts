@@ -6,6 +6,7 @@ import { joinQueue, getTicketStatus, broadcastQueueUpdate, QueueJoinError, leave
 import { pushSubscriptionBodySchema, joinQueueBodySchema } from '../validators/queue.validators';
 import { savePushSubscription, removePushSubscription, forgetMyDetails } from '../services/queue.service';
 import { advanceSalonQueue } from '../services/queueAutomation.service';
+import { SALON_SUSPENDED_PUBLIC, isSalonSuspendedError } from '../utils/suspension';
 
 // Missing details / consent are the customer's to fix: 400 plus a code the join page can react to.
 const CUSTOMER_INPUT_CODES = ['CUSTOMER_DETAILS_REQUIRED', 'CONSENT_REQUIRED'];
@@ -27,6 +28,10 @@ export async function postJoinQueue(req: Request, res: Response, next: NextFunct
     await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
     res.status(201).json({ ticket });
   } catch (err) {
+    // Admin Slice 2: the founder suspended this salon (raised by the queue_entries trigger).
+    if (isSalonSuspendedError(err)) {
+      return res.status(409).json({ message: SALON_SUSPENDED_PUBLIC, code: 'SALON_SUSPENDED' });
+    }
     if (err instanceof QueueJoinError) {
       if (CUSTOMER_INPUT_CODES.includes(err.code)) {
         return res.status(400).json({ message: err.message, code: err.code });

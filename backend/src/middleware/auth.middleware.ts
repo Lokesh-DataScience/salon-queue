@@ -1,24 +1,45 @@
 // backend/src/middleware/auth.middleware.ts
 import type { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../services/auth.service';
+import { getSessionState, tokenIssuedBeforeCutoff } from '../services/sessionState.service';
+import { SALON_SUSPENDED_STAFF } from '../utils/suspension';
 import { AppError } from './errorHandler';
+import type { JwtPayload } from '../types/auth.types';
 
 // Verifies the access-token cookie and attaches req.staff. Does NOT check
 // salon ownership — that's a separate, route-specific concern (see
 // ownership.middleware.ts in Milestone 3b), since "own this salon" only
 // makes sense once we know *which* salon a request is about.
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
+//
+// Admin Slice 2: also checks (cached ~30s, cleared by founder actions) that the account still
+// exists, its salon is not suspended, and the token is newer than a founder password reset.
+// All three end in 401, so the app's normal "session ended" handling sends them to the login page,
+// where the real reason is shown.
+export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   const token = req.cookies?.access_token;
 
   if (!token) {
     return next(new AppError('Not authenticated.', 401));
   }
 
+  let payload: JwtPayload & { iat?: number };
   try {
-    req.staff = verifyAccessToken(token);
-    next();
+    payload = verifyAccessToken(token);
   } catch {
-    next(new AppError('Session expired or invalid. Please log in again.', 401));
+    return next(new AppError('Session expired or invalid. Please log in again.', 401));
+  }
+
+  try {
+    const state = await getSessionState(payload.staffId);
+    if (!state) return next(new AppError('Session expired. Please log in again.', 401));
+    if (state.salonSuspended) return next(new AppError(SALON_SUSPENDED_STAFF, 401));
+    if (tokenIssuedBeforeCutoff(payload.iat, state.sessionsValidAfterMs)) {
+      return next(new AppError('Session expired. Please log in again.', 401));
+    }
+    req.staff = payload;
+    next();
+  } catch (err) {
+    next(err);
   }
 }
 

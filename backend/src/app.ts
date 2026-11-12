@@ -68,6 +68,8 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.post('/api/barber/me/password', limits.login); // only failed attempts count
     app.post('/api/auth/barber/register', limits.register);
     app.use('/api/admin', limits.admin);
+    // The founder's own password is checked here; only wrong attempts count (same rules as login).
+    app.post('/api/admin/founder/staff/:staffId/password', limits.login);
     const news = createNewsLimiters();
     app.get('/api/salons/:salonId/feed', news.feed);
     app.get('/api/geo/reverse', news.geo);

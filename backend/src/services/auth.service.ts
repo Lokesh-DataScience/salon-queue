@@ -9,6 +9,14 @@ import type { JwtPayload, RefreshPayload, StaffRole } from '../types/auth.types'
 import type { RegisterSalonBody } from '../validators/auth.validators';
 import { assignPlaceToSalon } from './place.service';
 import { normalizePhone } from '../utils/phone';
+import { SALON_SUSPENDED_STAFF } from '../utils/suspension';
+import { tokenIssuedBeforeCutoff } from './sessionState.service';
+
+// The embedded salon row can come back as an object or a one-item array depending on the client's typing.
+function salonSuspended(salons: unknown): boolean {
+  const s = (Array.isArray(salons) ? salons[0] : salons) as { is_suspended?: boolean } | null | undefined;
+  return !!s?.is_suspended;
+}
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 interface SalonStaffRow {
@@ -19,6 +27,7 @@ interface SalonStaffRow {
   password_hash: string;
   role: StaffRole;
   is_active: boolean;
+  salons: unknown; // embedded { is_suspended }
 }
 
 const BAD_LOGIN = 'Invalid email, phone number or password.';
@@ -27,7 +36,7 @@ const BAD_LOGIN = 'Invalid email, phone number or password.';
 export async function loginBarber(identifier: string, password: string) {
   const select = supabase
     .from('salon_staff')
-    .select('id, salon_id, name, email, password_hash, role, is_active');
+    .select('id, salon_id, name, email, password_hash, role, is_active, salons(is_suspended)');
 
   let lookup;
   if (identifier.includes('@')) {
@@ -48,6 +57,10 @@ export async function loginBarber(identifier: string, password: string) {
   // Checked only after the password, so this message cannot be used to probe for accounts.
   if (!data.is_active) {
     throw new AppError('This account has been switched off. Please contact your salon owner.', 403);
+  }
+  // Also only after the password: a suspended salon's staff learn why they can't get in.
+  if (salonSuspended(data.salons)) {
+    throw new AppError(SALON_SUSPENDED_STAFF, 403);
   }
 
   return {
@@ -99,11 +112,15 @@ export async function rotateRefreshToken(refreshToken: string) {
 
   const { data: staff, error: staffError } = await supabase
     .from('salon_staff')
-    .select('id, salon_id, role, is_active')
+    .select('id, salon_id, role, is_active, sessions_valid_after, salons(is_suspended)')
     .eq('id', payload.staffId)
     .maybeSingle();
   if (staffError) throw staffError; // infrastructure problem: 500, not a forced logout
   if (!staff || !staff.is_active) throw new AppError(SESSION_ENDED, 401); // removed or switched-off staff end here
+  // Admin Slice 2: a suspended salon, or a founder password reset after this token was issued, ends the session.
+  if (salonSuspended(staff.salons)) throw new AppError(SALON_SUSPENDED_STAFF, 401);
+  const cutoff = staff.sessions_valid_after ? Date.parse(staff.sessions_valid_after as string) : null;
+  if (tokenIssuedBeforeCutoff((payload as { iat?: number }).iat, cutoff)) throw new AppError(SESSION_ENDED, 401);
 
   const { error: claimError } = await supabase
     .from('revoked_tokens')
