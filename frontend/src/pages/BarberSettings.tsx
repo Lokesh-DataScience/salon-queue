@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { fetchMe, logoutBarber } from '../api/barber';
+import { fetchAdminMe, type AdminRole } from '../api/admin';
 import { MULTI_BARBER } from '../lib/multiBarber';
 
 type Row = { to: string; title: string; hint: string };
@@ -21,6 +22,12 @@ const toolRows: Row[] = [
   { to: '/barber/qr', title: 'Salon QR code', hint: 'View and print your poster' },
   { to: '/barber/offers', title: 'Offers', hint: 'Rewards for customers who scan' },
 ];
+
+const ADMIN_HINT: Record<AdminRole, string> = {
+  FOUNDER: 'Founder, sales and tech pages',
+  SALES: 'Sales page',
+  TECH: 'Tech page',
+};
 
 const rowClass = 'flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-brand-soft';
 
@@ -69,6 +76,8 @@ function LogoutRow() {
 
 export default function BarberSettings() {
   const { data: me } = useQuery({ queryKey: ['barberMe'], queryFn: fetchMe, retry: false });
+  // Only internal admin accounts get an answer here; everyone else gets null and sees no row.
+  const { data: admin } = useQuery({ queryKey: ['adminMe'], queryFn: fetchAdminMe, retry: false });
   // The customer list is the owner's. Staff never see the row.
   const tools: Row[] =
     me?.role === 'OWNER'
@@ -82,6 +91,7 @@ export default function BarberSettings() {
       <nav aria-label="Settings" className="grid gap-6">
         <RowList rows={salonRows} />
         <RowList rows={tools} />
+        {admin && <RowList rows={[{ to: '/barber/admin', title: 'Admin', hint: ADMIN_HINT[admin.role] }]} />}
         <LogoutRow />
       </nav>
     </PageShell>

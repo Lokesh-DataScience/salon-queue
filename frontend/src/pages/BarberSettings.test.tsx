@@ -5,11 +5,13 @@ import userEvent from '@testing-library/user-event';
 import BarberSettings from './BarberSettings';
 import { renderPage } from '../test/utils';
 import * as barber from '../api/barber';
+import * as admin from '../api/admin';
 
 vi.mock('../api/barber', () => ({
   logoutBarber: vi.fn(),
   fetchMe: vi.fn(),
 }));
+vi.mock('../api/admin', () => ({ fetchAdminMe: vi.fn() }));
 vi.mock('../lib/multiBarber', () => ({ MULTI_BARBER: false }));
 
 const OWNER = { id: 'staff-1', name: 'Owner', role: 'OWNER' as const, salonId: 'salon-1', laneId: null, laneName: null };
@@ -19,6 +21,7 @@ const renderSettings = () => renderPage(<BarberSettings />, { path: '/barber/set
 beforeEach(() => {
   vi.mocked(barber.logoutBarber).mockReset();
   vi.mocked(barber.fetchMe).mockReset().mockResolvedValue(OWNER);
+  vi.mocked(admin.fetchAdminMe).mockReset().mockResolvedValue(null); // a normal barber
 });
 
 describe('BarberSettings menu', () => {
@@ -50,6 +53,18 @@ describe('BarberSettings menu', () => {
     renderSettings();
     await screen.findByRole('link', { name: /salon qr code/i });
     expect(screen.queryByRole('link', { name: /^customers/i })).not.toBeInTheDocument();
+  });
+
+  it('shows no Admin row to a normal barber', async () => {
+    renderSettings();
+    await screen.findByRole('link', { name: /salon qr code/i });
+    expect(screen.queryByRole('link', { name: /^admin/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the Admin row to an admin account', async () => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue({ role: 'SALES', sections: ['sales'] });
+    renderSettings();
+    expect(await screen.findByRole('link', { name: /^admin/i })).toHaveAttribute('href', '/barber/admin');
   });
 
   it('logs out from Settings and leaves for the login page', async () => {

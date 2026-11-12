@@ -12,6 +12,7 @@ import queueRouter from './routes/queue.routes';
 import queueTicketRouter from './routes/ticket.routes';
 import barberAuthRouter from './routes/auth.routes';
 import barberRouter from './routes/barber.routes';
+import adminRouter from './routes/admin.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { createRateLimiters } from './middleware/rateLimit';
 import { feedRouter, geoRouter } from './routes/feed.routes';
@@ -66,6 +67,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.post('/api/auth/barber/login', limits.login);
     app.post('/api/barber/me/password', limits.login); // only failed attempts count
     app.post('/api/auth/barber/register', limits.register);
+    app.use('/api/admin', limits.admin);
     const news = createNewsLimiters();
     app.get('/api/salons/:salonId/feed', news.feed);
     app.get('/api/geo/reverse', news.geo);
@@ -87,6 +89,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
   app.use('/api/queue-tickets', queueTicketRouter);
   app.use('/api/auth/barber', barberAuthRouter);
   app.use('/api/barber', barberRouter);
+  app.use('/api/admin', adminRouter); // internal admin pages; role checked in the DB on every request
   if (clientDir) {
     app.use(
       '/.well-known',

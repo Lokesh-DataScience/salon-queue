@@ -5,8 +5,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMe, logoutBarber } from '../api/barber';
 import { SESSION_EXPIRED_EVENT } from '../api/client';
 
-// QR and Offers live under Settings, so the Settings tab stays highlighted on them.
-const SETTINGS_PATHS = ['/barber/settings', '/barber/qr', '/barber/offers'];
+// QR, Offers and Admin live under Settings, so the Settings tab stays highlighted on them.
+const SETTINGS_PATHS = ['/barber/settings', '/barber/qr', '/barber/offers', '/barber/admin'];
 
 const iconProps = {
   'aria-hidden': true,

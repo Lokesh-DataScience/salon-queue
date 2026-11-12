@@ -22,6 +22,7 @@ import BarberCustomers from './pages/BarberCustomers';
 import BarberProfile from './pages/BarberProfile';
 import BarberServices from './pages/BarberServices';
 import BarberTeam from './pages/BarberTeam';
+import BarberAdmin from './pages/BarberAdmin';
 
 function NotFound() {
   return (
@@ -65,6 +66,7 @@ function App() {
         <Route path="/barber/qr" element={<BarberQr />} />
         <Route path="/barber/offers" element={<BarberOffers />} />
         <Route path="/barber/customers" element={<BarberCustomers />} />
+        <Route path="/barber/admin" element={<BarberAdmin />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

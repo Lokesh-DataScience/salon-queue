@@ -44,9 +44,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   let res = await send();
 
-  // Barber-only routes: if the access token expired, refresh silently and retry once.
-  // (A 401 means the handler never ran, so retrying a POST cannot double-apply it.)
-  if (res.status === 401 && path.startsWith('/api/barber/')) {
+  // Barber-session routes (barber + in-app admin): if the access token expired, refresh silently
+  // and retry once. (A 401 means the handler never ran, so retrying a POST cannot double-apply it.)
+  if (res.status === 401 && (path.startsWith('/api/barber/') || path.startsWith('/api/admin/'))) {
     const outcome = await refreshSession();
     // 'denied' can simply mean another tab rotated the token first. Its new cookies are
     // already in the shared cookie jar, so retry once for 'ok' and 'denied' alike.

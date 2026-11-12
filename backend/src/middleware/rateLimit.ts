@@ -52,5 +52,11 @@ export function createRateLimiters() {
       limit: 5,
       message: 'Too many sign-up attempts from this network. Please try again later.',
     }),
+    // Internal admin pages: a few people clicking around, never thousands of calls.
+    admin: limiter({
+      windowMs: 60_000,
+      limit: 120,
+      message: 'Too many requests. Please wait a moment and try again.',
+    }),
   };
 }

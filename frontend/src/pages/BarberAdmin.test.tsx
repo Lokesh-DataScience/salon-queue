@@ -1,0 +1,57 @@
+// frontend/src/pages/BarberAdmin.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import BarberAdmin from './BarberAdmin';
+import { renderPage } from '../test/utils';
+import * as admin from '../api/admin';
+
+vi.mock('../api/admin', () => ({
+  fetchAdminMe: vi.fn(),
+  fetchAdminSection: vi.fn(),
+}));
+
+const renderAdmin = () => renderPage(<BarberAdmin />, { path: '/barber/admin', route: '/barber/admin' });
+
+beforeEach(() => {
+  vi.mocked(admin.fetchAdminMe).mockReset();
+  vi.mocked(admin.fetchAdminSection)
+    .mockReset()
+    .mockImplementation(async (section) => ({ section, ok: true }));
+});
+
+describe('BarberAdmin', () => {
+  it('looks like a missing page to a normal barber', async () => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue(null);
+    renderAdmin();
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+    expect(admin.fetchAdminSection).not.toHaveBeenCalled();
+  });
+
+  it('shows SALES only the Sales section, with no tabs', async () => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue({ role: 'SALES', sections: ['sales'] });
+    renderAdmin();
+    expect(await screen.findByRole('heading', { name: 'Sales' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByText(/founder/i)).not.toBeInTheDocument();
+    expect(admin.fetchAdminSection).toHaveBeenCalledWith('sales');
+  });
+
+  it('gives FOUNDER three tabs and switches between them', async () => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue({ role: 'FOUNDER', sections: ['founder', 'sales', 'tech'] });
+    const user = userEvent.setup();
+    renderAdmin();
+
+    expect(await screen.findByRole('tab', { name: 'Founder' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('tab', { name: 'Tech' }));
+    expect(screen.getByRole('tab', { name: 'Tech' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('heading', { name: 'Tech' })).toBeInTheDocument();
+    expect(admin.fetchAdminSection).toHaveBeenCalledWith('tech');
+  });
+
+  it('links back to Settings', async () => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue({ role: 'TECH', sections: ['tech'] });
+    renderAdmin();
+    expect(await screen.findByRole('link', { name: /settings/i })).toHaveAttribute('href', '/barber/settings');
+  });
+});
