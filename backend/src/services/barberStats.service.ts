@@ -1,3 +1,4 @@
+// backend/src/services/barberStats.service.ts
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 

@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
 import { requireAdminRole } from '../middleware/admin.middleware';
 import { getAdminMe, getSectionStatus } from '../controllers/admin.controller';
+import { getOverview } from '../controllers/founder.controller';
 
 const router = Router();
 
@@ -15,6 +16,7 @@ router.get('/me', requireAdminRole(), getAdminMe);
 const founder = Router();
 founder.use(requireAdminRole('FOUNDER'));
 founder.get('/', getSectionStatus('founder'));
+founder.get('/overview', getOverview); // Slice 1
 
 const sales = Router();
 sales.use(requireAdminRole('SALES'));

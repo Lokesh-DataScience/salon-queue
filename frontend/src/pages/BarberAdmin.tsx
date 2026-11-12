@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { fetchAdminMe, fetchAdminSection, type AdminSection } from '../api/admin';
+import FounderPanel from '../components/admin/FounderPanel';
 
 const LABELS: Record<AdminSection, string> = {
   founder: 'Founder',
@@ -107,7 +108,7 @@ export default function BarberAdmin() {
         aria-labelledby={hasTabs ? `admin-tab-${active}` : undefined}
       >
         <h2 className="mb-3 text-lg font-semibold">{LABELS[active]}</h2>
-        <SectionPanel section={active} />
+        {active === 'founder' ? <FounderPanel /> : <SectionPanel section={active} />}
       </section>
     </PageShell>
   );
