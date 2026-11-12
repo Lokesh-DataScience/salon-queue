@@ -18,6 +18,7 @@ export const ACTION_LABEL: Record<string, string> = {
   'sales.lead_delete': 'Deleted a lead',
   'admin.grant': 'Gave admin access',
   'admin.revoke': 'Removed admin access',
+  'tech.bug_status': 'Changed a bug report',
 };
 
 const GROUPS: { id: AuditGroup | 'all'; label: string }[] = [
@@ -26,6 +27,7 @@ const GROUPS: { id: AuditGroup | 'all'; label: string }[] = [
   { id: 'staff', label: 'Passwords' },
   { id: 'sales', label: 'Sales' },
   { id: 'admin', label: 'Team' },
+  { id: 'tech', label: 'Tech' },
 ];
 
 const fmtWhen = (iso: string) =>

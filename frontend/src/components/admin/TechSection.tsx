@@ -1,14 +1,16 @@
 // frontend/src/components/admin/TechSection.tsx
-// The Tech tab: Health (Slice 7), Errors & sign-ins (Slice 8) and Queues (Slice 9). Kept in the address (?view=).
+// The Tech tab: Health (7), Errors & sign-ins (8), Queues (9) and Bugs (10). Kept in the address (?view=).
 import { useSearchParams } from 'react-router-dom';
 import TechPanel from './TechPanel';
 import EventsPanel from './EventsPanel';
 import QueueHealthPanel from './QueueHealthPanel';
+import BugsPanel from './BugsPanel';
 
 const VIEWS = [
   { id: 'health', label: 'Health' },
   { id: 'events', label: 'Errors & sign-ins' },
   { id: 'queues', label: 'Queues' },
+  { id: 'bugs', label: 'Bugs' },
 ] as const;
 type View = (typeof VIEWS)[number]['id'];
 
@@ -25,7 +27,7 @@ export default function TechSection() {
 
   return (
     <div className="grid gap-4">
-      <div role="group" aria-label="Tech view" className="grid grid-cols-3 gap-2">
+      <div role="group" aria-label="Tech view" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {VIEWS.map((v) => {
           const on = v.id === view;
           return (
@@ -41,6 +43,7 @@ export default function TechSection() {
       {view === 'health' && <TechPanel />}
       {view === 'events' && <EventsPanel />}
       {view === 'queues' && <QueueHealthPanel />}
+      {view === 'bugs' && <BugsPanel />}
     </div>
   );
 }

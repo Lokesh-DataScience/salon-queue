@@ -121,7 +121,7 @@ export async function revokeAdmin(actor: Actor, staffId: string) {
 
 const PAGE = 50;
 
-export async function listAudit(opts: { group?: 'salon' | 'staff' | 'sales' | 'admin'; before?: number }) {
+export async function listAudit(opts: { group?: 'salon' | 'staff' | 'sales' | 'admin' | 'tech'; before?: number }) {
   let q = supabase
     .from('admin_audit_log')
     .select('id, created_at, actor_staff_id, actor_role, action, target_type, target_id, details, salon_staff(name, email)')

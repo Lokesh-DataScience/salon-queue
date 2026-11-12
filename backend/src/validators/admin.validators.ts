@@ -40,7 +40,7 @@ export const grantAdminBodySchema = z
   .strict();
 
 export const auditQuerySchema = z.object({
-  group: z.enum(['salon', 'staff', 'sales', 'admin']).optional(),
+  group: z.enum(['salon', 'staff', 'sales', 'admin', 'tech']).optional(),
   before: z.coerce.number().int().positive().optional(), // id cursor for "Load more"
 });
 
@@ -78,3 +78,22 @@ export const leadIdParamSchema = z.object({ leadId: z.string().uuid() });
 
 // Slice 9: Tech salon lookup
 export const techSalonSearchSchema = z.object({ search: z.string().trim().max(50).optional() });
+
+// Slice 10: bug reports
+export const BUG_STATUSES = ['new', 'investigating', 'fixed', 'wont_fix'] as const;
+
+export const bugReportBodySchema = z
+  .object({
+    kind: z.enum(['bug', 'idea', 'question']).default('bug'),
+    message: z.string().trim().min(5, 'Please write a few words about what happened.').max(2000, 'Please keep it under 2000 characters.'),
+    page: z.string().trim().max(200).optional(),
+    device: z.string().trim().max(300).optional(),
+  })
+  .strict();
+
+export const bugListQuerySchema = z.object({ status: z.enum(['open', 'all']).default('open') });
+export const bugIdParamSchema = z.object({ bugId: z.string().uuid() });
+export const bugUpdateBodySchema = z
+  .object({ status: z.enum(BUG_STATUSES).optional(), techNote: z.string().trim().max(1000).optional() })
+  .strict()
+  .refine((b) => b.status !== undefined || b.techNote !== undefined, { message: 'Nothing to update.' });

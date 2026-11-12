@@ -23,6 +23,7 @@ import BarberProfile from './pages/BarberProfile';
 import BarberServices from './pages/BarberServices';
 import BarberTeam from './pages/BarberTeam';
 import BarberAdmin from './pages/BarberAdmin';
+import BarberReport from './pages/BarberReport';
 
 function NotFound() {
   return (
@@ -67,6 +68,7 @@ function App() {
         <Route path="/barber/offers" element={<BarberOffers />} />
         <Route path="/barber/customers" element={<BarberCustomers />} />
         <Route path="/barber/admin" element={<BarberAdmin />} />
+        <Route path="/barber/report" element={<BarberReport />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -91,6 +91,7 @@ export default function BarberSettings() {
       <nav aria-label="Settings" className="grid gap-6">
         <RowList rows={salonRows} />
         <RowList rows={tools} />
+        <RowList rows={[{ to: '/barber/report', title: 'Report a problem', hint: 'Tell us what went wrong or what you need' }]} />
         {admin && <RowList rows={[{ to: '/barber/admin', title: 'Admin', hint: ADMIN_HINT[admin.role] }]} />}
         <LogoutRow />
       </nav>

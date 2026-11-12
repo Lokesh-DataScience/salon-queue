@@ -271,7 +271,7 @@ export function revokeAdminRole(staffId: string) {
   return apiFetch<{ ok: boolean }>(`/api/admin/founder/team/${staffId}`, { method: 'DELETE' });
 }
 
-export type AuditGroup = 'salon' | 'staff' | 'sales' | 'admin';
+export type AuditGroup = 'salon' | 'staff' | 'sales' | 'admin' | 'tech';
 
 export interface AuditEntry {
   id: number;
@@ -433,4 +433,30 @@ export function searchTechSalons(search: string) {
 
 export function fetchReadOnlyQueue(salonId: string) {
   return apiFetch<ReadOnlyQueue>(`/api/admin/tech/salons/${salonId}/queue`);
+}
+
+// ── Tech: bug reports (Slice 10) ──────────────────────────────────────────
+export type BugStatus = 'new' | 'investigating' | 'fixed' | 'wont_fix';
+
+export interface BugReport {
+  id: string;
+  createdAt: string;
+  kind: 'bug' | 'idea' | 'question';
+  message: string;
+  page: string | null;
+  device: string | null;
+  status: BugStatus;
+  techNote: string;
+  updatedAt: string;
+  salonId: string | null;
+  salonName: string | null;
+  reporter: { name: string; contact: string | null } | null;
+}
+
+export function fetchBugs(status: 'open' | 'all') {
+  return apiFetch<{ reports: BugReport[] }>(`/api/admin/tech/bugs?status=${status}`).then((r) => r.reports);
+}
+
+export function updateBug(id: string, patch: { status?: BugStatus; techNote?: string }) {
+  return apiFetch<{ report: { id: string } }>(`/api/admin/tech/bugs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }

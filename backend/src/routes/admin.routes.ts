@@ -19,6 +19,7 @@ import { getLeads, postLead, patchLead, removeLead } from '../controllers/leads.
 import { getHealth } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
 import { getQueueChecks, getTechSalons, getTechSalonQueue } from '../controllers/queueHealth.controller';
+import { getBugs, patchBug } from '../controllers/bugReports.controller';
 import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
 
 const router = Router();
@@ -69,6 +70,9 @@ tech.get('/events', getEvents); // Slice 8
 tech.get('/queues', getQueueChecks);
 tech.get('/salons', getTechSalons);
 tech.get('/salons/:salonId/queue', getTechSalonQueue);
+// Slice 10: bug reports
+tech.get('/bugs', getBugs);
+tech.patch('/bugs/:bugId', patchBug);
 
 router.use('/founder', founder);
 router.use('/sales', sales);

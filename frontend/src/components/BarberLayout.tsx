@@ -6,7 +6,7 @@ import { fetchMe, logoutBarber } from '../api/barber';
 import { SESSION_EXPIRED_EVENT } from '../api/client';
 
 // QR, Offers and Admin live under Settings, so the Settings tab stays highlighted on them.
-const SETTINGS_PATHS = ['/barber/settings', '/barber/qr', '/barber/offers', '/barber/admin'];
+const SETTINGS_PATHS = ['/barber/settings', '/barber/qr', '/barber/offers', '/barber/admin', '/barber/report'];
 
 const iconProps = {
   'aria-hidden': true,
