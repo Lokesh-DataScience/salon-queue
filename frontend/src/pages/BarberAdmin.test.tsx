@@ -19,6 +19,7 @@ vi.mock('../api/admin', () => ({
   deleteAdminSalon: vi.fn(),
   fetchSalesActivity: vi.fn(),
   updateSalesInfo: vi.fn(),
+  fetchTechHealth: vi.fn(),
 }));
 
 const renderAdmin = () => renderPage(<BarberAdmin />, { path: '/barber/admin', route: '/barber/admin' });
@@ -41,6 +42,7 @@ beforeEach(() => {
     days: [],
   });
   vi.mocked(admin.fetchSalesActivity).mockReset().mockResolvedValue({ today: '2026-11-12', salons: [], areas: [] });
+  vi.mocked(admin.fetchTechHealth).mockReset().mockRejectedValue(new Error('not needed in these tests'));
 });
 
 describe('BarberAdmin', () => {
@@ -69,7 +71,7 @@ describe('BarberAdmin', () => {
     await user.click(screen.getByRole('tab', { name: 'Tech' }));
     expect(screen.getByRole('tab', { name: 'Tech' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('heading', { name: 'Tech' })).toBeInTheDocument();
-    expect(admin.fetchAdminSection).toHaveBeenCalledWith('tech');
+    expect(admin.fetchTechHealth).toHaveBeenCalled();
   });
 
   it('links back to Settings', async () => {

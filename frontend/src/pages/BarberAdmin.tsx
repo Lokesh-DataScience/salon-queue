@@ -7,6 +7,7 @@ import PageShell from '../components/PageShell';
 import { fetchAdminMe, fetchAdminSection, type AdminSection } from '../api/admin';
 import FounderSection from '../components/admin/FounderSection';
 import SalesPanel from '../components/admin/SalesPanel';
+import TechPanel from '../components/admin/TechPanel';
 
 const LABELS: Record<AdminSection, string> = {
   founder: 'Founder',
@@ -109,7 +110,7 @@ export default function BarberAdmin() {
         aria-labelledby={hasTabs ? `admin-tab-${active}` : undefined}
       >
         <h2 className="mb-3 text-lg font-semibold">{LABELS[active]}</h2>
-        {active === 'founder' ? <FounderSection /> : active === 'sales' ? <SalesPanel /> : <SectionPanel section={active} />}
+        {active === 'founder' ? <FounderSection /> : active === 'sales' ? <SalesPanel /> : active === 'tech' ? <TechPanel /> : <SectionPanel section={active} />}
       </section>
     </PageShell>
   );

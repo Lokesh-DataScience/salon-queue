@@ -14,6 +14,7 @@ import {
   removeSalon,
 } from '../controllers/founderSalons.controller';
 import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
+import { getHealth } from '../controllers/tech.controller';
 
 const router = Router();
 
@@ -46,6 +47,7 @@ sales.patch('/salons/:salonId/info', patchSalesInfo);
 const tech = Router();
 tech.use(requireAdminRole('TECH'));
 tech.get('/', getSectionStatus('tech'));
+tech.get('/health', getHealth); // Slice 7
 
 router.use('/founder', founder);
 router.use('/sales', sales);

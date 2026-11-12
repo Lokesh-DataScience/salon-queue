@@ -181,3 +181,38 @@ export function updateSalesInfo(salonId: string, patch: { isPartner?: boolean; n
     { method: 'PATCH', body: JSON.stringify(patch) },
   );
 }
+
+// ── Tech tab: health panel (Slice 7) ──────────────────────────────────────
+export type CheckStatus = 'ok' | 'late' | 'failing' | 'unknown';
+
+export interface TechJob {
+  name: 'sweeper' | 'cleanup' | 'news' | 'pinger';
+  label: string;
+  schedule: string;
+  note: string | null;
+  status: CheckStatus;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastFailureCode: string | null;
+  detail: Record<string, number | string>;
+}
+
+export interface TechHealth {
+  checkedAt: string;
+  database: { status: CheckStatus; responseMs: number | null; errorCode: string | null };
+  jobs: TechJob[];
+  sockets: number | null;
+  server: {
+    startedAt: string;
+    uptimeSeconds: number;
+    memoryMb: number;
+    heapUsedMb: number;
+    nodeVersion: string;
+    environment: string;
+  };
+  build: { commit: string | null; branch: string | null };
+}
+
+export function fetchTechHealth() {
+  return apiFetch<TechHealth>('/api/admin/tech/health');
+}

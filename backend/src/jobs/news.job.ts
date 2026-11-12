@@ -1,5 +1,6 @@
 // backend/src/jobs/news.job.ts
 import { refreshAllStaleFeeds } from '../services/news.service';
+import { errorCode, recordFailure, recordSuccess } from '../services/heartbeat.service';
 
 const TICK_MS = 15 * 60 * 1000;
 
@@ -10,8 +11,10 @@ export function startNewsJob() {
     try {
       const r = await refreshAllStaleFeeds();
       if (r.refreshed > 0) console.log(`[news] refreshed ${r.refreshed} of ${r.checked} feeds`);
-    } catch {
+      await recordSuccess('news', { refreshed: r.refreshed, checked: r.checked });
+    } catch (err) {
       console.error('[news] job failed');
+      await recordFailure('news', errorCode(err));
     }
   };
   setTimeout(tick, 15_000).unref();
