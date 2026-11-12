@@ -20,6 +20,16 @@ import { getHealth } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
 import { getQueueChecks, getTechSalons, getTechSalonQueue } from '../controllers/queueHealth.controller';
 import { getBugs, patchBug } from '../controllers/bugReports.controller';
+import {
+  getTestSalons,
+  postTestScan,
+  postTestWalkIn,
+  postTestFinish,
+  postTestPush,
+  postTestClear,
+  getFlags,
+  patchFlag,
+} from '../controllers/testTools.controller';
 import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
 
 const router = Router();
@@ -73,6 +83,15 @@ tech.get('/salons/:salonId/queue', getTechSalonQueue);
 // Slice 10: bug reports
 tech.get('/bugs', getBugs);
 tech.patch('/bugs/:bugId', patchBug);
+// Slice 11: testing tools (internal salons only) and feature flags
+tech.get('/test-salons', getTestSalons);
+tech.post('/test/:salonId/scan', postTestScan);
+tech.post('/test/:salonId/walk-in', postTestWalkIn);
+tech.post('/test/:salonId/finish', postTestFinish);
+tech.post('/test/:salonId/push', postTestPush);
+tech.post('/test/:salonId/clear', postTestClear);
+tech.get('/flags', getFlags);
+tech.patch('/flags/:key', patchFlag);
 
 router.use('/founder', founder);
 router.use('/sales', sales);

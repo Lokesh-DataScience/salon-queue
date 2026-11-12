@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-d
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMe, logoutBarber } from '../api/barber';
 import { SESSION_EXPIRED_EVENT } from '../api/client';
+import { fetchBarberFlags } from '../api/flags';
 
 // QR, Offers and Admin live under Settings, so the Settings tab stays highlighted on them.
 const SETTINGS_PATHS = ['/barber/settings', '/barber/qr', '/barber/offers', '/barber/admin', '/barber/report'];
@@ -75,6 +76,16 @@ export default function BarberLayout() {
   // Only a 401 sends them to login; a network blip should not log anyone out.
   const { data: me, error } = useQuery({ queryKey: ['barberMe'], queryFn: fetchMe, retry: false });
   const isOwner = me?.role === 'OWNER';
+  // Feature flags (Admin → Tech → Tools & flags). A failed load just means no notice.
+  const { data: flags } = useQuery({
+    queryKey: ['barberFlags'],
+    queryFn: fetchBarberFlags,
+    enabled: !!me,
+    retry: false,
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  const notice = flags?.barber_notice?.enabled ? flags.barber_notice.value.trim() : '';
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -110,6 +121,11 @@ export default function BarberLayout() {
   return (
     <>
       <div className="barber-nav-spacer">
+        {notice && (
+          <div role="status" className="border-b-2 border-ink bg-brand-soft px-4 py-2 text-center text-sm font-semibold text-ink print:hidden">
+            {notice}
+          </div>
+        )}
         <Outlet />
       </div>
 

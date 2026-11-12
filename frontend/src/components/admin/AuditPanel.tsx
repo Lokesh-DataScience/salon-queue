@@ -19,6 +19,12 @@ export const ACTION_LABEL: Record<string, string> = {
   'admin.grant': 'Gave admin access',
   'admin.revoke': 'Removed admin access',
   'tech.bug_status': 'Changed a bug report',
+  'tech.test_scan': 'Test: added a QR customer',
+  'tech.test_walk_in': 'Test: added a walk-in',
+  'tech.test_finish': 'Test: finished a service',
+  'tech.test_push': 'Test: sent a push',
+  'tech.test_clear': "Test: cleared a queue",
+  'tech.flag_update': 'Changed a feature flag',
 };
 
 const GROUPS: { id: AuditGroup | 'all'; label: string }[] = [

@@ -97,3 +97,13 @@ export const bugUpdateBodySchema = z
   .object({ status: z.enum(BUG_STATUSES).optional(), techNote: z.string().trim().max(1000).optional() })
   .strict()
   .refine((b) => b.status !== undefined || b.techNote !== undefined, { message: 'Nothing to update.' });
+
+// Slice 11: testing tools and feature flags
+export const testSalonParamSchema = z.object({ salonId: z.string().uuid() });
+export const testTokenBodySchema = z.object({ token: z.coerce.number().int().positive().optional() }).strict();
+export const testPushBodySchema = z.object({ token: z.coerce.number().int().positive() }).strict();
+export const flagKeyParamSchema = z.object({ key: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/) });
+export const flagUpdateBodySchema = z
+  .object({ enabled: z.boolean().optional(), value: z.string().trim().max(200).optional() })
+  .strict()
+  .refine((b) => b.enabled !== undefined || b.value !== undefined, { message: 'Nothing to update.' });

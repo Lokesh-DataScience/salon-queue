@@ -28,6 +28,7 @@ import {
 import { getCustomers, removeCustomer } from '../controllers/customers.controller';
 import { postRedeemPrize } from '../controllers/barber.controller';
 import { postBugReport, getMyBugReports } from '../controllers/bugReports.controller';
+import { getBarberFlags } from '../controllers/testTools.controller';
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in staff member
@@ -37,6 +38,8 @@ router.post('/me/password', postChangePassword);
 // Admin Slice 10: "Report a problem" (any signed-in staff; each sees only their own reports)
 router.get('/bug-reports', getMyBugReports);
 router.post('/bug-reports', postBugReport);
+// Admin Slice 11: feature flags the barber app reads (on/off + short text only)
+router.get('/flags', getBarberFlags);
 
 // ── Owner only: salon settings, services, stats, offers, team ──
 router.get('/salon', requireOwner, getProfile);

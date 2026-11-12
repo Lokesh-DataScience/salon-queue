@@ -7,6 +7,7 @@ import PageShell from '../components/PageShell';
 import { fetchMe, logoutBarber } from '../api/barber';
 import { fetchAdminMe, type AdminRole } from '../api/admin';
 import { MULTI_BARBER } from '../lib/multiBarber';
+import { fetchBarberFlags, flagOn } from '../api/flags';
 
 type Row = { to: string; title: string; hint: string };
 
@@ -78,6 +79,8 @@ export default function BarberSettings() {
   const { data: me } = useQuery({ queryKey: ['barberMe'], queryFn: fetchMe, retry: false });
   // Only internal admin accounts get an answer here; everyone else gets null and sees no row.
   const { data: admin } = useQuery({ queryKey: ['adminMe'], queryFn: fetchAdminMe, retry: false });
+  // "Report a problem" stays on unless Tech switches the bug_reports flag off.
+  const { data: flags } = useQuery({ queryKey: ['barberFlags'], queryFn: fetchBarberFlags, retry: false, staleTime: 60_000 });
   // The customer list is the owner's. Staff never see the row.
   const tools: Row[] =
     me?.role === 'OWNER'
@@ -91,7 +94,9 @@ export default function BarberSettings() {
       <nav aria-label="Settings" className="grid gap-6">
         <RowList rows={salonRows} />
         <RowList rows={tools} />
-        <RowList rows={[{ to: '/barber/report', title: 'Report a problem', hint: 'Tell us what went wrong or what you need' }]} />
+        {flagOn(flags, 'bug_reports', true) && (
+          <RowList rows={[{ to: '/barber/report', title: 'Report a problem', hint: 'Tell us what went wrong or what you need' }]} />
+        )}
         {admin && <RowList rows={[{ to: '/barber/admin', title: 'Admin', hint: ADMIN_HINT[admin.role] }]} />}
         <LogoutRow />
       </nav>

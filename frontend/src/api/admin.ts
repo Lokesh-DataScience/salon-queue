@@ -460,3 +460,40 @@ export function fetchBugs(status: 'open' | 'all') {
 export function updateBug(id: string, patch: { status?: BugStatus; techNote?: string }) {
   return apiFetch<{ report: { id: string } }>(`/api/admin/tech/bugs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }
+
+// Slice 11: testing tools (internal salons only) and feature flags
+export interface TestSalon {
+  id: string;
+  name: string;
+  hours: string;
+  isSuspended: boolean;
+}
+
+export interface AdminFlag {
+  key: string;
+  enabled: boolean;
+  value: string;
+  description: string;
+  updatedAt: string;
+}
+
+export type TestAction = 'scan' | 'walk-in' | 'finish' | 'push' | 'clear';
+
+export function fetchTestSalons() {
+  return apiFetch<{ salons: TestSalon[] }>('/api/admin/tech/test-salons').then((r) => r.salons);
+}
+
+export function runTestAction(salonId: string, action: TestAction, body: { token?: number } = {}) {
+  return apiFetch<{ token?: number; tokens?: number[]; ticketUrl?: string; cancelled?: number }>(
+    `/api/admin/tech/test/${salonId}/${action}`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function fetchFlags() {
+  return apiFetch<{ flags: AdminFlag[] }>('/api/admin/tech/flags').then((r) => r.flags);
+}
+
+export function updateFlag(key: string, patch: { enabled?: boolean; value?: string }) {
+  return apiFetch<{ ok: true }>(`/api/admin/tech/flags/${key}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}

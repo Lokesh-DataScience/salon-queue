@@ -6,6 +6,7 @@ import BarberSettings from './BarberSettings';
 import { renderPage } from '../test/utils';
 import * as barber from '../api/barber';
 import * as admin from '../api/admin';
+import * as flags from '../api/flags';
 
 vi.mock('../api/barber', () => ({
   logoutBarber: vi.fn(),
@@ -13,6 +14,10 @@ vi.mock('../api/barber', () => ({
 }));
 vi.mock('../api/admin', () => ({ fetchAdminMe: vi.fn() }));
 vi.mock('../lib/multiBarber', () => ({ MULTI_BARBER: false }));
+vi.mock('../api/flags', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api/flags')>()),
+  fetchBarberFlags: vi.fn(),
+}));
 
 const OWNER = { id: 'staff-1', name: 'Owner', role: 'OWNER' as const, salonId: 'salon-1', laneId: null, laneName: null };
 
@@ -22,6 +27,7 @@ beforeEach(() => {
   vi.mocked(barber.logoutBarber).mockReset();
   vi.mocked(barber.fetchMe).mockReset().mockResolvedValue(OWNER);
   vi.mocked(admin.fetchAdminMe).mockReset().mockResolvedValue(null); // a normal barber
+  vi.mocked(flags.fetchBarberFlags).mockReset().mockResolvedValue({});
 });
 
 describe('BarberSettings menu', () => {
@@ -75,5 +81,17 @@ describe('BarberSettings menu', () => {
     await user.click(await screen.findByRole('button', { name: 'Log out' }));
     expect(barber.logoutBarber).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('OTHER PAGE')).toBeInTheDocument();
+  });
+
+  it('shows "Report a problem" unless the bug_reports flag is off', async () => {
+    renderSettings();
+    expect(await screen.findByRole('link', { name: /report a problem/i })).toHaveAttribute('href', '/barber/report');
+  });
+
+  it('hides "Report a problem" when Tech switches the flag off', async () => {
+    vi.mocked(flags.fetchBarberFlags).mockResolvedValue({ bug_reports: { enabled: false, value: '' } });
+    renderSettings();
+    await screen.findByRole('link', { name: /salon profile/i });
+    await vi.waitFor(() => expect(screen.queryByRole('link', { name: /report a problem/i })).not.toBeInTheDocument());
   });
 });
