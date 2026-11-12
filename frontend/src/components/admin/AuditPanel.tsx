@@ -13,6 +13,9 @@ export const ACTION_LABEL: Record<string, string> = {
   'salon.delete': 'Deleted a salon',
   'staff.password_reset': 'Reset a password',
   'sales.update_info': 'Edited sales notes',
+  'sales.lead_create': 'Added a lead',
+  'sales.lead_update': 'Updated a lead',
+  'sales.lead_delete': 'Deleted a lead',
   'admin.grant': 'Gave admin access',
   'admin.revoke': 'Removed admin access',
 };
@@ -21,7 +24,7 @@ const GROUPS: { id: AuditGroup | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'salon', label: 'Salons' },
   { id: 'staff', label: 'Passwords' },
-  { id: 'sales', label: 'Sales notes' },
+  { id: 'sales', label: 'Sales' },
   { id: 'admin', label: 'Team' },
 ];
 
@@ -40,6 +43,8 @@ function summary(e: AuditEntry) {
   if (d.isPartner === false) parts.push('unmarked partner');
   if (d.notesChanged) parts.push('notes changed');
   if (d.salonMarkedInternal === true) parts.push('salon marked internal');
+  if (typeof d.status === 'string' && typeof d.previousStatus === 'string') parts.push(`${d.previousStatus} → ${d.status}`);
+  if (typeof d.linkedSalon === 'string') parts.push(`linked to ${d.linkedSalon}`);
   return parts.join(' · ');
 }
 

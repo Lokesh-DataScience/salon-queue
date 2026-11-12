@@ -15,6 +15,7 @@ import {
 } from '../controllers/founderSalons.controller';
 import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
 import { getOnboardingFunnel } from '../controllers/onboarding.controller';
+import { getLeads, postLead, patchLead, removeLead } from '../controllers/leads.controller';
 import { getHealth } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
 import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
@@ -52,6 +53,11 @@ sales.get('/', getSectionStatus('sales'));
 sales.get('/activity', getActivity);
 sales.patch('/salons/:salonId/info', patchSalesInfo);
 sales.get('/onboarding', getOnboardingFunnel); // Slice 5
+// Slice 6: leads
+sales.get('/leads', getLeads);
+sales.post('/leads', postLead);
+sales.patch('/leads/:leadId', patchLead);
+sales.delete('/leads/:leadId', removeLead);
 
 const tech = Router();
 tech.use(requireAdminRole('TECH'));

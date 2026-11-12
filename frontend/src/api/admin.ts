@@ -318,3 +318,40 @@ export interface OnboardingFunnel {
 export function fetchSalesOnboarding(period: OnboardingPeriod) {
   return apiFetch<OnboardingFunnel>(`/api/admin/sales/onboarding?period=${period}`);
 }
+
+// ── Sales: leads (Slice 6) ────────────────────────────────────────────────
+export type LeadStatus = 'new' | 'contacted' | 'demo' | 'interested' | 'not_interested' | 'converted';
+
+export interface Lead {
+  id: string;
+  name: string;
+  ownerName: string;
+  phone: string;
+  area: string;
+  address: string;
+  status: LeadStatus;
+  followUpOn: string | null; // YYYY-MM-DD
+  notes: string;
+  salonId: string | null;
+  salonName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type LeadInput = Partial<Omit<Lead, 'id' | 'salonName' | 'createdAt' | 'updatedAt'>>;
+
+export function fetchLeads() {
+  return apiFetch<{ today: string; leads: Lead[] }>('/api/admin/sales/leads');
+}
+
+export function createLead(input: LeadInput & { name: string }) {
+  return apiFetch<{ lead: Lead }>('/api/admin/sales/leads', { method: 'POST', body: JSON.stringify(input) }).then((r) => r.lead);
+}
+
+export function updateLead(id: string, input: LeadInput) {
+  return apiFetch<{ lead: Lead }>(`/api/admin/sales/leads/${id}`, { method: 'PATCH', body: JSON.stringify(input) }).then((r) => r.lead);
+}
+
+export function deleteLead(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/admin/sales/leads/${id}`, { method: 'DELETE' });
+}

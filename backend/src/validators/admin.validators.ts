@@ -46,3 +46,32 @@ export const auditQuerySchema = z.object({
 
 // Slice 5: onboarding period
 export const onboardingQuerySchema = z.object({ period: z.enum(['30', '90', 'all']).default('30') });
+
+// Slice 6: leads
+export const LEAD_STATUSES = ['new', 'contacted', 'demo', 'interested', 'not_interested', 'converted'] as const;
+
+const leadFields = {
+  name: z.string().trim().min(1, 'Enter the salon name.').max(120),
+  ownerName: z.string().trim().max(120),
+  phone: z.string().trim().max(20),
+  area: z.string().trim().max(120),
+  address: z.string().trim().max(300),
+  status: z.enum(LEAD_STATUSES),
+  followUpOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-11-20.').nullable(),
+  notes: z.string().max(2000, 'Notes can be at most 2000 characters.'),
+  salonId: z.string().uuid().nullable(),
+};
+
+export const createLeadBodySchema = z
+  .object({ ...leadFields })
+  .partial()
+  .required({ name: true })
+  .strict();
+
+export const updateLeadBodySchema = z
+  .object({ ...leadFields })
+  .partial()
+  .strict()
+  .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to update.' });
+
+export const leadIdParamSchema = z.object({ leadId: z.string().uuid() });
