@@ -2,7 +2,7 @@
 // Internal admin pages. The server decides everything; this only asks.
 import { apiFetch, ApiError } from './client';
 
-export type AdminRole = 'FOUNDER' | 'SALES' | 'TECH';
+export type AdminRole = 'FOUNDER' | 'COFOUNDER' | 'SALES' | 'TECH';
 export type AdminSection = 'founder' | 'sales' | 'tech';
 
 export interface AdminMe {
@@ -260,7 +260,7 @@ export function fetchTeam() {
   return apiFetch<{ admins: TeamMember[] }>('/api/admin/founder/team').then((r) => r.admins);
 }
 
-export function grantAdminRole(input: { identifier: string; role: 'SALES' | 'TECH'; markSalonInternal: boolean; note?: string }) {
+export function grantAdminRole(input: { identifier: string; role: 'COFOUNDER' | 'SALES' | 'TECH'; markSalonInternal: boolean; note?: string }) {
   return apiFetch<{ staffId: string; role: AdminRole }>('/api/admin/founder/team', {
     method: 'POST',
     body: JSON.stringify(input),

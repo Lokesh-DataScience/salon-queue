@@ -9,6 +9,7 @@ import * as admin from '../../api/admin';
 import type { TeamMember } from '../../api/admin';
 
 vi.mock('../../api/admin', () => ({
+  fetchAdminMe: vi.fn(),
   fetchTeam: vi.fn(),
   grantAdminRole: vi.fn(),
   revokeAdminRole: vi.fn(),
@@ -27,6 +28,7 @@ const partner: TeamMember = {
 const render = (ui: React.ReactElement) => renderPage(ui, { path: '/barber/admin', route: '/barber/admin' });
 
 beforeEach(() => {
+  vi.mocked(admin.fetchAdminMe).mockReset().mockResolvedValue({ role: 'FOUNDER', sections: ['founder', 'sales', 'tech'] });
   vi.mocked(admin.fetchTeam).mockReset().mockResolvedValue([me, partner]);
   vi.mocked(admin.grantAdminRole).mockReset().mockResolvedValue({ staffId: 'x', role: 'TECH' });
   vi.mocked(admin.revokeAdminRole).mockReset().mockResolvedValue({ ok: true });
@@ -86,5 +88,28 @@ describe('AuditPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Team' }));
     expect(admin.fetchAudit).toHaveBeenLastCalledWith({ group: 'admin', before: undefined });
+  });
+});
+
+describe('TeamPanel as Cofounder', () => {
+  it('shows the team but cannot give or remove access', async () => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue({ role: 'COFOUNDER', sections: ['founder', 'sales', 'tech'] });
+    vi.mocked(admin.fetchTeam).mockResolvedValue([{ ...me, isYou: false }, partner, { ...partner, staffId: 'c1', role: 'COFOUNDER', name: 'Co', isYou: true }]);
+    render(<TeamPanel />);
+    const list = await screen.findByRole('region', { name: 'Admins' });
+    expect(await within(list).findByText('Cofounder')).toBeInTheDocument();
+    expect(await screen.findByText(/view only/i)).toBeInTheDocument();
+    expect(within(list).queryByRole('button', { name: /remove admin access/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Give admin access' })).not.toBeInTheDocument();
+  });
+
+  it('the founder can give Cofounder access', async () => {
+    const user = userEvent.setup();
+    render(<TeamPanel />);
+    await user.type(await screen.findByLabelText('Their email or phone'), 'co@example.com');
+    await user.click(screen.getByRole('radio', { name: 'Cofounder' }));
+    expect(screen.getByText(/can't change salons or admin access/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Give access' }));
+    expect(admin.grantAdminRole).toHaveBeenCalledWith({ identifier: 'co@example.com', role: 'COFOUNDER', markSalonInternal: true, note: undefined });
   });
 });

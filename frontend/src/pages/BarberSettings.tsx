@@ -26,6 +26,7 @@ const toolRows: Row[] = [
 
 const ADMIN_HINT: Record<AdminRole, string> = {
   FOUNDER: 'Founder, sales and tech pages',
+  COFOUNDER: 'Founder, sales and tech pages',
   SALES: 'Sales page',
   TECH: 'Tech page',
 };

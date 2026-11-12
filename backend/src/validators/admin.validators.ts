@@ -33,7 +33,7 @@ export const salesInfoBodySchema = z
 export const grantAdminBodySchema = z
   .object({
     identifier: z.string().trim().min(3).max(200), // the account's email or phone
-    role: z.enum(['SALES', 'TECH']),
+    role: z.enum(['COFOUNDER', 'SALES', 'TECH']),
     markSalonInternal: z.boolean().default(true),
     note: z.string().trim().max(200).optional(),
   })

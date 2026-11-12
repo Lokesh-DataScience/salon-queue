@@ -8,6 +8,7 @@ import * as admin from '../../api/admin';
 import type { AdminSalonDetail, AdminSalonSummary } from '../../api/admin';
 
 vi.mock('../../api/admin', () => ({
+  fetchAdminMe: vi.fn(),
   fetchAdminSalons: vi.fn(),
   fetchAdminSalon: vi.fn(),
   createAdminSalon: vi.fn(),
@@ -39,6 +40,7 @@ const detail = (s: AdminSalonSummary): AdminSalonDetail => ({
 const renderIt = () => renderPage(<FounderSalons />, { path: '/barber/admin', route: '/barber/admin' });
 
 beforeEach(() => {
+  vi.mocked(admin.fetchAdminMe).mockReset().mockResolvedValue({ role: 'FOUNDER', sections: ['founder', 'sales', 'tech'] });
   vi.mocked(admin.fetchAdminSalons).mockReset().mockResolvedValue([REAL, DEMO]);
   vi.mocked(admin.fetchAdminSalon).mockReset().mockImplementation(async (id) => detail(id === DEMO.id ? DEMO : { ...REAL, isSuspended: false }));
   vi.mocked(admin.setSalonSuspended).mockReset().mockResolvedValue({ salon: { id: REAL.id, isSuspended: true } });
@@ -99,5 +101,27 @@ describe('FounderSalons', () => {
     await user.click(screen.getByRole('button', { name: 'Set new password' }));
     expect(admin.resetStaffPassword).toHaveBeenCalledWith('staff-1', 'founder-pass', 'brand-new-pass');
     expect(await screen.findByText(/password changed/i)).toBeInTheDocument();
+  });
+});
+
+describe('FounderSalons as Cofounder', () => {
+  beforeEach(() => {
+    vi.mocked(admin.fetchAdminMe).mockResolvedValue({ role: 'COFOUNDER', sections: ['founder', 'sales', 'tech'] });
+  });
+
+  it('shows the list but no Add a salon button', async () => {
+    renderIt();
+    await screen.findByRole('list', { name: 'Salons' });
+    await vi.waitFor(() => expect(admin.fetchAdminMe).toHaveBeenCalled());
+    await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Add a salon' })).not.toBeInTheDocument());
+  });
+
+  it('shows salon details and staff, with no buttons that change anything', async () => {
+    renderPage(<FounderSalons />, { path: '/barber/admin', route: '/barber/admin?salon=salon-demo' });
+    expect(await screen.findByText(/view only/i)).toBeInTheDocument();
+    expect(screen.getByText('milan@example.com')).toBeInTheDocument();
+    for (const name of [/reset password/i, /suspend salon/i, /mark as/i, /delete salon forever/i]) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
   });
 });

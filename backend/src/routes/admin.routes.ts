@@ -1,7 +1,7 @@
 // backend/src/routes/admin.routes.ts
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
-import { requireAdminRole } from '../middleware/admin.middleware';
+import { requireAdminRole, requireFounder } from '../middleware/admin.middleware';
 import { getAdminMe, getSectionStatus } from '../controllers/admin.controller';
 import { getOverview } from '../controllers/founder.controller';
 import {
@@ -41,21 +41,22 @@ router.get('/me', requireAdminRole(), getAdminMe);
 // One sub-router per section. The guard sits on the sub-router, so every route a later
 // slice adds inside it is protected automatically.
 const founder = Router();
-founder.use(requireAdminRole('FOUNDER'));
+founder.use(requireAdminRole('FOUNDER')); // FOUNDER and COFOUNDER can view
+const onlyFounder = requireFounder(); // changes: FOUNDER only
 founder.get('/', getSectionStatus('founder'));
 founder.get('/overview', getOverview); // Slice 1
 // Slice 2: salon management
 founder.get('/salons', getSalons);
-founder.post('/salons', postSalon);
+founder.post('/salons', onlyFounder, postSalon);
 founder.get('/salons/:salonId', getSalonDetail);
-founder.post('/salons/:salonId/suspension', postSuspension);
-founder.post('/salons/:salonId/internal', postInternal);
-founder.delete('/salons/:salonId', removeSalon);
-founder.post('/staff/:staffId/password', postStaffPassword);
+founder.post('/salons/:salonId/suspension', onlyFounder, postSuspension);
+founder.post('/salons/:salonId/internal', onlyFounder, postInternal);
+founder.delete('/salons/:salonId', onlyFounder, removeSalon);
+founder.post('/staff/:staffId/password', onlyFounder, postStaffPassword);
 // Slice 3: team (admin roles) and audit log
 founder.get('/team', getTeam);
-founder.post('/team', postTeam);
-founder.delete('/team/:staffId', deleteTeam);
+founder.post('/team', onlyFounder, postTeam);
+founder.delete('/team/:staffId', onlyFounder, deleteTeam);
 founder.get('/audit', getAudit);
 
 const sales = Router();

@@ -1,5 +1,6 @@
 // backend/src/services/founderTeam.service.ts
-// Founder-only: who has admin access, give/remove SALES or TECH, and read the audit log.
+// Who has admin access, give/remove COFOUNDER, SALES or TECH, and read the audit log.
+// Viewing: FOUNDER and COFOUNDER. Giving/removing: FOUNDER only (requireFounder on the route).
 // FOUNDER itself is only ever granted in Supabase, and nobody can change their own role here.
 import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
@@ -71,7 +72,7 @@ async function currentRole(staffId: string): Promise<AdminRole | null> {
 
 export async function grantAdmin(
   actor: Actor,
-  input: { identifier: string; role: 'SALES' | 'TECH'; markSalonInternal: boolean; note?: string },
+  input: { identifier: string; role: 'COFOUNDER' | 'SALES' | 'TECH'; markSalonInternal: boolean; note?: string },
 ) {
   const staff = await findStaff(input.identifier);
   if (staff.id === actor.staffId) throw new AppError("You can't change your own role.", 409);

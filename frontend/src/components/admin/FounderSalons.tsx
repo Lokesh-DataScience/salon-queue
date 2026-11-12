@@ -7,6 +7,7 @@ import { fetchAdminSalons } from '../../api/admin';
 import SalonBadges from './SalonBadges';
 import SalonAdminDetail from './SalonAdminDetail';
 import NewSalonForm from './NewSalonForm';
+import { useFounderReadOnly } from './useAdminRole';
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
@@ -17,6 +18,7 @@ export default function FounderSalons() {
   const [draft, setDraft] = useState('');
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
+  const readOnly = useFounderReadOnly(); // Cofounder: can look, can't add
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['adminSalons', search],
@@ -32,7 +34,7 @@ export default function FounderSalons() {
   }
 
   if (selected) return <SalonAdminDetail salonId={selected} onBack={() => open(null)} />;
-  if (adding) {
+  if (adding && !readOnly) {
     return (
       <NewSalonForm
         onCancel={() => setAdding(false)}
@@ -67,9 +69,11 @@ export default function FounderSalons() {
         <button type="submit" className="btn-secondary min-h-12 px-4">Search</button>
       </form>
 
-      <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
-        Add a salon
-      </button>
+      {!readOnly && (
+        <button type="button" className="btn-primary" onClick={() => setAdding(true)}>
+          Add a salon
+        </button>
+      )}
 
       {isLoading && <p role="status" className="text-gray-600">Loading salons...</p>}
       {isError && (

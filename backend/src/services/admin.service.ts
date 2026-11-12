@@ -4,7 +4,7 @@
 // Founder tab) — never by any barber endpoint.
 import { supabase } from '../config/supabase';
 
-export const ADMIN_ROLES = ['FOUNDER', 'SALES', 'TECH'] as const;
+export const ADMIN_ROLES = ['FOUNDER', 'COFOUNDER', 'SALES', 'TECH'] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 export const ADMIN_SECTIONS = ['founder', 'sales', 'tech'] as const;
@@ -16,9 +16,10 @@ const SECTION_ROLE: Record<AdminSection, AdminRole> = {
   tech: 'TECH',
 };
 
-// FOUNDER sees every section; everyone else only their own.
+// FOUNDER and COFOUNDER see every section; everyone else only their own.
+// (COFOUNDER can't make salon or team changes — see requireFounder.)
 export function sectionsFor(role: AdminRole): AdminSection[] {
-  if (role === 'FOUNDER') return [...ADMIN_SECTIONS];
+  if (role === 'FOUNDER' || role === 'COFOUNDER') return [...ADMIN_SECTIONS];
   return ADMIN_SECTIONS.filter((s) => SECTION_ROLE[s] === role);
 }
 

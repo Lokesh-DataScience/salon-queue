@@ -1,5 +1,6 @@
 // frontend/src/components/admin/SalonAdminDetail.tsx
 // One salon, for the founder: suspend, mark internal, reset a staff password, delete (internal only).
+// A Cofounder sees the same details with no action buttons.
 // Every risky action asks for a second, explicit tap — no browser pop-ups.
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import {
   type AdminStaff,
 } from '../../api/admin';
 import SalonBadges from './SalonBadges';
+import { FOUNDER_ONLY_NOTE, useFounderReadOnly } from './useAdminRole';
 
 const errText = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.');
 
@@ -74,6 +76,7 @@ export default function SalonAdminDetail({ salonId, onBack }: { salonId: string;
     queryFn: () => fetchAdminSalon(salonId),
     retry: false,
   });
+  const readOnly = useFounderReadOnly();
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [deleteName, setDeleteName] = useState('');
 
@@ -125,6 +128,7 @@ export default function SalonAdminDetail({ salonId, onBack }: { salonId: string;
         </div>
         <p className="mt-1 text-sm text-gray-700">{s.address}</p>
         <p className="text-sm text-gray-700">Salon phone: {s.phone}</p>
+        {readOnly && <p className="mt-2 text-sm font-semibold text-gray-700">{FOUNDER_ONLY_NOTE}</p>}
       </section>
 
       <section aria-label="Staff accounts" className="card">
@@ -136,66 +140,70 @@ export default function SalonAdminDetail({ salonId, onBack }: { salonId: string;
                 {m.name} <span className="text-sm font-normal text-gray-600">({m.role.toLowerCase()}{m.isActive ? '' : ', switched off'})</span>
               </p>
               <p className="text-sm text-gray-600">{m.email ?? m.phone ?? '—'}</p>
-              <div className="mt-2"><ResetPassword member={m} /></div>
+              {!readOnly && <div className="mt-2"><ResetPassword member={m} /></div>}
             </li>
           ))}
         </ul>
       </section>
 
-      <section aria-label="Suspension" className="card">
-        <h3 className="mb-1 text-base font-semibold">{s.isSuspended ? 'Suspended' : 'Suspend salon'}</h3>
-        <p className="mb-3 text-sm text-gray-600">
-          {s.isSuspended
-            ? 'Customers cannot take new tokens and staff cannot sign in.'
-            : 'Stops new tokens and signs the staff out. Customers already waiting keep their tickets.'}
-        </p>
-        {suspend.isError && <p role="alert" className="mb-2 text-sm text-red-700">{errText(suspend.error)}</p>}
-        {s.isSuspended ? (
-          <button type="button" className="btn-primary" disabled={suspend.isPending} onClick={() => suspend.mutate(false)}>
-            {suspend.isPending ? 'Saving...' : 'Unsuspend salon'}
-          </button>
-        ) : confirmSuspend ? (
-          <div className="flex gap-2">
-            <button type="button" className="btn-primary flex-1 bg-red-700" disabled={suspend.isPending} onClick={() => suspend.mutate(true)}>
-              {suspend.isPending ? 'Suspending...' : `Yes, suspend ${s.name}`}
+      {!readOnly && (
+        <>
+          <section aria-label="Suspension" className="card">
+            <h3 className="mb-1 text-base font-semibold">{s.isSuspended ? 'Suspended' : 'Suspend salon'}</h3>
+            <p className="mb-3 text-sm text-gray-600">
+              {s.isSuspended
+                ? 'Customers cannot take new tokens and staff cannot sign in.'
+                : 'Stops new tokens and signs the staff out. Customers already waiting keep their tickets.'}
+            </p>
+            {suspend.isError && <p role="alert" className="mb-2 text-sm text-red-700">{errText(suspend.error)}</p>}
+            {s.isSuspended ? (
+              <button type="button" className="btn-primary" disabled={suspend.isPending} onClick={() => suspend.mutate(false)}>
+                {suspend.isPending ? 'Saving...' : 'Unsuspend salon'}
+              </button>
+            ) : confirmSuspend ? (
+              <div className="flex gap-2">
+                <button type="button" className="btn-primary flex-1 bg-red-700" disabled={suspend.isPending} onClick={() => suspend.mutate(true)}>
+                  {suspend.isPending ? 'Suspending...' : `Yes, suspend ${s.name}`}
+                </button>
+                <button type="button" className="btn-secondary px-4" onClick={() => setConfirmSuspend(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button type="button" className="btn-secondary" onClick={() => setConfirmSuspend(true)}>Suspend salon</button>
+            )}
+          </section>
+
+          <section aria-label="Internal" className="card">
+            <h3 className="mb-1 text-base font-semibold">Internal salon</h3>
+            <p className="mb-3 text-sm text-gray-600">Internal salons (your own, demo or test accounts) are left out of all numbers.</p>
+            {internal.isError && <p role="alert" className="mb-2 text-sm text-red-700">{errText(internal.error)}</p>}
+            <button type="button" className="btn-secondary" disabled={internal.isPending} onClick={() => internal.mutate(!s.isInternal)}>
+              {s.isInternal ? 'Mark as a real salon' : 'Mark as internal'}
             </button>
-            <button type="button" className="btn-secondary px-4" onClick={() => setConfirmSuspend(false)}>Cancel</button>
-          </div>
-        ) : (
-          <button type="button" className="btn-secondary" onClick={() => setConfirmSuspend(true)}>Suspend salon</button>
-        )}
-      </section>
+          </section>
 
-      <section aria-label="Internal" className="card">
-        <h3 className="mb-1 text-base font-semibold">Internal salon</h3>
-        <p className="mb-3 text-sm text-gray-600">Internal salons (your own, demo or test accounts) are left out of all numbers.</p>
-        {internal.isError && <p role="alert" className="mb-2 text-sm text-red-700">{errText(internal.error)}</p>}
-        <button type="button" className="btn-secondary" disabled={internal.isPending} onClick={() => internal.mutate(!s.isInternal)}>
-          {s.isInternal ? 'Mark as a real salon' : 'Mark as internal'}
-        </button>
-      </section>
-
-      {s.isInternal && (
-        <section aria-label="Delete salon" className="card border-red-300">
-          <h3 className="mb-1 text-base font-semibold text-red-800">Delete salon</h3>
-          <p className="mb-3 text-sm text-gray-600">
-            Removes this salon, its staff accounts and all its queue history. This cannot be undone.
-          </p>
-          <label htmlFor="confirm-name" className="mb-1 block text-sm font-medium">
-            Type <strong>{s.name}</strong> to confirm
-          </label>
-          <input id="confirm-name" className="field mb-3" value={deleteName} autoComplete="off"
-            onChange={(e) => setDeleteName(e.target.value)} />
-          {remove.isError && <p role="alert" className="mb-2 text-sm text-red-700">{errText(remove.error)}</p>}
-          <button
-            type="button"
-            className="btn-primary bg-red-700"
-            disabled={deleteName.trim() !== s.name.trim() || remove.isPending}
-            onClick={() => remove.mutate()}
-          >
-            {remove.isPending ? 'Deleting...' : 'Delete salon forever'}
-          </button>
-        </section>
+          {s.isInternal && (
+            <section aria-label="Delete salon" className="card border-red-300">
+              <h3 className="mb-1 text-base font-semibold text-red-800">Delete salon</h3>
+              <p className="mb-3 text-sm text-gray-600">
+                Removes this salon, its staff accounts and all its queue history. This cannot be undone.
+              </p>
+              <label htmlFor="confirm-name" className="mb-1 block text-sm font-medium">
+                Type <strong>{s.name}</strong> to confirm
+              </label>
+              <input id="confirm-name" className="field mb-3" value={deleteName} autoComplete="off"
+                onChange={(e) => setDeleteName(e.target.value)} />
+              {remove.isError && <p role="alert" className="mb-2 text-sm text-red-700">{errText(remove.error)}</p>}
+              <button
+                type="button"
+                className="btn-primary bg-red-700"
+                disabled={deleteName.trim() !== s.name.trim() || remove.isPending}
+                onClick={() => remove.mutate()}
+              >
+                {remove.isPending ? 'Deleting...' : 'Delete salon forever'}
+              </button>
+            </section>
+          )}
+        </>
       )}
     </div>
   );

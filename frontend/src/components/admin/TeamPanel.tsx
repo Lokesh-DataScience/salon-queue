@@ -1,23 +1,25 @@
 // frontend/src/components/admin/TeamPanel.tsx
-// Founder → Team: who has admin access; give or remove Sales / Tech access.
+// Founder → Team: who has admin access; give or remove Cofounder / Sales / Tech access.
 // Founder access itself is only changed in Supabase, and you can't change your own.
+// A Cofounder sees the list only.
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchTeam, grantAdminRole, revokeAdminRole, type TeamMember } from '../../api/admin';
+import { FOUNDER_ONLY_NOTE, useFounderReadOnly } from './useAdminRole';
 
-const ROLE_LABEL = { FOUNDER: 'Founder', SALES: 'Sales', TECH: 'Tech' } as const;
+const ROLE_LABEL = { FOUNDER: 'Founder', COFOUNDER: 'Cofounder', SALES: 'Sales', TECH: 'Tech' } as const;
 const errText = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.');
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
-function MemberRow({ m }: { m: TeamMember }) {
+function MemberRow({ m, readOnly }: { m: TeamMember; readOnly: boolean }) {
   const qc = useQueryClient();
   const [confirm, setConfirm] = useState(false);
   const remove = useMutation({
     mutationFn: () => revokeAdminRole(m.staffId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['adminTeam'] }),
   });
-  const locked = m.isYou || m.role === 'FOUNDER';
+  const locked = readOnly || m.isYou || m.role === 'FOUNDER';
 
   return (
     <li className="py-3">
@@ -54,7 +56,7 @@ function MemberRow({ m }: { m: TeamMember }) {
 function GrantForm() {
   const qc = useQueryClient();
   const [identifier, setIdentifier] = useState('');
-  const [role, setRole] = useState<'SALES' | 'TECH'>('SALES');
+  const [role, setRole] = useState<'COFOUNDER' | 'SALES' | 'TECH'>('SALES');
   const [markSalonInternal, setMarkSalonInternal] = useState(true);
   const [note, setNote] = useState('');
   const m = useMutation({
@@ -77,14 +79,19 @@ function GrantForm() {
       </div>
       <fieldset>
         <legend className="mb-1 text-sm font-medium">Access</legend>
-        <div className="grid grid-cols-2 gap-2">
-          {(['SALES', 'TECH'] as const).map((r) => (
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(['SALES', 'TECH', 'COFOUNDER'] as const).map((r) => (
             <label key={r} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 px-3 ${role === r ? 'border-ink bg-brand font-bold' : 'border-gray-300'}`}>
               <input type="radio" name="grant-role" value={r} checked={role === r} onChange={() => setRole(r)} className="h-5 w-5" />
               {ROLE_LABEL[r]}
             </label>
           ))}
         </div>
+        {role === 'COFOUNDER' && (
+          <p className="mt-2 text-sm text-gray-700">
+            Sees every admin page and can use Sales and Tech, but can't change salons or admin access.
+          </p>
+        )}
       </fieldset>
       <label className="flex min-h-12 items-center gap-3">
         <input type="checkbox" className="h-5 w-5" checked={markSalonInternal} onChange={(e) => setMarkSalonInternal(e.target.checked)} />
@@ -103,6 +110,7 @@ function GrantForm() {
 }
 
 export default function TeamPanel() {
+  const readOnly = useFounderReadOnly();
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['adminTeam'], queryFn: fetchTeam, retry: false });
 
   return (
@@ -118,12 +126,14 @@ export default function TeamPanel() {
         )}
         {data && (
           <ul className="divide-y divide-gray-200">
-            {data.map((m) => <MemberRow key={m.staffId} m={m} />)}
+            {data.map((m) => <MemberRow key={m.staffId} m={m} readOnly={readOnly} />)}
           </ul>
         )}
-        <p className="mt-2 text-xs text-gray-600">Founder access can only be given or removed in Supabase.</p>
+        <p className="mt-2 text-xs text-gray-600">
+          {readOnly ? FOUNDER_ONLY_NOTE : 'Founder access can only be given or removed in Supabase.'}
+        </p>
       </section>
-      <GrantForm />
+      {!readOnly && <GrantForm />}
     </div>
   );
 }
