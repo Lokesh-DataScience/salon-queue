@@ -11,6 +11,7 @@ import { assignPlaceToSalon } from './place.service';
 import { normalizePhone } from '../utils/phone';
 import { SALON_SUSPENDED_STAFF } from '../utils/suspension';
 import { tokenIssuedBeforeCutoff } from './sessionState.service';
+import { recordAuthEvent } from './events.service';
 
 // The embedded salon row can come back as an object or a one-item array depending on the client's typing.
 function salonSuspended(salons: unknown): boolean {
@@ -106,7 +107,15 @@ export async function rotateRefreshToken(refreshToken: string) {
   let payload: RefreshPayload;
   try {
     payload = verifyRefreshToken(refreshToken);
-  } catch {
+  } catch (err) {
+    // Admin Slice 8: say WHY in the Tech tab. decode() is only used to name the account, never to trust it.
+    const name = err instanceof Error ? err.name : '';
+    const code =
+      name === 'TokenExpiredError' ? 'REFRESH_EXPIRED'
+      : err instanceof Error && err.message === 'missing jti' ? 'REFRESH_OLD_FORMAT'
+      : 'REFRESH_INVALID';
+    const decoded = jwt.decode(refreshToken) as { staffId?: string } | null;
+    void recordAuthEvent(code, decoded?.staffId);
     throw new AppError(SESSION_ENDED, 401);
   }
 
@@ -116,17 +125,31 @@ export async function rotateRefreshToken(refreshToken: string) {
     .eq('id', payload.staffId)
     .maybeSingle();
   if (staffError) throw staffError; // infrastructure problem: 500, not a forced logout
-  if (!staff || !staff.is_active) throw new AppError(SESSION_ENDED, 401); // removed or switched-off staff end here
+  if (!staff || !staff.is_active) {
+    // removed or switched-off staff end here
+    void recordAuthEvent(staff ? 'STAFF_INACTIVE' : 'STAFF_NOT_FOUND', payload.staffId);
+    throw new AppError(SESSION_ENDED, 401);
+  }
   // Admin Slice 2: a suspended salon, or a founder password reset after this token was issued, ends the session.
-  if (salonSuspended(staff.salons)) throw new AppError(SALON_SUSPENDED_STAFF, 401);
+  if (salonSuspended(staff.salons)) {
+    void recordAuthEvent('SALON_SUSPENDED', payload.staffId);
+    throw new AppError(SALON_SUSPENDED_STAFF, 401);
+  }
   const cutoff = staff.sessions_valid_after ? Date.parse(staff.sessions_valid_after as string) : null;
-  if (tokenIssuedBeforeCutoff((payload as { iat?: number }).iat, cutoff)) throw new AppError(SESSION_ENDED, 401);
+  if (tokenIssuedBeforeCutoff((payload as { iat?: number }).iat, cutoff)) {
+    void recordAuthEvent('PASSWORD_RESET', payload.staffId);
+    throw new AppError(SESSION_ENDED, 401);
+  }
 
   const { error: claimError } = await supabase
     .from('revoked_tokens')
     .insert({ jti: payload.jti, expires_at: new Date(payload.exp * 1000).toISOString() });
   if (claimError) {
-    if (claimError.code === '23505') throw new AppError(SESSION_ENDED, 401); // already used or revoked
+    if (claimError.code === '23505') {
+      // already used or revoked: two refreshes racing, a replayed cookie, or a token from before logout
+      void recordAuthEvent('REFRESH_REUSED', payload.staffId);
+      throw new AppError(SESSION_ENDED, 401);
+    }
     throw claimError;
   }
 

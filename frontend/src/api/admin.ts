@@ -216,3 +216,27 @@ export interface TechHealth {
 export function fetchTechHealth() {
   return apiFetch<TechHealth>('/api/admin/tech/health');
 }
+
+// ── Tech tab: error and sign-in log (Slice 8) ─────────────────────────────
+export interface EventGroup {
+  kind: 'error' | 'auth' | 'rate_limit';
+  code: string;
+  route: string | null;
+  count: number;
+  lastAt: string;
+  accounts: number; // distinct staff accounts (sign-in problems only)
+}
+
+export interface EventSummary {
+  days: 1 | 7;
+  total: number;
+  truncated: boolean;
+  errors: EventGroup[];
+  auth: EventGroup[];
+  rateLimits: EventGroup[];
+  recent: { id: number; at: string; kind: EventGroup['kind']; code: string; route: string | null; status: number | null }[];
+}
+
+export function fetchTechEvents(days: 1 | 7) {
+  return apiFetch<EventSummary>(`/api/admin/tech/events?days=${days}`);
+}

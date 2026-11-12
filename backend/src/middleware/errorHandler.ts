@@ -1,6 +1,7 @@
 // backend/src/middleware/errorHandler.ts
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { recordEvent } from '../services/events.service';
 
 export class AppError extends Error {
   statusCode: number;
@@ -58,5 +59,7 @@ export function errorHandler(
 
   // req.path excludes the query string, so ?accessToken=... never reaches the log.
   console.error(`[error] ${req.method} ${req.path} ${describeError(err)}`);
+  // Admin Slice 8: the same name + code (never the message) goes to the Tech tab's error log.
+  void recordEvent({ kind: 'error', code: describeError(err).replace(' code=', ':'), route: `${req.method} ${req.path}`, status: 500 });
   res.status(500).json({ message: 'Something went wrong. Please try again.' });
 }

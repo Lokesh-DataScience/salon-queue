@@ -10,6 +10,7 @@ import {
   REFRESH_TOKEN_TTL_SECONDS,
 } from '../services/auth.service';
 import { AppError } from '../middleware/errorHandler';
+import { recordAuthEvent } from '../services/events.service';
 
 const isProd = env.NODE_ENV === 'production';
 
@@ -35,6 +36,10 @@ export async function postBarberLogin(req: Request, res: Response, next: NextFun
     setSessionCookies(res, tokens);
     res.status(200).json({ staff });
   } catch (err) {
+    // Admin Slice 8: counts only — never the email/phone that was typed.
+    if (err instanceof AppError && (err.statusCode === 401 || err.statusCode === 403)) {
+      void recordAuthEvent(err.statusCode === 401 ? 'LOGIN_FAILED' : 'LOGIN_REFUSED', null, '/api/auth/barber/login', err.statusCode);
+    }
     next(err);
   }
 }
@@ -42,7 +47,10 @@ export async function postBarberLogin(req: Request, res: Response, next: NextFun
 export async function postBarberRefresh(req: Request, res: Response, next: NextFunction) {
   try {
     const refreshToken = req.cookies?.refresh_token;
-    if (!refreshToken) throw new AppError('Not authenticated.', 401);
+    if (!refreshToken) {
+      void recordAuthEvent('REFRESH_NO_COOKIE');
+      throw new AppError('Not authenticated.', 401);
+    }
 
     const tokens = await rotateRefreshToken(refreshToken);
     setSessionCookies(res, tokens);

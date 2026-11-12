@@ -2,6 +2,7 @@
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { errorCode, recordFailure, recordSuccess } from '../services/heartbeat.service';
+import { pruneOldEvents } from '../services/events.service';
 
 let running = false;
 
@@ -36,6 +37,13 @@ async function runCleanup() {
     } else {
       console.log(`[cleanup] revokedTokensPruned=${count ?? 0}`);
       detail.revokedTokensPruned = count ?? 0;
+    }
+
+    // Admin Slice 8: the Tech tab's error/sign-in log keeps 14 days.
+    try {
+      detail.eventsPruned = await pruneOldEvents(14);
+    } catch (err) {
+      failed ??= `EVENTS_${errorCode(err)}`;
     }
 
     if (failed) await recordFailure('cleanup', failed);

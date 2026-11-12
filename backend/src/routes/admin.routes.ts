@@ -15,6 +15,7 @@ import {
 } from '../controllers/founderSalons.controller';
 import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
 import { getHealth } from '../controllers/tech.controller';
+import { getEvents } from '../controllers/techEvents.controller';
 
 const router = Router();
 
@@ -48,6 +49,7 @@ const tech = Router();
 tech.use(requireAdminRole('TECH'));
 tech.get('/', getSectionStatus('tech'));
 tech.get('/health', getHealth); // Slice 7
+tech.get('/events', getEvents); // Slice 8
 
 router.use('/founder', founder);
 router.use('/sales', sales);

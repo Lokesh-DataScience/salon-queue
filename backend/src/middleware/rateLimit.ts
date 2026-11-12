@@ -1,6 +1,8 @@
 import rateLimit from 'express-rate-limit';
+import { recordEvent } from '../services/events.service';
 
 function limiter(opts: {
+  name: string;
   windowMs: number;
   limit: number;
   message: string;
@@ -13,6 +15,11 @@ function limiter(opts: {
     legacyHeaders: false,
     skipSuccessfulRequests: opts.skipSuccessfulRequests ?? false,
     message: { message: opts.message }, // same {message} shape the frontend already reads
+    // Admin Slice 8: note which limit was hit (name + route shape only, no IP) for the Tech tab.
+    handler: (req, res, _next, options) => {
+      void recordEvent({ kind: 'rate_limit', code: opts.name, route: `${req.method} ${req.path}`, status: options.statusCode });
+      res.status(options.statusCode).send(options.message);
+    },
   });
 }
 
@@ -20,40 +27,47 @@ function limiter(opts: {
 export function createRateLimiters() {
   return {
     global: limiter({
+      name: 'global',
       windowMs: 60_000,
       limit: 300,
       message: 'Too many requests. Please slow down and try again shortly.',
     }),
     join: limiter({
+      name: 'join',
       windowMs: 15 * 60_000,
       limit: 20,
       message: 'Too many queue joins from this network. Please try again in a few minutes.',
     }),
     // Only failed attempts (status >= 400) count, so a barber who logs in correctly is never locked out.
     login: limiter({
+      name: 'login',
       windowMs: 15 * 60_000,
       limit: 10,
       skipSuccessfulRequests: true,
       message: 'Too many login attempts. Please try again in 15 minutes.',
     }),
     nearby: limiter({
+      name: 'nearby',
       windowMs: 60_000,
       limit: 60,
       message: 'Too many searches. Please wait a moment and try again.',
     }),
     ticket: limiter({
+      name: 'ticket',
       windowMs: 60_000,
       limit: 120,
       message: 'Too many requests. Please wait a moment and try again.',
     }),
         // Counts every attempt, successful or not: nobody legitimately registers more than a few salons an hour.
     register: limiter({
+      name: 'register',
       windowMs: 60 * 60_000,
       limit: 5,
       message: 'Too many sign-up attempts from this network. Please try again later.',
     }),
     // Internal admin pages: a few people clicking around, never thousands of calls.
     admin: limiter({
+      name: 'admin',
       windowMs: 60_000,
       limit: 120,
       message: 'Too many requests. Please wait a moment and try again.',
