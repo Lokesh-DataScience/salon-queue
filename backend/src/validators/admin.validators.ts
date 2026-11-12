@@ -75,3 +75,6 @@ export const updateLeadBodySchema = z
   .refine((b) => Object.keys(b).length > 0, { message: 'Nothing to update.' });
 
 export const leadIdParamSchema = z.object({ leadId: z.string().uuid() });
+
+// Slice 9: Tech salon lookup
+export const techSalonSearchSchema = z.object({ search: z.string().trim().max(50).optional() });

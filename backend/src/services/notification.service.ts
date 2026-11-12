@@ -2,6 +2,7 @@
 import * as webpush from 'web-push';
 import { env } from '../config/env';
 import { supabase } from '../config/supabase';
+import { recordPush } from './pushStats.service';
 
 export type NotificationEvent = 'QUEUE_APPROACHING' | 'TURN_NOW' | 'QUEUE_CANCELLED';
 
@@ -90,13 +91,16 @@ export class WebPushProvider implements NotificationProvider {
         JSON.stringify(message),
         { TTL: 300, urgency: 'high' }, // a "your turn" that arrives 20 minutes late is worse than none
       );
+      void recordPush('sent'); // Admin Slice 9b: accepted by the push service
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
       if (status === 404 || status === 410) {
         // The browser says this subscription is gone for good.
+        void recordPush('expired');
         await supabase.from('queue_entries').update({ push_subscription: null }).eq('id', target.entryId);
         return;
       }
+      void recordPush('failed', status ? `HTTP_${status}` : err instanceof Error ? err.name : 'Error'); // never the endpoint
       throw err;
     }
   }

@@ -18,6 +18,7 @@ import { getOnboardingFunnel } from '../controllers/onboarding.controller';
 import { getLeads, postLead, patchLead, removeLead } from '../controllers/leads.controller';
 import { getHealth } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
+import { getQueueChecks, getTechSalons, getTechSalonQueue } from '../controllers/queueHealth.controller';
 import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
 
 const router = Router();
@@ -64,6 +65,10 @@ tech.use(requireAdminRole('TECH'));
 tech.get('/', getSectionStatus('tech'));
 tech.get('/health', getHealth); // Slice 7
 tech.get('/events', getEvents); // Slice 8
+// Slice 9: queue health (read-only)
+tech.get('/queues', getQueueChecks);
+tech.get('/salons', getTechSalons);
+tech.get('/salons/:salonId/queue', getTechSalonQueue);
 
 router.use('/founder', founder);
 router.use('/sales', sales);

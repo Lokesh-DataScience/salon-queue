@@ -1,18 +1,21 @@
 // frontend/src/components/admin/TechSection.tsx
-// The Tech tab: "Health" (Slice 7) and "Errors & sign-ins" (Slice 8). The choice is kept in the address (?view=).
+// The Tech tab: Health (Slice 7), Errors & sign-ins (Slice 8) and Queues (Slice 9). Kept in the address (?view=).
 import { useSearchParams } from 'react-router-dom';
 import TechPanel from './TechPanel';
 import EventsPanel from './EventsPanel';
+import QueueHealthPanel from './QueueHealthPanel';
 
 const VIEWS = [
   { id: 'health', label: 'Health' },
   { id: 'events', label: 'Errors & sign-ins' },
+  { id: 'queues', label: 'Queues' },
 ] as const;
 type View = (typeof VIEWS)[number]['id'];
 
 export default function TechSection() {
   const [params, setParams] = useSearchParams();
-  const view: View = params.get('view') === 'events' ? 'events' : 'health';
+  const requested = params.get('view');
+  const view: View = VIEWS.some((v) => v.id === requested) ? (requested as View) : 'health';
 
   function choose(v: View) {
     const next = new URLSearchParams(params);
@@ -22,7 +25,7 @@ export default function TechSection() {
 
   return (
     <div className="grid gap-4">
-      <div role="group" aria-label="Tech view" className="grid grid-cols-2 gap-2">
+      <div role="group" aria-label="Tech view" className="grid grid-cols-3 gap-2">
         {VIEWS.map((v) => {
           const on = v.id === view;
           return (
@@ -35,7 +38,9 @@ export default function TechSection() {
           );
         })}
       </div>
-      {view === 'health' ? <TechPanel /> : <EventsPanel />}
+      {view === 'health' && <TechPanel />}
+      {view === 'events' && <EventsPanel />}
+      {view === 'queues' && <QueueHealthPanel />}
     </div>
   );
 }

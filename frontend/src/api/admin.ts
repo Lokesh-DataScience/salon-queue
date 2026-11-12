@@ -355,3 +355,82 @@ export function updateLead(id: string, input: LeadInput) {
 export function deleteLead(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/admin/sales/leads/${id}`, { method: 'DELETE' });
 }
+
+// ── Tech: queue health (Slice 9) ──────────────────────────────────────────
+export interface QueueCheck {
+  id: 'duplicate_tokens' | 'double_serving' | 'overdue_serving' | 'stale_active' | 'stuck_paused';
+  label: string;
+  serious: boolean;
+  count: number;
+  rows: Array<{
+    salon_id: string;
+    salon: string;
+    date?: string;
+    token?: number;
+    tokens?: number[];
+    copies?: number;
+    serving?: number;
+    minutes_over?: number;
+    tickets?: number;
+    waiting?: number;
+    minutes_paused?: number;
+  }>;
+}
+
+export interface QueueHealth {
+  checkedAt: string;
+  checks: QueueCheck[];
+  pushToday: { qrTickets: number; withPush: number; gotClose: number; gotNext: number; gotTurn: number };
+  pushDelivery: {
+    today: PushDay;
+    lastDays: PushDay[];
+    total: { sent: number; expired: number; failed: number };
+  };
+}
+
+export interface PushDay {
+  day: string;
+  sent: number;
+  expired: number;
+  failed: number;
+  lastFailureCode: string | null;
+}
+
+export interface TechSalon {
+  id: string;
+  name: string;
+  address: string;
+  isInternal: boolean;
+  isSuspended: boolean;
+}
+
+export interface ReadOnlyQueue {
+  salon: { id: string; name: string; isOpen: boolean; isQueueActive: boolean; isSuspended: boolean; hours: string };
+  date: string;
+  queue: { status: string; nextToken: number; updatedAt: string } | null;
+  entries: Array<{
+    token: number;
+    status: string;
+    walkIn: boolean;
+    line: number | null;
+    joinedAt: string;
+    startedAt: string | null;
+    endsAt: string | null;
+    completedAt: string | null;
+    priority: boolean;
+    durationMinutes: number | null;
+    notifiedStage: number;
+  }>;
+}
+
+export function fetchQueueHealth() {
+  return apiFetch<QueueHealth>('/api/admin/tech/queues');
+}
+
+export function searchTechSalons(search: string) {
+  return apiFetch<{ salons: TechSalon[] }>(`/api/admin/tech/salons?search=${encodeURIComponent(search)}`).then((r) => r.salons);
+}
+
+export function fetchReadOnlyQueue(salonId: string) {
+  return apiFetch<ReadOnlyQueue>(`/api/admin/tech/salons/${salonId}/queue`);
+}
