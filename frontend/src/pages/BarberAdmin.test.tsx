@@ -21,6 +21,10 @@ vi.mock('../api/admin', () => ({
   updateSalesInfo: vi.fn(),
   fetchTechHealth: vi.fn(),
   fetchTechEvents: vi.fn(),
+  fetchTeam: vi.fn(),
+  grantAdminRole: vi.fn(),
+  revokeAdminRole: vi.fn(),
+  fetchAudit: vi.fn(),
 }));
 
 const renderAdmin = () => renderPage(<BarberAdmin />, { path: '/barber/admin', route: '/barber/admin' });

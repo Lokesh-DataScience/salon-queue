@@ -240,3 +240,53 @@ export interface EventSummary {
 export function fetchTechEvents(days: 1 | 7) {
   return apiFetch<EventSummary>(`/api/admin/tech/events?days=${days}`);
 }
+
+// ── Founder: team and audit log (Slice 3) ─────────────────────────────────
+export interface TeamMember {
+  staffId: string;
+  role: AdminRole;
+  grantedAt: string;
+  note: string | null;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  salonId: string | null;
+  salonName: string | null;
+  salonIsInternal: boolean | null;
+  isYou: boolean;
+}
+
+export function fetchTeam() {
+  return apiFetch<{ admins: TeamMember[] }>('/api/admin/founder/team').then((r) => r.admins);
+}
+
+export function grantAdminRole(input: { identifier: string; role: 'SALES' | 'TECH'; markSalonInternal: boolean; note?: string }) {
+  return apiFetch<{ staffId: string; role: AdminRole }>('/api/admin/founder/team', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function revokeAdminRole(staffId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/admin/founder/team/${staffId}`, { method: 'DELETE' });
+}
+
+export type AuditGroup = 'salon' | 'staff' | 'sales' | 'admin';
+
+export interface AuditEntry {
+  id: number;
+  at: string;
+  action: string;
+  actor: { name: string; email: string | null; role: string };
+  targetType: string | null;
+  targetId: string | null;
+  details: Record<string, unknown>;
+}
+
+export function fetchAudit(opts: { group?: AuditGroup; before?: number } = {}) {
+  const q = new URLSearchParams();
+  if (opts.group) q.set('group', opts.group);
+  if (opts.before) q.set('before', String(opts.before));
+  const s = q.toString();
+  return apiFetch<{ entries: AuditEntry[]; nextBefore: number | null }>(`/api/admin/founder/audit${s ? `?${s}` : ''}`);
+}

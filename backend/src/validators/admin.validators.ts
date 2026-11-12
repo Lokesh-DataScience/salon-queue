@@ -28,3 +28,18 @@ export const salesInfoBodySchema = z
   })
   .strict()
   .refine((b) => b.isPartner !== undefined || b.notes !== undefined, { message: 'Nothing to update.' });
+
+// Slice 3: team (admin roles) and audit log. FOUNDER is never granted from the app.
+export const grantAdminBodySchema = z
+  .object({
+    identifier: z.string().trim().min(3).max(200), // the account's email or phone
+    role: z.enum(['SALES', 'TECH']),
+    markSalonInternal: z.boolean().default(true),
+    note: z.string().trim().max(200).optional(),
+  })
+  .strict();
+
+export const auditQuerySchema = z.object({
+  group: z.enum(['salon', 'staff', 'sales', 'admin']).optional(),
+  before: z.coerce.number().int().positive().optional(), // id cursor for "Load more"
+});

@@ -16,6 +16,7 @@ import {
 import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
 import { getHealth } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
+import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
 
 const router = Router();
 
@@ -37,6 +38,11 @@ founder.post('/salons/:salonId/suspension', postSuspension);
 founder.post('/salons/:salonId/internal', postInternal);
 founder.delete('/salons/:salonId', removeSalon);
 founder.post('/staff/:staffId/password', postStaffPassword);
+// Slice 3: team (admin roles) and audit log
+founder.get('/team', getTeam);
+founder.post('/team', postTeam);
+founder.delete('/team/:staffId', deleteTeam);
+founder.get('/audit', getAudit);
 
 const sales = Router();
 sales.use(requireAdminRole('SALES'));
