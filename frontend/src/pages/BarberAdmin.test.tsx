@@ -17,6 +17,8 @@ vi.mock('../api/admin', () => ({
   setSalonInternal: vi.fn(),
   resetStaffPassword: vi.fn(),
   deleteAdminSalon: vi.fn(),
+  fetchSalesActivity: vi.fn(),
+  updateSalesInfo: vi.fn(),
 }));
 
 const renderAdmin = () => renderPage(<BarberAdmin />, { path: '/barber/admin', route: '/barber/admin' });
@@ -38,6 +40,7 @@ beforeEach(() => {
     },
     days: [],
   });
+  vi.mocked(admin.fetchSalesActivity).mockReset().mockResolvedValue({ today: '2026-11-12', salons: [], areas: [] });
 });
 
 describe('BarberAdmin', () => {
@@ -54,7 +57,7 @@ describe('BarberAdmin', () => {
     expect(await screen.findByRole('heading', { name: 'Sales' })).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(screen.queryByText(/founder/i)).not.toBeInTheDocument();
-    expect(admin.fetchAdminSection).toHaveBeenCalledWith('sales');
+    expect(admin.fetchSalesActivity).toHaveBeenCalled();
   });
 
   it('gives FOUNDER three tabs and switches between them', async () => {

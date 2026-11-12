@@ -136,3 +136,48 @@ export function deleteAdminSalon(salonId: string, confirmName: string) {
     body: JSON.stringify({ confirmName }),
   });
 }
+
+// ── Sales tab (Slice 4) ───────────────────────────────────────────────────
+export interface SalesSalon {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  area: string;
+  createdAt: string;
+  isSuspended: boolean;
+  owner: { name: string | null; email: string | null; phone: string | null };
+  lastTicketAt: string | null;
+  daysSinceLastTicket: number | null; // null = never had a ticket
+  tickets7d: number;
+  avgPerDay7d: number;
+  ticketsThisMonth: number;
+  churnRisk: boolean;
+  isPartner: boolean;
+  notes: string;
+  infoUpdatedAt: string | null;
+}
+
+export interface SalesArea {
+  area: string;
+  salons: number;
+  activeSalons7d: number;
+  ticketsThisMonth: number;
+}
+
+export interface SalesActivity {
+  today: string;
+  salons: SalesSalon[]; // churn risk first
+  areas: SalesArea[];
+}
+
+export function fetchSalesActivity() {
+  return apiFetch<SalesActivity>('/api/admin/sales/activity');
+}
+
+export function updateSalesInfo(salonId: string, patch: { isPartner?: boolean; notes?: string }) {
+  return apiFetch<{ info: { salonId: string; isPartner: boolean; notes: string } }>(
+    `/api/admin/sales/salons/${salonId}/info`,
+    { method: 'PATCH', body: JSON.stringify(patch) },
+  );
+}

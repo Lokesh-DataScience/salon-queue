@@ -13,6 +13,7 @@ import {
   postStaffPassword,
   removeSalon,
 } from '../controllers/founderSalons.controller';
+import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
 
 const router = Router();
 
@@ -38,6 +39,9 @@ founder.post('/staff/:staffId/password', postStaffPassword);
 const sales = Router();
 sales.use(requireAdminRole('SALES'));
 sales.get('/', getSectionStatus('sales'));
+// Slice 4: salon activity, churn risk, areas, partner flag + notes
+sales.get('/activity', getActivity);
+sales.patch('/salons/:salonId/info', patchSalesInfo);
 
 const tech = Router();
 tech.use(requireAdminRole('TECH'));

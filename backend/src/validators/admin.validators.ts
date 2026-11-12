@@ -19,3 +19,12 @@ export const adminResetPasswordBodySchema = z
   .strict();
 
 export const deleteSalonBodySchema = z.object({ confirmName: z.string().trim().min(1).max(200) }).strict();
+
+// Slice 4: Sales partner flag + notes. At least one of the two.
+export const salesInfoBodySchema = z
+  .object({
+    isPartner: z.boolean().optional(),
+    notes: z.string().max(2000, 'Notes can be at most 2000 characters.').optional(),
+  })
+  .strict()
+  .refine((b) => b.isPartner !== undefined || b.notes !== undefined, { message: 'Nothing to update.' });
