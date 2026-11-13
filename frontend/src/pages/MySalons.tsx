@@ -32,6 +32,8 @@ const TEXT = {
     pinned: 'पिन किया हुआ',
     emptyTitle: 'अभी कोई सैलून नहीं',
     emptyBody: 'किसी सैलून में लगा QR कोड स्कैन करें। वह सैलून यहाँ अपने-आप जुड़ जाएगा।',
+    scan: 'QR स्कैन करें',
+    addMore: 'नया सैलून जोड़ें — QR स्कैन करें',
   },
   en: {
     title: 'My salons',
@@ -49,6 +51,8 @@ const TEXT = {
     pinned: 'Pinned',
     emptyTitle: 'No salons yet',
     emptyBody: "Scan the QR code at any salon. It will appear here automatically.",
+    scan: 'Scan QR',
+    addMore: 'Add a salon — scan its QR',
   },
 };
 
@@ -151,6 +155,10 @@ export default function MySalons() {
           </span>
           <p className="text-lg font-semibold">{t.emptyTitle}</p>
           <p className="mt-2 text-base text-gray-700">{t.emptyBody}</p>
+          <Link to="/c/scan" className="btn-primary mt-5 gap-2">
+            <Icon name="camera" />
+            {t.scan}
+          </Link>
         </div>
       ) : (
         <ul className="grid gap-3">
@@ -169,6 +177,12 @@ export default function MySalons() {
             />
           ))}
         </ul>
+      )}
+      {salons.length > 0 && (
+        <Link to="/c/scan" className="btn-secondary mt-4 gap-2">
+          <Icon name="camera" />
+          {t.addMore}
+        </Link>
       )}
     </PageShell>
   );

@@ -28,6 +28,8 @@ import BarberReport from './pages/BarberReport';
 import MySalons from './pages/MySalons';
 import SalonQueue from './pages/SalonQueue';
 import MyTickets from './pages/MyTickets';
+import ScanQr from './pages/ScanQr';
+import VisitHistory from './pages/VisitHistory';
 import CustomerChrome from './components/CustomerChrome';
 import { applyManifest } from './lib/appManifest';
 
@@ -74,6 +76,8 @@ function App() {
       {/* Customer app: only salons this phone has scanned. */}
       <Route path="/c" element={<MySalons />} />
       <Route path="/c/tokens" element={<MyTickets />} />
+      <Route path="/c/scan" element={<ScanQr />} />
+      <Route path="/c/history" element={<VisitHistory />} />
       <Route path="/c/s/:code" element={<SalonQueue />} />
       <Route path="/c/s/:code/join" element={<ScanLanding source="app" />} />
       <Route path="/barber/login" element={<BarberLogin />} />

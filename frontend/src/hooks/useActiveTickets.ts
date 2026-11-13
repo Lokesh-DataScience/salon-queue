@@ -4,6 +4,8 @@ import { useQueries } from '@tanstack/react-query';
 import { fetchTicketStatus } from '../api/tickets';
 import { ApiError } from '../api/client';
 import { getTickets, removeTicket, type StoredTicket } from '../lib/activeTickets';
+import { getMySalons } from '../lib/mySalons';
+import { recordVisit } from '../lib/visitHistory';
 
 const FINISHED = ['COMPLETED', 'SKIPPED', 'CANCELLED'];
 
@@ -32,7 +34,20 @@ export function useActiveTickets(salonId?: string) {
   const signature = results.map((q) => `${q.status}:${q.data?.status ?? ''}`).join('|');
   useEffect(() => {
     stored.forEach((t, i) => {
-      if (results[i] && isDead(results[i])) removeTicket(t.ticketId);
+      const q = results[i];
+      if (!q || !isDead(q)) return;
+      // Finished while the ticket page was closed: still goes into the visit history.
+      if (q.data) {
+        recordVisit({
+          ticketId: t.ticketId,
+          salonId: t.salonId,
+          salonName: q.data.salonName ?? getMySalons().find((s) => s.salonId === t.salonId)?.name,
+          salonCode: q.data.salonCode,
+          tokenNumber: t.tokenNumber,
+          status: q.data.status,
+        });
+      }
+      removeTicket(t.ticketId);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);

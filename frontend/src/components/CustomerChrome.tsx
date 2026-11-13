@@ -18,7 +18,7 @@ export function isCustomerPath(pathname: string): boolean {
 // The join flow (/c/s/:code/join) stays focused: no bar while the customer fills it in.
 export function showsBottomNav(pathname: string, installed: boolean): boolean {
   const p = pathname.replace(/\/+$/, '') || '/';
-  if (p === '/c' || p === '/c/tokens') return true;
+  if (p === '/c' || p === '/c/tokens' || p === '/c/scan' || p === '/c/history') return true;
   if (/^\/c\/s\/[^/]+$/.test(p)) return true;
   return installed && p.startsWith('/tickets/');
 }
@@ -26,13 +26,15 @@ export function showsBottomNav(pathname: string, installed: boolean): boolean {
 interface Tab {
   to: string;
   icon: IconName;
-  key: 'salons' | 'tokens';
+  key: 'salons' | 'tokens' | 'scan' | 'history';
   active: (p: string) => boolean;
 }
 
 const TABS: Tab[] = [
   { to: '/c', icon: 'store', key: 'salons', active: (p) => p === '/c' || p === '/c/' || p.startsWith('/c/s/') },
   { to: '/c/tokens', icon: 'ticket', key: 'tokens', active: (p) => p.startsWith('/c/tokens') || p.startsWith('/tickets/') },
+  { to: '/c/scan', icon: 'camera', key: 'scan', active: (p) => p.startsWith('/c/scan') },
+  { to: '/c/history', icon: 'clock', key: 'history', active: (p) => p.startsWith('/c/history') },
 ];
 
 const TEXT = {
@@ -40,12 +42,16 @@ const TEXT = {
     nav: 'मुख्य मेनू',
     salons: 'सैलून',
     tokens: 'टोकन',
+    scan: 'QR स्कैन',
+    history: 'इतिहास',
     offline: 'इंटरनेट बंद है। लाइन अभी अपडेट नहीं हो रही।',
   },
   en: {
     nav: 'Main menu',
     salons: 'Salons',
     tokens: 'Tokens',
+    scan: 'Scan QR',
+    history: 'History',
     offline: "You're offline. The queue isn't updating right now.",
   },
 };

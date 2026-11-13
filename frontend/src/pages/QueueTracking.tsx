@@ -8,7 +8,8 @@ import { fetchTicketStatus, leaveTicket } from '../api/tickets';
 import { socket } from '../lib/socket';
 import { ApiError } from '../api/client';
 import { saveTicket, removeTicket } from '../lib/activeTickets';
-import { saveMySalon } from '../lib/mySalons';
+import { getMySalons, saveMySalon } from '../lib/mySalons';
+import { recordVisit } from '../lib/visitHistory';
 import NotifyMe from '../components/NotifyMe';
 import PageShell from '../components/PageShell';
 import CustomerHeader from '../components/CustomerHeader';
@@ -287,6 +288,14 @@ export default function QueueTracking() {
     if (!ticket || !ticketId) return;
     if (FINISHED.includes(ticket.status)) {
       removeTicket(ticketId);
+      recordVisit({
+        ticketId,
+        salonId: ticket.salonId,
+        salonName: ticket.salonName ?? getMySalons().find((s) => s.salonId === ticket.salonId)?.name,
+        salonCode: ticket.salonCode,
+        tokenNumber: ticket.tokenNumber,
+        status: ticket.status,
+      });
     } else {
       saveTicket({ ticketId, accessToken, salonId: ticket.salonId, tokenNumber: ticket.tokenNumber });
     }
