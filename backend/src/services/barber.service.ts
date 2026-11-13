@@ -36,17 +36,14 @@ interface QueueEntryRow {
   completed_at: string | null;
   skipped_at: string | null;
   priority_at: string | null;
+  order_key?: number | string | null;
+  join_source?: 'qr' | 'app';
+  not_here_count?: number;
   lane_id?: string | null;
   prize?: { name: string; redeemed: boolean } | null;
 }
 
 // above getBarberQueueSnapshot
-function byServeOrder(a: QueueEntryRow, b: QueueEntryRow) {
-  if (a.priority_at && b.priority_at) return Date.parse(a.priority_at) - Date.parse(b.priority_at);
-  if (a.priority_at) return -1;
-  if (b.priority_at) return 1;
-  return a.token_number - b.token_number;
-}
 
 // ── PRIORITY: serve a waiting customer right after the current one ──────────
 export async function moveToFront(salonId: string, entryId: string, entryLaneId?: string | null) {
@@ -65,6 +62,30 @@ export async function moveToFront(salonId: string, entryId: string, entryLaneId?
     throw error;
   }
   return { id: entryId, tokenNumber: data as number };
+}
+
+// ── NOT HERE: an app customer who is not at the salon when their turn comes ──
+// First time: back behind the next two waiting customers of the same line. Second time (or nobody
+// else waiting): the ticket is cancelled. All of it happens in one locked database call.
+export async function markNotHere(salonId: string, entryId: string, entryLaneId?: string | null) {
+  await assertEntryAccess(salonId, entryId, entryLaneId); // staff: their own line only
+  const { data, error } = await supabase.rpc('mark_not_here', { p_salon_id: salonId, p_entry_id: entryId });
+
+  if (error) {
+    const msg = error.message ?? '';
+    if (msg.includes('ENTRY_NOT_FOUND')) throw new AppError('Queue entry not found.', 404);
+    if (msg.includes('NOT_APP_JOIN')) {
+      throw new AppError('Only customers who joined from the app can be marked "Not here". Use Skip instead.', 409);
+    }
+    if (msg.includes('NOT_AT_CHAIR')) throw new AppError('This customer is no longer at the chair.', 409);
+    throw error;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    id: entryId,
+    action: row.action as 'moved_back' | 'cancelled',
+    tokenNumber: row.token_number as number,
+  };
 }
 
 // ── Dashboard read ──────────────────────────────────────────────────────
@@ -102,7 +123,7 @@ export async function getBarberQueueSnapshot(input: ScopeOrSalonId) {
   const { data: entries, error: entriesError } = await supabase
     .from('queue_entries')
     .select(
-            'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at, priority_at, lane_id, offer_id, prize_redeemed_at, salon_offers(name), salon_customers(name, phone)'
+            'id, token_number, status, joined_at, called_at, started_at, completed_at, skipped_at, priority_at, order_key, join_source, not_here_count, lane_id, offer_id, prize_redeemed_at, salon_offers(name), salon_customers(name, phone)'
     )
     .eq('queue_id', queue.id)
     .in('status', ['CALLED', 'SERVING', 'WAITING'])

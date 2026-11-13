@@ -4,7 +4,7 @@ import { env } from '../config/env';
 import { supabase } from '../config/supabase';
 import { recordPush } from './pushStats.service';
 
-export type NotificationEvent = 'QUEUE_APPROACHING' | 'TURN_NOW' | 'QUEUE_CANCELLED';
+export type NotificationEvent = 'QUEUE_APPROACHING' | 'TURN_NOW' | 'QUEUE_CANCELLED' | 'MOVED_BACK';
 
 // Deliberately NO name or phone here. Providers look up whatever they need by entryId,
 // so personal data never passes through this layer or its logs.
@@ -61,6 +61,13 @@ export function buildPushMessage(
       return {
         title: 'Your turn was skipped',
         body: `The salon skipped token #${n}. Please speak to the staff if this looks like a mistake.`,
+        url,
+      };
+    case 'MOVED_BACK':
+      // Only app customers can be moved back, and the customer app speaks Hindi.
+      return {
+        title: 'आप सैलून में नहीं मिले',
+        body: `टोकन #${n} को 2 जगह पीछे किया गया है। कृपया जल्दी सैलून पहुँचें।`,
         url,
       };
   }
@@ -151,4 +158,5 @@ export const NotificationService = {
     dispatch('QUEUE_APPROACHING', t, { peopleAhead }),
   notifyTurnNow: (t: NotificationTarget) => dispatch('TURN_NOW', t),
   notifyQueueCancelled: (t: NotificationTarget) => dispatch('QUEUE_CANCELLED', t),
+  notifyMovedBack: (t: NotificationTarget) => dispatch('MOVED_BACK', t),
 };

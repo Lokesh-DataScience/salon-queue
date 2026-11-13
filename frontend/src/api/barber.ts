@@ -19,6 +19,8 @@ export interface BarberQueueEntry {
   completed_at: string | null;
   skipped_at: string | null;
   priority_at: string | null;
+  join_source?: 'qr' | 'app'; // 'app' = took the token from the customer app (may not be at the salon yet)
+  not_here_count?: number; // times the barber pressed "Not here" for this ticket
   // From this salon's own customer list. null for a walk-in, or if the customer was removed.
   customer_name: string | null;
   customer_phone: string | null;
@@ -87,10 +89,14 @@ export interface BarberSalonProfile extends BarberSalon {
   openingTime: string;
   closingTime: string;
   averageServiceMinutes: number;
+  allowAppJoin: boolean; // customers may take a token from the app (from home)
 }
 
 export type SalonProfileUpdate = Partial<
-  Pick<BarberSalonProfile, 'name' | 'phone' | 'address' | 'openingTime' | 'closingTime' | 'averageServiceMinutes'>
+  Pick<
+    BarberSalonProfile,
+    'name' | 'phone' | 'address' | 'openingTime' | 'closingTime' | 'averageServiceMinutes' | 'allowAppJoin'
+  >
 >;
 
 export function fetchBarberSalonProfile() {
@@ -226,6 +232,14 @@ export function updateService(id: string, changes: Partial<ServiceInput>) {
 
 export function deleteService(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/barber/services/${id}`, { method: 'DELETE' });
+}
+
+// An app customer who is not at the salon: first time back 2 places, second time cancelled.
+export function markNotHere(entryId: string) {
+  return apiFetch<{ entry: { id: string; action: 'moved_back' | 'cancelled'; tokenNumber: number } }>(
+    `/api/barber/queue/${entryId}/not-here`,
+    { method: 'POST' },
+  );
 }
 
 export function prioritizeEntry(entryId: string) {

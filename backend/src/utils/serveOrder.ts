@@ -3,6 +3,8 @@ export interface OrderableEntry {
   status: string;
   token_number: number;
   priority_at?: string | null;
+  // Set only when the barber moved a no-show back ("Not here"); otherwise the token number decides.
+  order_key?: number | string | null;
 }
 
 const STATUS_RANK: Record<string, number> = { SERVING: 0, CALLED: 1, WAITING: 2 };
@@ -15,5 +17,8 @@ export function compareServeOrder(a: OrderableEntry, b: OrderableEntry): number 
   if (a.priority_at && b.priority_at) return Date.parse(a.priority_at) - Date.parse(b.priority_at);
   if (a.priority_at) return -1;
   if (b.priority_at) return 1;
+  const ka = a.order_key != null ? Number(a.order_key) : a.token_number;
+  const kb = b.order_key != null ? Number(b.order_key) : b.token_number;
+  if (ka !== kb) return ka - kb;
   return a.token_number - b.token_number;
 }

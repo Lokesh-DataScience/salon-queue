@@ -11,6 +11,7 @@ import {
   resumeForScope,
   addWalkIn,
   moveToFront,
+  markNotHere,
   assertEntryAccess,
 } from '../services/barber.service';
 import { resolveScope } from '../services/barberScope.service';
@@ -163,6 +164,24 @@ export async function postRedeemPrize(req: Request, res: Response, next: NextFun
     const result = await redeemPrizeForEntry(scope.salonId, entryId, scope.entryLaneId);
     await broadcastQueueUpdate(scope.salonId); // the customer's prize card flips to "Redeemed"
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// "Not here": an app customer who is not at the salon. First time back 2 places, second time cancelled.
+export async function postNotHere(req: Request, res: Response, next: NextFunction) {
+  try {
+    const scope = await scopeOf(req); // from the verified session only
+    const { salonId } = scope;
+    const { entryId } = entryIdParamSchema.parse(req.params);
+    const entry = await markNotHere(salonId, entryId, scope.entryLaneId);
+    await advanceSalonQueue(salonId); // the next customer starts now
+    await broadcastQueueUpdate(salonId);
+    const target = { entryId, salonId, tokenNumber: entry.tokenNumber };
+    if (entry.action === 'moved_back') await NotificationService.notifyMovedBack(target);
+    else await NotificationService.notifyQueueCancelled(target);
+    res.json({ entry });
   } catch (err) {
     next(err);
   }

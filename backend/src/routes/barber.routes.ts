@@ -12,6 +12,7 @@ import {
   postWalkIn,
   postExtend,
   postPrioritize,
+  postNotHere,
 } from '../controllers/barber.controller';
 import { getOffers, postOffer, patchOffer, removeOffer, patchExpected } from '../controllers/offers.controller';
 import { getProfile, patchProfile } from '../controllers/salonProfile.controller';
@@ -64,6 +65,7 @@ router.post('/queue/:entryId/complete', postComplete);
 router.post('/queue/:entryId/extend', postExtend);
 router.post('/queue/:entryId/skip', postSkip);
 router.post('/queue/:entryId/prioritize', postPrioritize);
+router.post('/queue/:entryId/not-here', postNotHere); // app customers only
 router.post('/queue/pause', postPause);
 router.post('/queue/resume', postResume);
 router.post('/queue/walk-in', postWalkIn);

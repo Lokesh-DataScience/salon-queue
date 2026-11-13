@@ -109,7 +109,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     // Who is ahead, in SERVE order (the barber can move an urgent customer to the front).
   const { data: active } = await supabase
     .from('queue_entries')
-    .select('id, status, token_number, priority_at, duration_minutes, ends_at')
+    .select('id, status, token_number, priority_at, order_key, duration_minutes, ends_at')
     .eq('queue_id', entry.queue_id)
     .eq('lane_id', entry.lane_id) // only this customer's own barber line counts
     .in('status', ['SERVING', 'CALLED', 'WAITING']);
@@ -220,7 +220,7 @@ export async function getSanitizedQueueState(salonId: string) {
 
   const { data: entries } = await supabase
     .from('queue_entries')
-    .select('id, token_number, status, priority_at')
+    .select('id, token_number, status, priority_at, order_key')
     .eq('queue_id', queue.id)
     .in('status', ['WAITING', 'CALLED', 'SERVING']);
 

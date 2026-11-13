@@ -21,6 +21,7 @@ const salon: BarberSalonProfile = {
   openingTime: '09:00',
   closingTime: '21:00',
   averageServiceMinutes: 15,
+  allowAppJoin: true,
 };
 
 const renderProfile = () =>

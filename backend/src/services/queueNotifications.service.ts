@@ -30,7 +30,7 @@ export async function evaluateNotifications(
 
     const { data: entries } = await supabase
       .from('queue_entries')
-      .select('id, token_number, status, notified_stage, priority_at, lane_id')
+      .select('id, token_number, status, notified_stage, priority_at, order_key, lane_id')
       .eq('queue_id', queue.id)
       .in('status', ['WAITING', 'CALLED', 'SERVING'])
       .order('token_number', { ascending: true });

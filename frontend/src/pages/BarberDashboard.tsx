@@ -14,6 +14,7 @@ import {
   prioritizeEntry,
   fetchMe,
   redeemPrizeForEntry,
+  markNotHere,
 } from '../api/barber';
 import BarberLaneSwitcher from '../components/BarberLaneSwitcher';
 import ChangePassword from '../components/ChangePassword';
@@ -23,6 +24,15 @@ import { SESSION_EXPIRED_EVENT, ApiError } from '../api/client';
 import type { BarberQueueEntry, BarberQueueSnapshot } from '../api/barber';
 const QUEUE_KEY = ['barberQueue']; // other lines use [...QUEUE_KEY, laneId], so invalidating QUEUE_KEY refreshes them all
 const LANE_STORE = 'svq.barber.lane'; // which line the owner was looking at (not personal data)
+
+// Marks a customer who took their token from the customer app (they may still be on the way).
+function AppBadge() {
+  return (
+    <span className="pill shrink-0 border-ink bg-brand-soft text-xs font-semibold text-ink" title="Joined from the app">
+      📱 App
+    </span>
+  );
+}
 
 export default function BarberDashboard() {
   const navigate = useNavigate();
@@ -176,6 +186,13 @@ export default function BarberDashboard() {
     onSettled: () => setBumpTarget(null),
   });
 
+  // "Not here": an app customer who has not reached the salon. Confirmed in a sheet, like the emergency bump.
+  const [notHereTarget, setNotHereTarget] = useState<{ id: string; token_number: number; willCancel: boolean } | null>(null);
+  const notHereMutation = useMutation({
+    mutationFn: (id: string) => runAction(() => markNotHere(id)),
+    onSettled: () => setNotHereTarget(null),
+  });
+
   const [walkInMsg, setWalkInMsg] = useState<string | null>(null);
   useEffect(() => {
     if (!walkInMsg) return;
@@ -251,9 +268,13 @@ export default function BarberDashboard() {
     skipMutation.isPending ||
     pauseMutation.isPending ||
     walkInMutation.isPending ||
-    bumpMutation.isPending;
+    bumpMutation.isPending ||
+    notHereMutation.isPending;
   const nextWaiting = queue.waiting[0] ?? null;
   const active = queue.serving ?? queue.called; // whoever is at the chair / being called
+  // Only app customers can be "not here": a wall-QR scan means they were standing in the shop.
+  // Second time, or nobody else waiting, the server cancels instead of moving back.
+  const notHereWillCancel = !!active && ((active.not_here_count ?? 0) >= 1 || queue.waiting.length === 0);
 
   // What the one button says and does right now.
   let label: string;
@@ -330,6 +351,23 @@ export default function BarberDashboard() {
           <p className="text-sm font-bold uppercase tracking-wide text-gray-700">{statusLine}</p>
           <p className="my-2 text-8xl font-extrabold tabular-nums text-ink">{active ? `#${active.token_number}` : '—'}</p>
           {active && <CustomerLine name={active.customer_name} phone={active.customer_phone} center />}
+          {active?.join_source === 'app' && (
+            <div className="mt-3 grid justify-items-center gap-3">
+              <AppBadge />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  setNotHereTarget({ id: active.id, token_number: active.token_number, willCancel: notHereWillCancel })
+                }
+                className="min-h-12 w-full rounded-xl border-2 border-amber-700 bg-white px-4 text-base font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-40"
+              >
+                {notHereWillCancel
+                  ? `Not here — cancel #${active.token_number}`
+                  : `Not here — move #${active.token_number} back 2`}
+              </button>
+            </div>
+          )}
           {queue.serving?.prize &&
             (queue.serving.prize.redeemed ? (
               <p role="status" className="mt-3 text-base font-semibold text-green-800">
@@ -444,6 +482,7 @@ export default function BarberDashboard() {
                         </button>
                       )}
                       <CustomerLine name={entry.customer_name} phone={entry.customer_phone} />
+                      {entry.join_source === 'app' && <AppBadge />}
                     </li>
                   );
                 })}
@@ -469,6 +508,55 @@ export default function BarberDashboard() {
           </button>
         </div>
       </div>
+
+      {/* "Not here" confirm sheet: one extra tap, because it moves or cancels someone's ticket. */}
+      {notHereTarget && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/50 p-4"
+          onClick={() => !notHereMutation.isPending && setNotHereTarget(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="not-here-title"
+            className="mx-auto w-full max-w-md rounded-2xl border-2 border-ink bg-white p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="not-here-title" className="text-xl font-bold text-ink">
+              {notHereTarget.willCancel
+                ? `Cancel token #${notHereTarget.token_number}?`
+                : `Move #${notHereTarget.token_number} back 2 places?`}
+            </h2>
+            <p className="mt-1 text-sm text-gray-700">
+              {notHereTarget.willCancel
+                ? 'They are not here again (or no one else is waiting). Their token will be cancelled and they will be told.'
+                : 'The next customer starts now. They will be told to hurry; if they are still not here next time, the token is cancelled.'}
+            </p>
+            <div className="mt-4 grid gap-3">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={notHereMutation.isPending}
+                onClick={() => notHereMutation.mutate(notHereTarget.id)}
+              >
+                {notHereMutation.isPending
+                  ? 'Working...'
+                  : notHereTarget.willCancel
+                    ? 'Yes, cancel token'
+                    : 'Yes, move back'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={notHereMutation.isPending}
+                onClick={() => setNotHereTarget(null)}
+              >
+                Keep waiting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Emergency confirm sheet: one extra tap so a stray touch can never reorder the queue. */}
       {bumpTarget && (

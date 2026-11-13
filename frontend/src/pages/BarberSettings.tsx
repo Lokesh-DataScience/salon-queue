@@ -1,10 +1,11 @@
 // frontend/src/pages/BarberSettings.tsx
 // The Settings menu: one row per area, each opening its own page.
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
-import { fetchMe, logoutBarber } from '../api/barber';
+import { fetchMe, logoutBarber, fetchBarberSalonProfile, updateBarberSalonProfile } from '../api/barber';
+import type { BarberSalonProfile } from '../api/barber';
 import { fetchAdminMe, type AdminRole } from '../api/admin';
 import { MULTI_BARBER } from '../lib/multiBarber';
 import { fetchBarberFlags, flagOn } from '../api/flags';
@@ -55,6 +56,59 @@ function RowList({ rows }: { rows: Row[] }) {
   );
 }
 
+// Owner's switch: may customers take a token from the customer app (from home)?
+// The wall QR keeps working either way.
+const PROFILE_KEY = ['barberSalonProfile'];
+
+function AppJoinSwitch() {
+  const queryClient = useQueryClient();
+  const { data: profile, isLoading } = useQuery({ queryKey: PROFILE_KEY, queryFn: fetchBarberSalonProfile, retry: false });
+  const [error, setError] = useState<string | null>(null);
+  const toggle = useMutation({
+    mutationFn: (allowAppJoin: boolean) => updateBarberSalonProfile({ allowAppJoin }),
+    onMutate: () => setError(null),
+    onSuccess: (salon) => queryClient.setQueryData<BarberSalonProfile>(PROFILE_KEY, salon),
+    onError: (err: Error) => setError(err.message),
+  });
+
+  if (isLoading || !profile) return null;
+  const on = toggle.isPending ? !profile.allowAppJoin : profile.allowAppJoin; // show the new state while saving
+
+  return (
+    <div className="card overflow-hidden p-0">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Tokens from the app"
+        disabled={toggle.isPending}
+        onClick={() => toggle.mutate(!profile.allowAppJoin)}
+        className={rowClass}
+      >
+        <span>
+          <span className="block text-base font-semibold">Tokens from the app (घर से टोकन)</span>
+          <span className="block text-sm text-gray-600">
+            {on ? 'On: customers can take a token from home' : 'Off: only the QR code at the salon works'}
+          </span>
+        </span>
+        <span
+          aria-hidden="true"
+          className={`relative h-7 w-12 shrink-0 rounded-full border-2 border-ink transition-colors ${on ? 'bg-brand' : 'bg-gray-200'}`}
+        >
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-ink transition-all ${on ? 'left-[1.4rem]' : 'left-0.5'}`}
+          />
+        </span>
+      </button>
+      {error && (
+        <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function LogoutRow() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -94,6 +148,7 @@ export default function BarberSettings() {
 
       <nav aria-label="Settings" className="grid gap-6">
         <RowList rows={salonRows} />
+        {me?.role === 'OWNER' && <AppJoinSwitch />}
         <RowList rows={tools} />
         {flagOn(flags, 'bug_reports', true) && (
           <RowList rows={[{ to: '/barber/report', title: 'Report a problem', hint: 'Tell us what went wrong or what you need' }]} />

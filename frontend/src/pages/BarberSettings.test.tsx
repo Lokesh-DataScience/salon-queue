@@ -11,6 +11,8 @@ import * as flags from '../api/flags';
 vi.mock('../api/barber', () => ({
   logoutBarber: vi.fn(),
   fetchMe: vi.fn(),
+  fetchBarberSalonProfile: vi.fn(),
+  updateBarberSalonProfile: vi.fn(),
 }));
 vi.mock('../api/admin', () => ({ fetchAdminMe: vi.fn() }));
 vi.mock('../lib/multiBarber', () => ({ MULTI_BARBER: false }));
@@ -21,6 +23,11 @@ vi.mock('../api/flags', async (importOriginal) => ({
 
 const OWNER = { id: 'staff-1', name: 'Owner', role: 'OWNER' as const, salonId: 'salon-1', laneId: null, laneName: null };
 
+const PROFILE = {
+  id: 'salon-1', name: 'Test Salon', qrCode: 'abc123abc123', phone: '9876543210', address: 'Main Road',
+  openingTime: '09:00', closingTime: '21:00', averageServiceMinutes: 15, allowAppJoin: true,
+};
+
 const renderSettings = () => renderPage(<BarberSettings />, { path: '/barber/settings', route: '/barber/settings' });
 
 beforeEach(() => {
@@ -28,6 +35,8 @@ beforeEach(() => {
   vi.mocked(barber.fetchMe).mockReset().mockResolvedValue(OWNER);
   vi.mocked(admin.fetchAdminMe).mockReset().mockResolvedValue(null); // a normal barber
   vi.mocked(flags.fetchBarberFlags).mockReset().mockResolvedValue({});
+  vi.mocked(barber.fetchBarberSalonProfile).mockReset().mockResolvedValue(PROFILE);
+  vi.mocked(barber.updateBarberSalonProfile).mockReset();
 });
 
 describe('BarberSettings menu', () => {
@@ -93,5 +102,37 @@ describe('BarberSettings menu', () => {
     renderSettings();
     await screen.findByRole('link', { name: /salon profile/i });
     await vi.waitFor(() => expect(screen.queryByRole('link', { name: /report a problem/i })).not.toBeInTheDocument());
+  });
+
+  // ── Customer app Slice 2: the owner's "tokens from the app" switch ──
+  it('the owner sees the app-token switch, on by default, and can turn it off', async () => {
+    vi.mocked(barber.updateBarberSalonProfile).mockResolvedValue({ ...PROFILE, allowAppJoin: false });
+    const user = userEvent.setup();
+    renderSettings();
+
+    const sw = await screen.findByRole('switch', { name: 'Tokens from the app' });
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    await user.click(sw);
+    expect(barber.updateBarberSalonProfile).toHaveBeenCalledWith({ allowAppJoin: false });
+    await vi.waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'));
+    expect(screen.getByText(/only the QR code at the salon works/)).toBeInTheDocument();
+  });
+
+  it('shows the error and keeps the old setting when saving fails', async () => {
+    vi.mocked(barber.updateBarberSalonProfile).mockRejectedValue(new Error('Could not save.'));
+    const user = userEvent.setup();
+    renderSettings();
+
+    const sw = await screen.findByRole('switch', { name: 'Tokens from the app' });
+    await user.click(sw);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save.');
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('a staff barber does not get the switch', async () => {
+    vi.mocked(barber.fetchMe).mockResolvedValue({ ...OWNER, role: 'BARBER' });
+    renderSettings();
+    await screen.findByRole('link', { name: /salon qr code/i });
+    expect(screen.queryByRole('switch', { name: 'Tokens from the app' })).not.toBeInTheDocument();
   });
 });

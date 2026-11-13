@@ -19,7 +19,8 @@ vi.mock('../api/barber', () => ({
   skipEntry: vi.fn(),
   pauseQueue: vi.fn(),
   resumeQueue: vi.fn(),
-  prioritizeEntry: vi.fn()
+  prioritizeEntry: vi.fn(),
+  markNotHere: vi.fn(),
 }));
 
 const entry = (
@@ -257,5 +258,72 @@ describe('BarberDashboard (one-button)', () => {
 
     expect(await screen.findByText('Asha Rao')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Call 99887 76655' })).toHaveAttribute('href', 'tel:+919988776655');
+  });
+
+  // ── Customer app Slice 2: "Not here" ──
+  const fromApp = (e: BarberQueueEntry, notHere = 0): BarberQueueEntry => ({ ...e, join_source: 'app', not_here_count: notHere });
+
+  it('not here: an app customer at the chair can be moved back 2 places after confirming', async () => {
+    given({ serving: fromApp(entry(4, 'SERVING')), waiting: [entry(5), entry(6)] });
+    vi.mocked(barber.markNotHere).mockResolvedValue({ entry: { id: 'entry-4', action: 'moved_back', tokenNumber: 4 } });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: 'Not here — move #4 back 2' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Move #4 back 2 places?');
+    expect(barber.markNotHere).not.toHaveBeenCalled(); // nothing happens before the confirm
+    await user.click(screen.getByRole('button', { name: 'Yes, move back' }));
+    await waitFor(() => expect(barber.markNotHere).toHaveBeenCalledWith('entry-4'));
+  });
+
+  it('not here: "Keep waiting" closes the sheet and changes nothing', async () => {
+    given({ serving: fromApp(entry(4, 'SERVING')), waiting: [entry(5)] });
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: /Not here/ }));
+    await user.click(screen.getByRole('button', { name: 'Keep waiting' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(barber.markNotHere).not.toHaveBeenCalled();
+  });
+
+  it('not here: the second time, the button says it will cancel', async () => {
+    given({ serving: fromApp(entry(4, 'SERVING'), 1), waiting: [entry(5)] });
+    renderDashboard();
+    expect(await screen.findByRole('button', { name: 'Not here — cancel #4' })).toBeInTheDocument();
+  });
+
+  it('not here: with nobody else waiting, the button says it will cancel', async () => {
+    given({ serving: fromApp(entry(7, 'SERVING')), waiting: [] });
+    const user = userEvent.setup();
+    renderDashboard();
+    await user.click(await screen.findByRole('button', { name: 'Not here — cancel #7' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Cancel token #7?');
+  });
+
+  it('not here: never offered for a customer who scanned the wall QR', async () => {
+    given({ serving: entry(4, 'SERVING'), waiting: [entry(5)] });
+    renderDashboard();
+    await screen.findByRole('button', { name: 'COMPLETE #4' });
+    expect(screen.queryByRole('button', { name: /Not here/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('📱 App')).not.toBeInTheDocument();
+  });
+
+  it('marks app customers with an App badge in the waiting list', async () => {
+    given({ waiting: [entry(4), fromApp(entry(5))] });
+    renderDashboard();
+    await screen.findByText('Waiting (2)');
+    expect(screen.getAllByText('📱 App')).toHaveLength(1);
+  });
+
+  it('not here: a server refusal is shown and the queue re-syncs', async () => {
+    given({ serving: fromApp(entry(4, 'SERVING')), waiting: [entry(5)] });
+    vi.mocked(barber.markNotHere).mockRejectedValue(new Error('This customer is no longer at the chair.'));
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: /Not here/ }));
+    await user.click(screen.getByRole('button', { name: 'Yes, move back' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('no longer at the chair');
   });
 });
