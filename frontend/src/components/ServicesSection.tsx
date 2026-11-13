@@ -17,12 +17,22 @@ function parseMinutes(value: string): number | null {
   return value !== '' && Number.isInteger(m) && m >= 1 && m <= 240 ? m : null;
 }
 
+// '' = no price. Whole rupees, 0 to 1,00,000.
+function parsePrice(value: string): number | null | 'bad' {
+  if (value === '') return null;
+  const p = Number(value);
+  return Number.isInteger(p) && p >= 0 && p <= 100000 ? p : 'bad';
+}
+
+export const formatRupees = (p: number) => `₹${p.toLocaleString('en-IN')}`;
+
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 function AddServiceForm() {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [minutes, setMinutes] = useState('');
+  const [price, setPrice] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const add = useMutation({
@@ -30,6 +40,7 @@ function AddServiceForm() {
     onSuccess: () => {
       setName('');
       setMinutes('');
+      setPrice('');
       setError(null);
       queryClient.invalidateQueries({ queryKey: SERVICES_KEY });
     },
@@ -42,14 +53,16 @@ function AddServiceForm() {
     const m = parseMinutes(minutes);
     if (!name.trim()) return setError('Enter a service name.');
     if (m === null) return setError('Time must be 1 to 240 minutes.');
-    add.mutate({ name: name.trim(), durationMinutes: m });
+    const p = parsePrice(price);
+    if (p === 'bad') return setError('Price must be 0 to 1,00,000 rupees.');
+    add.mutate(p === null ? { name: name.trim(), durationMinutes: m } : { name: name.trim(), durationMinutes: m, priceRupees: p });
   }
 
   return (
     <form
       onSubmit={submit}
       noValidate
-      className="grid grid-cols-[1fr_6rem] gap-3 border-t border-gray-200 bg-gray-50 px-4 py-4 sm:grid-cols-[1fr_7rem_auto] sm:items-end"
+      className="grid grid-cols-[1fr_6rem] gap-3 border-t border-gray-200 bg-gray-50 px-4 py-4 sm:grid-cols-[1fr_7rem_7rem_auto] sm:items-end"
     >
       <p className="col-span-full text-sm font-semibold text-gray-700">Add a service</p>
       <div>
@@ -64,6 +77,12 @@ function AddServiceForm() {
           placeholder="e.g. 20"
           onChange={(e) => { setMinutes(e.target.value.replace(/\D/g, '').slice(0, 3)); setError(null); }} />
       </div>
+      <div className="col-span-2 sm:col-span-1">
+        <label htmlFor="new-service-price" className="mb-1 block text-sm font-medium">Price ₹ (optional)</label>
+        <input id="new-service-price" className="field" inputMode="numeric" value={price}
+          placeholder="e.g. 100"
+          onChange={(e) => { setPrice(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(null); }} />
+      </div>
       {error && <p role="alert" className="col-span-full text-sm text-red-700">{error}</p>}
       <button type="submit" className="btn-primary col-span-2 sm:col-span-1 sm:w-auto" disabled={add.isPending}>
         {add.isPending ? 'Adding...' : 'Add service'}
@@ -77,12 +96,14 @@ function ServiceRow({ service }: { service: SalonService }) {
   const [mode, setMode] = useState<'view' | 'edit' | 'confirmDelete'>('view');
   const [name, setName] = useState(service.name);
   const [minutes, setMinutes] = useState(String(service.durationMinutes));
+  const [price, setPrice] = useState(service.priceRupees != null ? String(service.priceRupees) : '');
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: SERVICES_KEY });
 
   const save = useMutation({
-    mutationFn: (changes: { name?: string; durationMinutes?: number }) => updateService(service.id, changes),
+    mutationFn: (changes: { name?: string; durationMinutes?: number; priceRupees?: number | null }) =>
+      updateService(service.id, changes),
     onSuccess: () => { setMode('view'); setError(null); refresh(); },
     onError: (e) => setError(errText(e, 'Could not save.')),
   });
@@ -99,9 +120,12 @@ function ServiceRow({ service }: { service: SalonService }) {
     const m = parseMinutes(minutes);
     if (!name.trim()) return setError('Enter a service name.');
     if (m === null) return setError('Time must be 1 to 240 minutes.');
-    const changes: { name?: string; durationMinutes?: number } = {};
+    const p = parsePrice(price);
+    if (p === 'bad') return setError('Price must be 0 to 1,00,000 rupees.');
+    const changes: { name?: string; durationMinutes?: number; priceRupees?: number | null } = {};
     if (name.trim() !== service.name) changes.name = name.trim();
     if (m !== service.durationMinutes) changes.durationMinutes = m;
+    if (p !== (service.priceRupees ?? null)) changes.priceRupees = p; // null clears the price
     if (Object.keys(changes).length === 0) return setMode('view');
     save.mutate(changes);
   }
@@ -122,13 +146,25 @@ function ServiceRow({ service }: { service: SalonService }) {
                 onChange={(e) => { setMinutes(e.target.value.replace(/\D/g, '').slice(0, 3)); setError(null); }} />
             </div>
           </div>
+          <div>
+            <label htmlFor={`price-${service.id}`} className="mb-1 block text-sm font-medium">Price ₹ (optional)</label>
+            <input id={`price-${service.id}`} className="field" inputMode="numeric" value={price}
+              placeholder="Leave empty to hide the price"
+              onChange={(e) => { setPrice(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(null); }} />
+          </div>
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
             <button type="submit" className="btn-primary" disabled={save.isPending}>
               {save.isPending ? 'Saving...' : 'Save'}
             </button>
             <button type="button" className="btn-secondary" disabled={save.isPending}
-              onClick={() => { setMode('view'); setName(service.name); setMinutes(String(service.durationMinutes)); setError(null); }}>
+              onClick={() => {
+                setMode('view');
+                setName(service.name);
+                setMinutes(String(service.durationMinutes));
+                setPrice(service.priceRupees != null ? String(service.priceRupees) : '');
+                setError(null);
+              }}>
               Cancel
             </button>
           </div>
@@ -142,7 +178,10 @@ function ServiceRow({ service }: { service: SalonService }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words text-base font-semibold">{service.name}</p>
-          <p className="text-sm text-gray-600">{service.durationMinutes} min</p>
+          <p className="text-sm text-gray-600">
+            {service.durationMinutes} min
+            {service.priceRupees != null && ` · ${formatRupees(service.priceRupees)}`}
+          </p>
         </div>
         {mode === 'view' && (
           <div className="flex shrink-0 gap-2">
@@ -191,7 +230,9 @@ export default function ServicesSection({ welcome = false, asPage = false }: { w
         <Heading id="services-heading" className={asPage ? 'text-2xl font-bold' : 'text-base font-bold'}>
           Services{services && services.length > 0 ? ` (${services.length})` : ''}
         </Heading>
-        <p className="text-sm text-gray-600">What customers pick from when they join your queue.</p>
+        <p className="text-sm text-gray-600">
+          What customers pick from when they join your queue. Prices you add show in the customer app.
+        </p>
       </div>
 
       {welcome && (

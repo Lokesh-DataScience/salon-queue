@@ -20,6 +20,9 @@ export default function ServicePicker({
   const valid = picked.filter((id) => services.some((s) => s.id === id));
   const chosen = services.filter((s) => valid.includes(s.id));
   const total = chosen.reduce((n, s) => n + s.durationMinutes, 0);
+  // A total price only when every chosen service has one.
+  const priced = chosen.length > 0 && chosen.every((s) => s.priceRupees != null);
+  const totalPrice = priced ? chosen.reduce((n, s) => n + (s.priceRupees ?? 0), 0) : null;
 
   function toggle(id: string) {
     setConfirmNone(false);
@@ -53,7 +56,10 @@ export default function ServicePicker({
                     onChange={() => toggle(s.id)}
                   />
                   <span className="flex-1 text-base font-semibold">{s.name}</span>
-                  <span className="text-sm text-gray-700">{s.durationMinutes} min</span>
+                  <span className="text-right text-sm text-gray-700">
+                    {s.durationMinutes} min
+                    {s.priceRupees != null && <span className="block font-semibold text-ink">₹{s.priceRupees.toLocaleString('en-IN')}</span>}
+                  </span>
                 </label>
               </li>
             );
@@ -64,7 +70,9 @@ export default function ServicePicker({
       <p role="status" className="mt-3 text-sm text-gray-700">
         {chosen.length === 0
           ? 'Tick one or more services.'
-          : `${chosen.length} ${chosen.length === 1 ? 'service' : 'services'} · about ${total} min`}
+          : `${chosen.length} ${chosen.length === 1 ? 'service' : 'services'} · about ${total} min${
+              totalPrice != null ? ` · ₹${totalPrice.toLocaleString('en-IN')}` : ''
+            }`}
       </p>
 
       {error && (

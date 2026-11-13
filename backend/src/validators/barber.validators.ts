@@ -28,14 +28,26 @@ const serviceDuration = z
   .min(1, 'Time must be at least 1 minute.')
   .max(240, 'Time can be at most 240 minutes.');
   
+// Whole rupees. null = no price shown to customers (also how a barber clears a price).
+const servicePrice = z
+  .number({ error: 'Price must be a number.' })
+  .int('Price must be in whole rupees.')
+  .min(0, 'Price cannot be negative.')
+  .max(100000, 'Price can be at most ₹1,00,000.')
+  .nullable();
+
 export const createServiceSchema = z
-  .object({ name: serviceName, durationMinutes: serviceDuration })
+  .object({ name: serviceName, durationMinutes: serviceDuration, priceRupees: servicePrice.optional() })
   .strict();
 
 export const updateServiceSchema = z
-  .object({ name: serviceName.optional(), durationMinutes: serviceDuration.optional() })
+  .object({
+    name: serviceName.optional(),
+    durationMinutes: serviceDuration.optional(),
+    priceRupees: servicePrice.optional(),
+  })
   .strict()
-  .refine((v) => v.name !== undefined || v.durationMinutes !== undefined, {
+  .refine((v) => v.name !== undefined || v.durationMinutes !== undefined || v.priceRupees !== undefined, {
     message: 'Nothing to update.',
   });
 

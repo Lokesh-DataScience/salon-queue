@@ -9,8 +9,20 @@ import { supabase } from '../src/config/supabase';
 afterAll(cleanupSalons);
 
 const KEYS = [
-  'allowAppJoin', 'estimatedWaitMinutes', 'isOpen', 'isPaused', 'lanes',
-  'name', 'nowServingToken', 'salonId', 'waitingCount',
+  'address',
+  'allowAppJoin',
+  'closingTime',
+  'estimatedWaitMinutes',
+  'isOpen',
+  'isPaused',
+  'lanes',
+  'location',
+  'name',
+  'nowServingToken',
+  'openingTime',
+  'phone',
+  'salonId',
+  'waitingCount',
 ];
 
 const view = (salonId: string) => request(app).get(`/api/salons/${salonId}/queue-public`);
@@ -62,7 +74,8 @@ describe('Public queue view for the customer app', () => {
     expect(text).not.toContain(t.accessToken);
     expect(text).not.toContain(t.ticketId);
     if (row?.prize_code) expect(text).not.toContain(row.prize_code);
-    expect(text).not.toMatch(/qr_code|qrCode|phone|address/i);
+    expect(text).not.toMatch(/qr_code|qrCode|customer_?name|customer_?phone|access_?token/i);
+    expect(JSON.parse(text).salon.phone).toBe('0000000000'); // only the salon's own number
   }, 60_000);
 
   it('follows the barber switch, pause and opening hours', async () => {

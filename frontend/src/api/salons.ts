@@ -48,6 +48,12 @@ export interface PublicQueue {
   waitingCount: number;
   estimatedWaitMinutes: number | null;
   lanes: PublicLane[] | null; // only when there is a choice of barber
+  // The salon's own contact details (never anything about customers). Any of them can be missing.
+  address?: string | null;
+  phone?: string | null;
+  openingTime?: string | null; // "HH:mm", India time
+  closingTime?: string | null;
+  location?: { lat: number; lng: number } | null;
 }
 
 export function fetchPublicQueue(salonId: string) {

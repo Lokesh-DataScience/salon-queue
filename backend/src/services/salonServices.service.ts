@@ -3,19 +3,21 @@ import { supabase } from '../config/supabase';
 import { AppError } from '../middleware/errorHandler';
 
 const MAX_SERVICES_PER_SALON = 30;
-const COLUMNS = 'id, name, duration_minutes';
+const COLUMNS = 'id, name, duration_minutes, price_rupees';
 const DUPLICATE_MSG = 'You already have a service with that name.';
 
 interface ServiceRow {
   id: string;
   name: string;
   duration_minutes: number;
+  price_rupees: number | null;
 }
 
 const toDto = (r: ServiceRow) => ({
   id: r.id,
   name: r.name,
   durationMinutes: r.duration_minutes,
+  priceRupees: r.price_rupees ?? null, // null = no price set
 });
 
 const isUniqueViolation = (e: { code?: string } | null) => e?.code === '23505';
@@ -35,7 +37,7 @@ export async function listServices(salonId: string) {
 
 export async function createService(
   salonId: string,
-  input: { name: string; durationMinutes: number },
+  input: { name: string; durationMinutes: number; priceRupees?: number | null },
 ) {
   const { count, error: countError } = await supabase
     .from('salon_services')
@@ -50,7 +52,12 @@ export async function createService(
 
   const { data, error } = await supabase
     .from('salon_services')
-    .insert({ salon_id: salonId, name: input.name, duration_minutes: input.durationMinutes })
+    .insert({
+      salon_id: salonId,
+      name: input.name,
+      duration_minutes: input.durationMinutes,
+      price_rupees: input.priceRupees ?? null,
+    })
     .select(COLUMNS)
     .single();
 
@@ -62,11 +69,12 @@ export async function createService(
 export async function updateService(
   salonId: string,
   serviceId: string,
-  input: { name?: string; durationMinutes?: number },
+  input: { name?: string; durationMinutes?: number; priceRupees?: number | null },
 ) {
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.durationMinutes !== undefined) updates.duration_minutes = input.durationMinutes;
+  if (input.priceRupees !== undefined) updates.price_rupees = input.priceRupees; // null clears it
 
   const { data, error } = await supabase
     .from('salon_services')

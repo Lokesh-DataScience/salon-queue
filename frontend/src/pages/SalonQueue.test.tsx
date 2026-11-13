@@ -9,10 +9,12 @@ import { ApiError } from '../api/client';
 import { saveTicket } from '../lib/activeTickets';
 import { getMySalons } from '../lib/mySalons';
 import * as salons from '../api/salons';
+import * as publicServices from '../api/publicServices';
 import type { PublicQueue } from '../api/salons';
 
 vi.mock('../lib/socket', () => import('../test/fakeSocket'));
 vi.mock('../api/salons', () => ({ fetchSalonByCode: vi.fn(), fetchPublicQueue: vi.fn() }));
+vi.mock('../api/publicServices', () => ({ fetchSalonServices: vi.fn() }));
 
 const CODE = 'abcdef123456';
 const queue = (over: Partial<PublicQueue> = {}): PublicQueue => ({
@@ -28,6 +30,7 @@ beforeEach(() => {
   resetSocket();
   vi.mocked(salons.fetchSalonByCode).mockReset().mockResolvedValue({ id: 'salon-1', name: 'Milan Hair Salon' });
   vi.mocked(salons.fetchPublicQueue).mockReset();
+  vi.mocked(publicServices.fetchSalonServices).mockReset().mockResolvedValue([]);
 });
 
 describe('SalonQueue (customer app)', () => {
@@ -136,5 +139,63 @@ describe('SalonQueue (customer app)', () => {
     renderQueue();
     expect(await screen.findByText(/कोई इंतज़ार में नहीं/)).toBeInTheDocument();
     expect(within(tile('इंतज़ार में')).getByText('0')).toBeInTheDocument();
+  });
+
+  it('shows the salon hours, address, a map link and a call link', async () => {
+    given({
+      openingTime: '09:00',
+      closingTime: '21:00',
+      address: 'Main Road, Bilaspur',
+      phone: '9876543210',
+      location: { lat: 22.08, lng: 82.15 },
+    });
+    renderQueue();
+    const info = await screen.findByRole('region', { name: 'सैलून की जानकारी' });
+    expect(info).toHaveTextContent('रोज़ सुबह 9:00 – रात 9:00');
+    expect(info).toHaveTextContent('Main Road, Bilaspur');
+    expect(within(info).getByRole('link', { name: 'नक्शा' })).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=22.08,82.15',
+    );
+    expect(within(info).getByRole('link', { name: 'कॉल करें' })).toHaveAttribute('href', 'tel:+919876543210');
+  });
+
+  it('leaves out what the salon has not filled in', async () => {
+    given({ address: null, phone: null, location: null, openingTime: null, closingTime: null });
+    renderQueue();
+    const info = await screen.findByRole('region', { name: 'सैलून की जानकारी' });
+    expect(within(info).queryByRole('link')).not.toBeInTheDocument();
+    expect(info).not.toHaveTextContent('रोज़');
+  });
+
+  it('lists the services with prices, and hides a price that is not set', async () => {
+    given();
+    vi.mocked(publicServices.fetchSalonServices).mockResolvedValue([
+      { id: 's1', name: 'बाल कटिंग', durationMinutes: 30, priceRupees: 100 },
+      { id: 's2', name: 'दाढ़ी', durationMinutes: 15, priceRupees: null },
+    ]);
+    renderQueue();
+    const list = await screen.findByRole('region', { name: 'सेवाएँ और रेट' });
+    expect(within(list).getByText('बाल कटिंग').closest('li')).toHaveTextContent('30 मिनट₹100');
+    expect(within(list).getByText('दाढ़ी').closest('li')).not.toHaveTextContent('₹');
+    expect(list).toHaveTextContent('पक्का रेट सैलून में पूछें');
+  });
+
+  it('shows no services card for a salon without services', async () => {
+    given();
+    renderQueue();
+    await screen.findByRole('heading', { name: 'Milan Hair Salon' });
+    await waitFor(() => expect(publicServices.fetchSalonServices).toHaveBeenCalledWith('salon-1'));
+    expect(screen.queryByRole('region', { name: 'सेवाएँ और रेट' })).not.toBeInTheDocument();
+  });
+
+  it('pins the salon to the top of "My salons"', async () => {
+    given();
+    renderQueue();
+    const pin = await screen.findByRole('button', { name: 'ऊपर पिन करें' });
+    expect(pin).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(pin);
+    expect(screen.getByRole('button', { name: 'पिन हटाएँ' })).toHaveAttribute('aria-pressed', 'true');
+    expect(getMySalons()[0]).toMatchObject({ code: CODE, pinned: true });
   });
 });

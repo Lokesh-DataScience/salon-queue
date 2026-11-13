@@ -2,6 +2,7 @@
 import { supabase } from '../config/supabase';
 import { todayISODate } from '../utils/date';
 import { isWithinHours } from '../utils/hours';
+import { publicSalonInfo } from '../utils/salonInfo';
 
 export async function findNearbySalons(lat: number, lng: number, radiusKm: number) {
   const { data, error } = await supabase.rpc('nearby_salons', {
@@ -66,13 +67,16 @@ export async function getSalonQueueSnapshot(salonId: string) {
   return { currentToken: queue.current_token, waitingCount: count ?? 0 };
 }
 
-// The customer app's view of one salon: is it open, can I join from here, how long is the wait.
-// Counts and token numbers only. Never names, phones, prizes or access tokens.
+// The customer app's view of one salon: is it open, can I join from here, how long is the wait,
+// and how to reach it (the salon's own address, business phone, hours and map location).
+// About customers: counts and token numbers only. Never their names, phones, prizes or access tokens.
 // Returns null for an unknown salon, and { suspended: true } for a salon the founder suspended.
 export async function getPublicQueue(salonId: string) {
   const { data: salon, error } = await supabase
     .from('salons')
-    .select('id, name, is_open, is_queue_active, opening_time, closing_time, allow_app_join, is_suspended')
+    .select(
+      'id, name, is_open, is_queue_active, opening_time, closing_time, allow_app_join, is_suspended, address, phone, latitude, longitude',
+    )
     .eq('id', salonId)
     .maybeSingle();
   if (error) throw error;
@@ -115,6 +119,7 @@ export async function getPublicQueue(salonId: string) {
       estimatedWaitMinutes,
       // Only when there is a choice of barber; a one-barber salon shows none.
       lanes: lanes.length > 1 ? lanes : null,
+      ...publicSalonInfo(salon),
     },
   };
 }
@@ -142,3 +147,4 @@ export async function getPublicLanes(salonId: string) {
       isPaused: l.is_paused, // on a break: shown, but not selectable
     }));
 }
+

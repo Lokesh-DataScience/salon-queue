@@ -95,3 +95,23 @@ describe('MySalons in English', () => {
     expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
   });
 });
+
+describe('MySalons pinning', () => {
+  it('pinning a salon moves it to the top and marks it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1000);
+    saveMySalon({ salonId: 's1', code: 'aaaaaaaaaaaa', name: 'Milan Hair Salon' });
+    vi.setSystemTime(2000);
+    saveMySalon({ salonId: 's2', code: 'bbbbbbbbbbbb', name: 'Second Salon' });
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    renderList();
+
+    await user.click(await screen.findByRole('button', { name: 'Milan Hair Salon को ऊपर पिन करें' }));
+    const links = screen.getAllByRole('link', { name: /Salon/ });
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/c/s/aaaaaaaaaaaa', '/c/s/bbbbbbbbbbbb']);
+    expect(links[0]).toHaveTextContent('पिन किया हुआ');
+    expect(screen.getByRole('button', { name: 'Milan Hair Salon से पिन हटाएँ' })).toHaveAttribute('aria-pressed', 'true');
+    expect(getMySalons()[0].pinned).toBe(true);
+  });
+});

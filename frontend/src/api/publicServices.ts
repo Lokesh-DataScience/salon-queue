@@ -5,6 +5,7 @@ export interface PublicService {
   id: string;
   name: string;
   durationMinutes: number;
+  priceRupees?: number | null; // null or missing = the salon hasn't set a price
 }
 
 export function fetchSalonServices(salonId: string) {

@@ -205,11 +205,13 @@ export interface SalonService {
   id: string;
   name: string;
   durationMinutes: number;
+  priceRupees?: number | null; // whole rupees; null = not shown to customers
 }
 
 export interface ServiceInput {
   name: string;
   durationMinutes: number;
+  priceRupees?: number | null;
 }
 
 export function fetchServices() {

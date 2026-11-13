@@ -27,17 +27,36 @@ const PATHS = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  pin: <path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3z" />,
+  phone: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />,
+  mapPin: (
+    <>
+      <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;
 
-export default function Icon({ name, size = 22, className }: { name: IconName; size?: number; className?: string }) {
+// filled: solid shape (used for a pinned pin).
+export default function Icon({
+  name,
+  size = 22,
+  className,
+  filled = false,
+}: {
+  name: IconName;
+  size?: number;
+  className?: string;
+  filled?: boolean;
+}) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth={1.9}
       strokeLinecap="round"

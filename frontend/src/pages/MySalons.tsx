@@ -10,7 +10,7 @@ import Icon from '../components/Icon';
 import SalonStatus, { salonState } from '../components/SalonStatus';
 import { fetchPublicQueue } from '../api/salons';
 import { getTickets } from '../lib/activeTickets';
-import { getMySalons, removeMySalon, type MySalon } from '../lib/mySalons';
+import { getMySalons, removeMySalon, setSalonPinned, type MySalon } from '../lib/mySalons';
 import { useT } from '../lib/i18n';
 
 const ticketUrl = (ticketId: string, accessToken: string) => `/tickets/${ticketId}?accessToken=${accessToken}`;
@@ -27,6 +27,9 @@ const TEXT = {
     removeYes: 'हाँ, हटाएँ',
     removeNo: 'रहने दें',
     removeAsk: 'सूची से हटाएँ?',
+    pin: (n: string) => `${n} को ऊपर पिन करें`,
+    unpin: (n: string) => `${n} से पिन हटाएँ`,
+    pinned: 'पिन किया हुआ',
     emptyTitle: 'अभी कोई सैलून नहीं',
     emptyBody: 'किसी सैलून में लगा QR कोड स्कैन करें। वह सैलून यहाँ अपने-आप जुड़ जाएगा।',
   },
@@ -41,13 +44,16 @@ const TEXT = {
     removeYes: 'Yes, remove',
     removeNo: 'Keep',
     removeAsk: 'Remove from list?',
+    pin: (n: string) => `Pin ${n} to the top`,
+    unpin: (n: string) => `Unpin ${n}`,
+    pinned: 'Pinned',
     emptyTitle: 'No salons yet',
     emptyBody: "Scan the QR code at any salon. It will appear here automatically.",
   },
 };
 
 // The socket allows only a few rooms per phone, so the list polls; the salon page itself is live.
-function SalonCard({ salon, onRemove }: { salon: MySalon; onRemove: () => void }) {
+function SalonCard({ salon, onRemove, onPin }: { salon: MySalon; onRemove: () => void; onPin: (pinned: boolean) => void }) {
   const t = useT(TEXT);
   const [confirming, setConfirming] = useState(false);
   const { data: q, isError } = useQuery({
@@ -63,7 +69,15 @@ function SalonCard({ salon, onRemove }: { salon: MySalon; onRemove: () => void }
     <li className="card overflow-hidden p-0">
       <Link to={`/c/s/${salon.code}`} className="flex items-center gap-3 px-4 py-4 hover:bg-gray-50">
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-lg font-bold text-ink">{q?.name ?? salon.name}</span>
+          <span className="flex items-center gap-1.5">
+            {salon.pinned && (
+              <span className="shrink-0 text-ink" title={t.pinned}>
+                <Icon name="pin" size={16} filled />
+                <span className="sr-only">{t.pinned}: </span>
+              </span>
+            )}
+            <span className="truncate text-lg font-bold text-ink">{q?.name ?? salon.name}</span>
+          </span>
           <span className="mt-1 flex flex-wrap items-center gap-x-2 text-base">
             {isError ? (
               <span className="text-gray-600">{t.unavailable}</span>
@@ -93,9 +107,20 @@ function SalonCard({ salon, onRemove }: { salon: MySalon; onRemove: () => void }
           <span />
         )}
         {!confirming ? (
-          <button type="button" className="min-h-11 px-2 text-sm text-gray-600" onClick={() => setConfirming(true)}>
-            {t.remove}
-          </button>
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-pressed={!!salon.pinned}
+              aria-label={salon.pinned ? t.unpin(salon.name) : t.pin(salon.name)}
+              className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-gray-100 ${salon.pinned ? 'text-ink' : 'text-gray-500'}`}
+              onClick={() => onPin(!salon.pinned)}
+            >
+              <Icon name="pin" size={20} filled={!!salon.pinned} />
+            </button>
+            <button type="button" className="min-h-11 px-2 text-sm text-gray-600" onClick={() => setConfirming(true)}>
+              {t.remove}
+            </button>
+          </span>
         ) : (
           <span className="flex items-center gap-1" role="group" aria-label={t.removeAsk}>
             <button type="button" className="min-h-11 px-2 text-sm font-semibold text-red-700" onClick={onRemove}>
@@ -135,6 +160,10 @@ export default function MySalons() {
               salon={s}
               onRemove={() => {
                 removeMySalon(s.salonId);
+                setSalons(getMySalons());
+              }}
+              onPin={(pinned) => {
+                setSalonPinned(s.salonId, pinned);
                 setSalons(getMySalons());
               }}
             />
