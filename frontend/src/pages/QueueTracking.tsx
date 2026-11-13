@@ -12,6 +12,7 @@ import { CUSTOMER_DISCOVERY } from '../lib/features';
 import LocalNews from '../components/LocalNews';
 import Countdown from '../components/Countdown';
 import ForgetMe from '../components/ForgetMe';
+import { isInstalledApp } from '../lib/appManifest';
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -192,7 +193,10 @@ export default function QueueTracking() {
   useEffect(() => {
     if (error instanceof ApiError && error.status === 404 && ticketId) removeTicket(ticketId);
   }, [error, ticketId]);
-  const homeLabel = CUSTOMER_DISCOVERY ? 'Find a salon' : 'Back to home';
+  // Inside the installed customer app, "home" is the My salons list.
+  const inApp = isInstalledApp();
+  const homeTo = inApp ? '/c' : '/';
+  const homeLabel = inApp ? 'मेरे सैलून' : CUSTOMER_DISCOVERY ? 'Find a salon' : 'Back to home';
 
   // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -216,7 +220,7 @@ export default function QueueTracking() {
           <p role="alert" className="text-red-700">
             We couldn't find this queue ticket. It may have expired, or the link is incomplete.
           </p>
-          <Link to="/" className="btn-secondary mt-6">{homeLabel}</Link>
+          <Link to={homeTo} className="btn-secondary mt-6">{homeLabel}</Link>
         </div>
       </PageShell>
     );
@@ -243,7 +247,7 @@ export default function QueueTracking() {
           <div className="mt-6">
             <ForgetMe ticketId={ticket.ticketId} accessToken={accessToken} salonId={ticket.salonId} />
           </div>
-          <Link to="/" className="btn-secondary mt-6">{homeLabel}</Link>
+          <Link to={homeTo} className="btn-secondary mt-6">{homeLabel}</Link>
         </div>
       </PageShell>
     );

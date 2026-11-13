@@ -12,6 +12,7 @@ import { ApiError } from '../api/client';
 import { getTickets, removeTicket, saveTicket } from '../lib/activeTickets';
 import { clearJoinKey, getJoinKey } from '../lib/joinKey';
 import { clearRememberToken, getRememberToken, saveRememberToken } from '../lib/rememberToken';
+import { saveMySalon } from '../lib/mySalons';
 import { askPushPermission, enablePushAfterJoin } from '../lib/push';
 import PageShell from '../components/PageShell';
 import ServicePicker from '../components/ServicePicker';
@@ -41,6 +42,12 @@ type View =
   | { kind: 'choose'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; error?: string }
   | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean };
 
+// The customer app shows these two refusals in Hindi; the wall-QR page keeps the server's text.
+const APP_MESSAGES: Record<string, string> = {
+  APP_JOIN_DISABLED: 'इस सैलून में अभी ऐप से टोकन बंद है। कृपया सैलून में लगा QR कोड स्कैन करें।',
+  ALREADY_IN_QUEUE: 'इस सैलून में आज आपका टोकन पहले से है। उसे उसी फ़ोन में देखें जिससे टोकन लिया था।',
+};
+
 const ticketUrl = (ticketId: string, accessToken: string) =>
   `/tickets/${ticketId}?accessToken=${accessToken}`;
 
@@ -50,8 +57,10 @@ async function withSalonLock<T>(salonId: string, fn: () => Promise<T>): Promise<
   return locks?.request ? locks.request(`join:${salonId}`, fn) : fn();
 }
 
-export default function ScanLanding() {
+// source "app": the same flow, started from the customer app's Join button (/c/s/:code/join).
+export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' } = {}) {
   const { code } = useParams<{ code: string }>();
+  const errorText = (err: ApiError) => (source === 'app' && err.code && APP_MESSAGES[err.code]) || err.message;
   const navigate = useNavigate();
   const [view, setView] = useState<View>({ kind: 'working' });
   const [joining, setJoining] = useState(false);
@@ -70,6 +79,7 @@ export default function ScanLanding() {
       const ticket = await joinSalonQueue(salonId, key, serviceIds, chosenLaneId, {
         ...(who ? { name: who.name, phone: who.phone, consent: true } : {}),
         rememberToken: getRememberToken(salonId) ?? undefined,
+        ...(source === 'app' ? { source: 'app' as const } : {}),
       });
       // The server hands out a token only when this phone is new to the salon (or on a new device).
       if (ticket.rememberToken) saveRememberToken(salonId, ticket.rememberToken);
@@ -83,7 +93,7 @@ export default function ScanLanding() {
       navigate(ticketUrl(ticket.ticketId, ticket.accessToken), { replace: true });
       return ticket;
     },
-    [navigate],
+    [navigate, source],
   );
 
   const runOnce = useCallback(async () => {
@@ -93,6 +103,8 @@ export default function ScanLanding() {
       const salon = await fetchSalonByCode(code ?? '');
       salonName = salon.name;
       setView({ kind: 'working', salonName });
+      // Remember the salon for the customer app's "My salons" (salon details only, nothing about the customer).
+      saveMySalon({ salonId: salon.id, code: code ?? '', name: salon.name });
 
       await withSalonLock(salon.id, async () => {
         // Scanning again must never hand out a second token: go back to the ticket this phone already holds.
@@ -161,7 +173,7 @@ export default function ScanLanding() {
         title: salonName ? "Can't get a token right now" : "Couldn't open the queue",
         message:
           err instanceof ApiError
-            ? err.message
+            ? errorText(err)
             : 'We could not reach the server. Please check your internet connection and try again.',
         salonName,
         canRetry: true,
@@ -208,7 +220,7 @@ export default function ScanLanding() {
       } catch (err) {
         const message =
           err instanceof ApiError
-            ? err.message
+            ? errorText(err)
             : 'We could not reach the server. Please check your internet connection and try again.';
         if (needsDetails(err)) {
           clearRememberToken(salon.id);

@@ -8,6 +8,7 @@ export interface JoinCustomer {
   phone?: string;
   consent?: boolean;
   rememberToken?: string;
+  source?: 'qr' | 'app'; // 'app' = taken from the customer app; the wall QR leaves it out
 }
 
 // laneId = the barber's line. Leave it out for "Any barber" (the server picks the shortest wait).
@@ -26,6 +27,7 @@ export function joinSalonQueue(
   if (customer?.phone) body.phone = customer.phone;
   if (customer?.consent) body.consent = true;
   if (customer?.rememberToken) body.rememberToken = customer.rememberToken;
+  if (customer?.source === 'app') body.source = 'app';
   return apiFetch<{ ticket: any }>(`/api/queues/${salonId}/join`, {
     method: 'POST',
     body: JSON.stringify(body),

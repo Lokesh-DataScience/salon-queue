@@ -7,6 +7,7 @@ import ScanLanding from './ScanLanding';
 import { renderPage } from '../test/utils';
 import { saveTicket, getTickets } from '../lib/activeTickets';
 import { saveRememberToken } from '../lib/rememberToken';
+import { getMySalons } from '../lib/mySalons';
 import { ApiError } from '../api/client';
 import * as tickets from '../api/tickets';
 import * as salons from '../api/salons';
@@ -125,5 +126,49 @@ describe('ScanLanding (wall QR)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(screen.getByText('OTHER PAGE')).toBeInTheDocument());
     expect(tickets.joinSalonQueue).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Customer app Slice 3 ──
+  it('remembers the scanned salon for the customer app (salon details only)', async () => {
+    vi.mocked(tickets.joinSalonQueue).mockResolvedValue(newTicket);
+    renderScan();
+    await screen.findByText('OTHER PAGE');
+    expect(getMySalons()).toEqual([
+      expect.objectContaining({ salonId: 'salon-1', code: '87bcee043619', name: 'Milan Hair Salon' }),
+    ]);
+  });
+
+  it('from the customer app, the join is marked as an app join', async () => {
+    vi.mocked(tickets.joinSalonQueue).mockResolvedValue(newTicket);
+    renderScan(<ScanLanding source="app" />);
+    await screen.findByText('OTHER PAGE');
+    expect(tickets.joinSalonQueue).toHaveBeenCalledWith('salon-1', expect.any(String), [], undefined, {
+      rememberToken: REMEMBER,
+      source: 'app',
+    });
+  });
+
+  it('from the customer app, a switched-off salon is explained in Hindi', async () => {
+    vi.mocked(tickets.joinSalonQueue).mockRejectedValue(
+      new ApiError('This salon is not taking tokens from the app right now.', 403, undefined, 'APP_JOIN_DISABLED'),
+    );
+    renderScan(<ScanLanding source="app" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('इस सैलून में अभी ऐप से टोकन बंद है');
+  });
+
+  it('from the customer app, "already in the queue" is explained in Hindi', async () => {
+    vi.mocked(tickets.joinSalonQueue).mockRejectedValue(
+      new ApiError('You already have a token at this salon today.', 409, undefined, 'ALREADY_IN_QUEUE'),
+    );
+    renderScan(<ScanLanding source="app" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('आपका टोकन पहले से है');
+  });
+
+  it('the wall QR keeps the server message', async () => {
+    vi.mocked(tickets.joinSalonQueue).mockRejectedValue(
+      new ApiError('You already have a token at this salon today.', 409, undefined, 'ALREADY_IN_QUEUE'),
+    );
+    renderScan();
+    expect(await screen.findByRole('alert')).toHaveTextContent('You already have a token at this salon today.');
   });
 });

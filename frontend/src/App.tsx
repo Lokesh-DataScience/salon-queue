@@ -1,5 +1,6 @@
 // frontend/src/App.tsx
-import { Routes, Route, Link, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import PageShell from './components/PageShell';
 import HomePage from './pages/HomePage';
 import ScanHome from './pages/ScanHome';
@@ -24,6 +25,9 @@ import BarberServices from './pages/BarberServices';
 import BarberTeam from './pages/BarberTeam';
 import BarberAdmin from './pages/BarberAdmin';
 import BarberReport from './pages/BarberReport';
+import MySalons from './pages/MySalons';
+import SalonQueue from './pages/SalonQueue';
+import { applyManifest } from './lib/appManifest';
 
 function NotFound() {
   return (
@@ -35,8 +39,17 @@ function NotFound() {
   );
 }
 
+// Barber pages offer the barber app for install; every customer page offers the customer app.
+function ManifestSwitch() {
+  const { pathname } = useLocation();
+  useEffect(() => applyManifest(pathname), [pathname]);
+  return null;
+}
+
 function App() {
   return (
+    <>
+    <ManifestSwitch />
     <Routes>
       {CUSTOMER_DISCOVERY ? (
         <>
@@ -55,6 +68,10 @@ function App() {
       <Route path="/q/:code" element={<ScanLanding />} />
       <Route path="/health" element={<HealthPage />} />
       <Route path="/tickets/:ticketId" element={<QueueTracking />} />
+      {/* Customer app: only salons this phone has scanned. */}
+      <Route path="/c" element={<MySalons />} />
+      <Route path="/c/s/:code" element={<SalonQueue />} />
+      <Route path="/c/s/:code/join" element={<ScanLanding source="app" />} />
       <Route path="/barber/login" element={<BarberLogin />} />
       <Route path="/barber/register" element={<BarberRegister />} />
       <Route element={<BarberLayout />}>
@@ -72,6 +89,7 @@ function App() {
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   );
 }
 

@@ -36,3 +36,20 @@ export interface PublicLane {
 export function fetchSalonLanes(salonId: string) {
   return apiFetch<{ lanes: PublicLane[] }>(`/api/salons/${salonId}/lanes`).then((r) => r.lanes);
 }
+
+// The customer app's view of one salon (counts and token numbers only, never names or phones).
+export interface PublicQueue {
+  salonId: string;
+  name: string;
+  isOpen: boolean;
+  isPaused: boolean;
+  allowAppJoin: boolean;
+  nowServingToken: number;
+  waitingCount: number;
+  estimatedWaitMinutes: number | null;
+  lanes: PublicLane[] | null; // only when there is a choice of barber
+}
+
+export function fetchPublicQueue(salonId: string) {
+  return apiFetch<{ salon: PublicQueue }>(`/api/salons/${salonId}/queue-public`).then((r) => r.salon);
+}
