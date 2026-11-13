@@ -11,6 +11,10 @@ import { getMySalons } from '../lib/mySalons';
 import { ApiError } from '../api/client';
 import * as tickets from '../api/tickets';
 import * as salons from '../api/salons';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 vi.mock('../api/tickets', () => ({
   joinSalonQueue: vi.fn(),
@@ -149,6 +153,7 @@ describe('ScanLanding (wall QR)', () => {
   });
 
   it('from the customer app, a switched-off salon is explained in Hindi', async () => {
+    setLang('hi');
     vi.mocked(tickets.joinSalonQueue).mockRejectedValue(
       new ApiError('This salon is not taking tokens from the app right now.', 403, undefined, 'APP_JOIN_DISABLED'),
     );
@@ -157,6 +162,7 @@ describe('ScanLanding (wall QR)', () => {
   });
 
   it('from the customer app, "already in the queue" is explained in Hindi', async () => {
+    setLang('hi');
     vi.mocked(tickets.joinSalonQueue).mockRejectedValue(
       new ApiError('You already have a token at this salon today.', 409, undefined, 'ALREADY_IN_QUEUE'),
     );

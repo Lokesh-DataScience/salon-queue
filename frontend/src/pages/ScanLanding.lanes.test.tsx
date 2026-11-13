@@ -5,6 +5,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ScanLanding from './ScanLanding';
 import { saveRememberToken } from '../lib/rememberToken';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 vi.mock('../lib/push', () => ({
   askPushPermission: () => Promise.resolve('denied'),

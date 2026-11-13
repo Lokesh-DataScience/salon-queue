@@ -7,6 +7,10 @@ import { renderPage } from '../test/utils';
 import { saveRememberToken } from '../lib/rememberToken';
 import * as salons from '../api/salons';
 import * as tickets from '../api/tickets';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 vi.mock('../api/salons', () => ({ fetchSalonByCode: vi.fn() }));
 vi.mock('../api/tickets', () => ({ fetchTicketStatus: vi.fn(), joinSalonQueue: vi.fn() }));

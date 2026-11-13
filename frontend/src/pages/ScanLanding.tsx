@@ -15,6 +15,8 @@ import { clearRememberToken, getRememberToken, saveRememberToken } from '../lib/
 import { saveMySalon } from '../lib/mySalons';
 import { askPushPermission, enablePushAfterJoin } from '../lib/push';
 import PageShell from '../components/PageShell';
+import CustomerHeader from '../components/CustomerHeader';
+import { useLang, useT } from '../lib/i18n';
 import ServicePicker from '../components/ServicePicker';
 import LanePicker from '../components/LanePicker';
 import CustomerDetailsForm, { type CustomerDetails } from '../components/CustomerDetailsForm';
@@ -36,16 +38,63 @@ async function loadLanes(salonId: string): Promise<PublicLane[]> {
 
 type SalonInfo = { id: string; name: string };
 
+// Messages are kept as keys (or the server's text + code) and translated when shown,
+// so switching the language also switches a message that is already on screen.
+type Msg = { key: 'network' | 'again' | 'notRecognisedBody' } | { server: string; code?: string };
+const fromError = (err: unknown): Msg =>
+  err instanceof ApiError ? { server: err.message, code: err.code } : { key: 'network' };
+
 type View =
   | { kind: 'working'; salonName?: string }
-  | { kind: 'details'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; notice?: string; error?: string }
-  | { kind: 'choose'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; error?: string }
-  | { kind: 'error'; title: string; message: string; salonName?: string; canRetry: boolean };
+  | { kind: 'details'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; notice?: Msg; error?: Msg }
+  | { kind: 'choose'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; error?: Msg }
+  | { kind: 'error'; title: 'notRecognised' | 'cantGet' | 'cantOpen'; message: Msg; salonName?: string; canRetry: boolean };
 
-// The customer app shows these two refusals in Hindi; the wall-QR page keeps the server's text.
-const APP_MESSAGES: Record<string, string> = {
+// Refusals the server marks with a code get our own Hindi text. In English (and for codes we
+// don't know) the server's own message is shown.
+const HINDI_CODES: Record<string, string> = {
   APP_JOIN_DISABLED: 'इस सैलून में अभी ऐप से टोकन बंद है। कृपया सैलून में लगा QR कोड स्कैन करें।',
   ALREADY_IN_QUEUE: 'इस सैलून में आज आपका टोकन पहले से है। उसे उसी फ़ोन में देखें जिससे टोकन लिया था।',
+  SALON_SUSPENDED: 'यह सैलून अभी टोकन नहीं ले रहा है।',
+  CONSENT_REQUIRED: 'आगे बढ़ने के लिए कृपया टिक बॉक्स पर निशान लगाएँ।',
+  CUSTOMER_DETAILS_REQUIRED: 'कृपया अपना नाम और मोबाइल नंबर भरें।',
+};
+
+const TEXT = {
+  hi: {
+    network: 'सर्वर से जुड़ नहीं पाए। इंटरनेट देखकर फिर से कोशिश करें।',
+    again: 'कृपया अपनी जानकारी फिर से भरें।',
+    notRecognised: 'QR कोड पहचाना नहीं गया',
+    notRecognisedBody: 'कृपया सैलून में लगा QR कोड फिर से स्कैन करें, या स्टाफ़ से मदद लें।',
+    cantGet: 'अभी टोकन नहीं मिल सकता',
+    cantOpen: 'लाइन नहीं खुल पाई',
+    retry: 'फिर से कोशिश करें',
+    getToken: 'टोकन लें',
+    details: 'आपकी जानकारी',
+    choose: 'सेवा चुनें',
+    continue: 'आगे बढ़ें',
+    getMine: 'मेरा टोकन लें',
+    busy: 'टोकन ले रहे हैं...',
+    working: 'आपका टोकन ले रहे हैं...',
+    wait: 'एक पल रुकें। साइन-अप की ज़रूरत नहीं।',
+  },
+  en: {
+    network: 'We could not reach the server. Please check your internet connection and try again.',
+    again: 'Please enter your details again.',
+    notRecognised: 'QR code not recognised',
+    notRecognisedBody: 'Please scan the QR code displayed at the salon again, or ask the salon staff for help.',
+    cantGet: "Can't get a token right now",
+    cantOpen: "Couldn't open the queue",
+    retry: 'Try again',
+    getToken: 'Get your token',
+    details: 'Your details',
+    choose: 'Choose your service',
+    continue: 'Continue',
+    getMine: 'Get my token',
+    busy: 'Getting your token...',
+    working: 'Getting your token...',
+    wait: 'Please wait a moment. No sign-up needed.',
+  },
 };
 
 const ticketUrl = (ticketId: string, accessToken: string) =>
@@ -60,7 +109,13 @@ async function withSalonLock<T>(salonId: string, fn: () => Promise<T>): Promise<
 // source "app": the same flow, started from the customer app's Join button (/c/s/:code/join).
 export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' } = {}) {
   const { code } = useParams<{ code: string }>();
-  const errorText = (err: ApiError) => (source === 'app' && err.code && APP_MESSAGES[err.code]) || err.message;
+  const lang = useLang();
+  const t = useT(TEXT);
+  const say = (m: Msg | undefined): string | undefined => {
+    if (!m) return undefined;
+    if ('key' in m) return t[m.key];
+    return (lang === 'hi' && m.code && HINDI_CODES[m.code]) || m.server;
+  };
   const navigate = useNavigate();
   const [view, setView] = useState<View>({ kind: 'working' });
   const [joining, setJoining] = useState(false);
@@ -154,27 +209,19 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
             salon: info,
             services,
             lanes: [],
-            notice: 'Please enter your details again.',
+            notice: { key: 'again' },
           });
         }
       });
     } catch (err) {
       if (!salonName && err instanceof ApiError && err.status === 404) {
-        setView({
-          kind: 'error',
-          title: 'QR code not recognised',
-          message: 'Please scan the QR code displayed at the salon again, or ask the salon staff for help.',
-          canRetry: false,
-        });
+        setView({ kind: 'error', title: 'notRecognised', message: { key: 'notRecognisedBody' }, canRetry: false });
         return;
       }
       setView({
         kind: 'error',
-        title: salonName ? "Can't get a token right now" : "Couldn't open the queue",
-        message:
-          err instanceof ApiError
-            ? errorText(err)
-            : 'We could not reach the server. Please check your internet connection and try again.',
+        title: salonName ? 'cantGet' : 'cantOpen',
+        message: fromError(err),
         salonName,
         canRetry: true,
       });
@@ -218,10 +265,7 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
           })
           .catch(() => {}); // the Notify me button on the ticket is the fallback
       } catch (err) {
-        const message =
-          err instanceof ApiError
-            ? errorText(err)
-            : 'We could not reach the server. Please check your internet connection and try again.';
+        const message = fromError(err);
         if (needsDetails(err)) {
           clearRememberToken(salon.id);
           setDetails(null);
@@ -230,7 +274,7 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
             salon,
             services,
             lanes,
-            notice: who ? undefined : 'Please enter your details again.',
+            notice: who ? undefined : { key: 'again' },
             error: who ? message : undefined,
           });
           return;
@@ -282,19 +326,18 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
   if (view.kind === 'details') {
     const more = view.services.length > 0 || view.lanes.length > 1;
     return (
-      <PageShell title="Get your token">
-        <p className="mb-1 text-sm text-gray-600">{view.salon.name}</p>
-        <h1 className="mb-3 text-xl font-semibold">Your details</h1>
+      <PageShell title={t.details}>
+        <CustomerHeader title={t.details} subtitle={view.salon.name} />
         {view.notice && (
           <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            {view.notice}
+            {say(view.notice)}
           </p>
         )}
         <CustomerDetailsForm
           salonName={view.salon.name}
           busy={joining}
-          error={view.error}
-          submitLabel={more ? 'Continue' : 'Get my token'}
+          error={say(view.error)}
+          submitLabel={more ? t.continue : t.getMine}
           onSubmit={onDetails}
         />
       </PageShell>
@@ -302,26 +345,24 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
   }
 
   if (view.kind === 'choose') {
+    const title = view.services.length > 0 ? t.choose : t.getToken;
     return (
-      <PageShell title={view.services.length > 0 ? 'Choose your service' : 'Get your token'}>
-        <p className="mb-1 text-sm text-gray-600">{view.salon.name}</p>
+      <PageShell title={title}>
+        <CustomerHeader title={title} subtitle={view.salon.name} />
         {view.lanes.length > 1 && (
           <LanePicker lanes={view.lanes} value={laneId} onChange={setLaneId} disabled={joining} />
         )}
         {view.services.length > 0 ? (
-          <>
-            <h1 className="mb-4 text-xl font-semibold">Choose your service</h1>
-            <ServicePicker services={view.services} busy={joining} error={view.error} onJoin={onChoose} />
-          </>
+          <ServicePicker services={view.services} busy={joining} error={say(view.error)} onJoin={onChoose} />
         ) : (
           <>
             {view.error && (
               <p role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-                {view.error}
+                {say(view.error)}
               </p>
             )}
             <button type="button" className="btn-primary" disabled={joining} onClick={() => onChoose([])}>
-              {joining ? 'Getting your token...' : 'Get my token'}
+              {joining ? t.busy : t.getMine}
             </button>
           </>
         )}
@@ -331,16 +372,15 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
 
   if (view.kind === 'error') {
     return (
-      <PageShell title="Get your token">
-        <div className="flex min-h-[60dvh] flex-col justify-center text-center">
-          {view.salonName && <p className="mb-2 text-sm text-gray-600">{view.salonName}</p>}
-          <h1 className="text-xl font-semibold">{view.title}</h1>
-          <p role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
-            {view.message}
+      <PageShell title={t.getToken}>
+        <CustomerHeader title={t[view.title]} subtitle={view.salonName} />
+        <div className="flex min-h-[50dvh] flex-col justify-center text-center">
+          <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-base text-red-900">
+            {say(view.message)}
           </p>
           {view.canRetry && (
             <button type="button" onClick={() => void run()} className="btn-primary mt-6">
-              Try again
+              {t.retry}
             </button>
           )}
         </div>
@@ -349,13 +389,12 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
   }
 
   return (
-    <PageShell title="Get your token">
-      <div className="flex min-h-[60dvh] flex-col justify-center text-center">
-        {view.salonName && <p className="mb-2 text-sm text-gray-600">{view.salonName}</p>}
-        <h1 className="text-xl font-semibold">Getting your token...</h1>
-        <p role="status" className="mt-2 text-gray-600">
-          Please wait a moment. No sign-up needed.
-        </p>
+    <PageShell title={t.getToken}>
+      <CustomerHeader title={t.getToken} subtitle={view.salonName} />
+      <div className="flex min-h-[50dvh] flex-col items-center justify-center text-center">
+        <span aria-hidden="true" className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-ink" />
+        <p className="text-xl font-semibold">{t.working}</p>
+        <p role="status" className="mt-2 text-gray-600">{t.wait}</p>
       </div>
     </PageShell>
   );

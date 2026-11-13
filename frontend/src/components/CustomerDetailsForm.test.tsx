@@ -2,6 +2,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import CustomerDetailsForm from './CustomerDetailsForm';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 afterEach(cleanup);
 beforeEach(() => localStorage.clear());

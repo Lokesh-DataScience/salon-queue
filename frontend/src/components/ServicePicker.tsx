@@ -1,6 +1,38 @@
 // frontend/src/components/ServicePicker.tsx
 import { useState } from 'react';
 import type { PublicService } from '../api/publicServices';
+import { useT } from '../lib/i18n';
+
+const rupees = (p: number) => `₹${p.toLocaleString('en-IN')}`;
+
+const TEXT = {
+  hi: {
+    legend: 'आपको क्या करवाना है?',
+    min: (m: number) => `${m} मिनट`,
+    none: 'एक या ज़्यादा सेवाएँ चुनें।',
+    chosen: (n: number, m: number, price: string) => `${n} ${n === 1 ? 'सेवा' : 'सेवाएँ'} · लगभग ${m} मिनट${price}`,
+    noService: 'आपने कोई सेवा नहीं चुनी। इंतज़ार का अंदाज़ा सैलून के औसत समय से लगेगा।',
+    noServiceLabel: 'कोई सेवा नहीं चुनी',
+    continue: 'आगे बढ़ें',
+    back: 'वापस',
+    busy: 'टोकन ले रहे हैं...',
+    get: 'मेरा टोकन लें',
+    footer: 'साइन-अप की ज़रूरत नहीं। हम सूचना भेजने की अनुमति माँग सकते हैं।',
+  },
+  en: {
+    legend: 'What would you like done?',
+    min: (m: number) => `${m} min`,
+    none: 'Tick one or more services.',
+    chosen: (n: number, m: number, price: string) => `${n} ${n === 1 ? 'service' : 'services'} · about ${m} min${price}`,
+    noService: "You haven't chosen a service. Your wait estimate will use the salon's average time per customer.",
+    noServiceLabel: 'No service chosen',
+    continue: 'Continue',
+    back: 'Back',
+    busy: 'Getting your token...',
+    get: 'Get my token',
+    footer: 'No sign-up needed. We may ask to send you alerts.',
+  },
+};
 
 export default function ServicePicker({
   services,
@@ -13,6 +45,7 @@ export default function ServicePicker({
   error?: string;
   onJoin: (serviceIds: string[]) => void;
 }) {
+  const t = useT(TEXT);
   const [picked, setPicked] = useState<string[]>([]);
   const [confirmNone, setConfirmNone] = useState(false);
 
@@ -37,7 +70,7 @@ export default function ServicePicker({
   return (
     <div>
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-gray-700">What would you like done?</legend>
+        <legend className="mb-2 text-sm font-semibold text-gray-700">{t.legend}</legend>
         <ul className="grid gap-2">
           {services.map((s) => {
             const on = valid.includes(s.id);
@@ -57,8 +90,8 @@ export default function ServicePicker({
                   />
                   <span className="flex-1 text-base font-semibold">{s.name}</span>
                   <span className="text-right text-sm text-gray-700">
-                    {s.durationMinutes} min
-                    {s.priceRupees != null && <span className="block font-semibold text-ink">₹{s.priceRupees.toLocaleString('en-IN')}</span>}
+                    {t.min(s.durationMinutes)}
+                    {s.priceRupees != null && <span className="block font-semibold text-ink">{rupees(s.priceRupees)}</span>}
                   </span>
                 </label>
               </li>
@@ -68,11 +101,7 @@ export default function ServicePicker({
       </fieldset>
 
       <p role="status" className="mt-3 text-sm text-gray-700">
-        {chosen.length === 0
-          ? 'Tick one or more services.'
-          : `${chosen.length} ${chosen.length === 1 ? 'service' : 'services'} · about ${total} min${
-              totalPrice != null ? ` · ₹${totalPrice.toLocaleString('en-IN')}` : ''
-            }`}
+        {chosen.length === 0 ? t.none : t.chosen(chosen.length, total, totalPrice != null ? ` · ${rupees(totalPrice)}` : '')}
       </p>
 
       {error && (
@@ -82,25 +111,25 @@ export default function ServicePicker({
       )}
 
       {confirmNone ? (
-        <div role="alertdialog" aria-label="No service chosen" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+        <div role="alertdialog" aria-label={t.noServiceLabel} className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="mb-3 text-sm text-amber-900">
-            You haven't chosen a service. Your wait estimate will use the salon's average time per customer.
+            {t.noService}
           </p>
           <div className="flex gap-3">
             <button type="button" className="btn-primary flex-1" disabled={busy} onClick={() => onJoin([])}>
-              {busy ? 'Getting your token...' : 'Continue'}
+              {busy ? t.busy : t.continue}
             </button>
             <button type="button" className="btn-secondary flex-1" disabled={busy} onClick={() => setConfirmNone(false)}>
-              Back
+              {t.back}
             </button>
           </div>
         </div>
       ) : (
         <button type="button" className="btn-primary mt-4" disabled={busy} aria-busy={busy} onClick={submit}>
-          {busy ? 'Getting your token...' : 'Get my token'}
+          {busy ? t.busy : t.get}
         </button>
       )}
-      <p className="mt-3 text-center text-xs text-gray-600">No sign-up needed. We may ask to send you alerts.</p>
+      <p className="mt-3 text-center text-xs text-gray-600">{t.footer}</p>
     </div>
   );
 }

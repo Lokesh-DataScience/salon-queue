@@ -1,8 +1,12 @@
 // The join flow's service picker shows prices when the salon set them (customer app polish, slice 2).
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ServicePicker from './ServicePicker';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 const services = [
   { id: 'a', name: 'Haircut', durationMinutes: 20, priceRupees: 100 },
