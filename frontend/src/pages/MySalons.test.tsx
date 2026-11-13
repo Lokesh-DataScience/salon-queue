@@ -1,5 +1,5 @@
 // frontend/src/pages/MySalons.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MySalons from './MySalons';
@@ -8,6 +8,7 @@ import { saveMySalon, getMySalons } from '../lib/mySalons';
 import { saveTicket } from '../lib/activeTickets';
 import * as salons from '../api/salons';
 import type { PublicQueue } from '../api/salons';
+import { resetLangForTests } from '../lib/i18n';
 
 vi.mock('../api/salons', () => ({ fetchPublicQueue: vi.fn() }));
 
@@ -19,6 +20,11 @@ const renderList = () => renderPage(<MySalons />, { path: '/c', route: '/c' });
 
 beforeEach(() => {
   vi.mocked(salons.fetchPublicQueue).mockReset().mockImplementation(async (id: string) => queue(id));
+});
+
+afterEach(() => {
+  localStorage.removeItem('svq.lang.v1');
+  resetLangForTests();
 });
 
 describe('MySalons (customer app home)', () => {
@@ -43,8 +49,8 @@ describe('MySalons (customer app home)', () => {
 
     const links = await screen.findAllByRole('link', { name: /Salon/ });
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['/c/s/bbbbbbbbbbbb', '/c/s/aaaaaaaaaaaa']);
-    expect(await screen.findByText('अभी #5 · 2 लोग इंतज़ार में')).toBeInTheDocument();
-    expect(await screen.findByText('🔒 अभी बंद है')).toBeInTheDocument();
+    expect(await screen.findByText(/अभी #5 · 2 लोग इंतज़ार में/)).toBeInTheDocument();
+    expect(await screen.findByText('अभी बंद है')).toBeInTheDocument();
   });
 
   it('links straight to this phone\'s ticket at a salon', async () => {
@@ -74,5 +80,18 @@ describe('MySalons (customer app home)', () => {
     renderList();
     expect(await screen.findByText('अभी उपलब्ध नहीं')).toBeInTheDocument();
     expect(screen.getByText('Milan Hair Salon')).toBeInTheDocument();
+  });
+});
+
+describe('MySalons in English', () => {
+  it('switches the page and the cards to English', async () => {
+    saveMySalon({ salonId: 's1', code: 'aaaaaaaaaaaa', name: 'Milan Hair Salon' });
+    const user = userEvent.setup();
+    renderList();
+    await screen.findByText(/अभी #5/);
+    await user.click(screen.getByRole('button', { name: 'Switch to English' }));
+    expect(screen.getByRole('heading', { name: 'My salons' })).toBeInTheDocument();
+    expect(await screen.findByText(/Now #5 · 2 waiting/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
   });
 });

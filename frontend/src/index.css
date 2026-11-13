@@ -20,6 +20,9 @@
   --color-gray-700: #3D4059;
   --color-gray-800: #2B3250;
   --color-gray-900: #1B2036;
+
+  /* Customer pages (Hindi + English). Barber pages keep the system font. */
+  --font-hind: 'Hind', ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -95,5 +98,27 @@ html {
 @layer components {
   .btn-sm {
     @apply inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-ink bg-white px-3 text-sm font-semibold text-ink hover:bg-brand-soft disabled:opacity-50;
+  }
+}
+
+/* ── Customer app (look A on the brand colours) ─────────────────────────── */
+@layer components {
+  body.c-font {
+    font-family: var(--font-hind);
+  }
+  /* Room for the bottom bar so the last card is never hidden behind it. */
+  body.has-c-nav {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .c-nav {
+    @apply fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white px-2 pt-1;
+    padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -2px 10px rgb(27 32 54 / 0.06);
+  }
+  .c-offline {
+    @apply sticky top-0 z-30 flex items-center justify-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-medium text-amber-900;
+  }
+  .c-chip {
+    @apply inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white px-3 text-sm font-semibold text-ink hover:bg-brand-soft;
   }
 }

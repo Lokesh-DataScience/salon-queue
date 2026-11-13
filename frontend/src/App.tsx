@@ -27,6 +27,8 @@ import BarberAdmin from './pages/BarberAdmin';
 import BarberReport from './pages/BarberReport';
 import MySalons from './pages/MySalons';
 import SalonQueue from './pages/SalonQueue';
+import MyTickets from './pages/MyTickets';
+import CustomerChrome from './components/CustomerChrome';
 import { applyManifest } from './lib/appManifest';
 
 function NotFound() {
@@ -50,6 +52,7 @@ function App() {
   return (
     <>
     <ManifestSwitch />
+    <CustomerChrome />
     <Routes>
       {CUSTOMER_DISCOVERY ? (
         <>
@@ -70,6 +73,7 @@ function App() {
       <Route path="/tickets/:ticketId" element={<QueueTracking />} />
       {/* Customer app: only salons this phone has scanned. */}
       <Route path="/c" element={<MySalons />} />
+      <Route path="/c/tokens" element={<MyTickets />} />
       <Route path="/c/s/:code" element={<SalonQueue />} />
       <Route path="/c/s/:code/join" element={<ScanLanding source="app" />} />
       <Route path="/barber/login" element={<BarberLogin />} />

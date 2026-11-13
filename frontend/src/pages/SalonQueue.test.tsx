@@ -1,6 +1,6 @@
 // frontend/src/pages/SalonQueue.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SalonQueue from './SalonQueue';
 import { renderPage } from '../test/utils';
@@ -20,6 +20,8 @@ const queue = (over: Partial<PublicQueue> = {}): PublicQueue => ({
   nowServingToken: 7, waitingCount: 3, estimatedWaitMinutes: 25, lanes: null, ...over,
 });
 const given = (over: Partial<PublicQueue> = {}) => vi.mocked(salons.fetchPublicQueue).mockResolvedValue(queue(over));
+// The three number tiles: "Now serving", "Waiting", "min wait".
+const tile = (label: string) => screen.getByRole('group', { name: label });
 const renderQueue = () => renderPage(<SalonQueue />, { path: '/c/s/:code', route: `/c/s/${CODE}` });
 
 beforeEach(() => {
@@ -34,9 +36,10 @@ describe('SalonQueue (customer app)', () => {
     renderQueue();
 
     expect(await screen.findByRole('heading', { name: 'Milan Hair Salon' })).toBeInTheDocument();
-    expect(screen.getByText('#7')).toBeInTheDocument();
-    expect(screen.getByText('3 लोग इंतज़ार में')).toBeInTheDocument();
-    expect(screen.getByText('अनुमानित इंतज़ार: ~25 मिनट')).toBeInTheDocument();
+    expect(tile('अभी चल रहा')).toHaveTextContent('#7');
+    expect(tile('इंतज़ार में')).toHaveTextContent('3');
+    expect(tile('मिनट इंतज़ार')).toHaveTextContent('~25');
+    expect(screen.getByText('खुला है')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'घर बैठे टोकन लें' })).toHaveAttribute('href', `/c/s/${CODE}/join`);
     await waitFor(() => expect(socket.emit).toHaveBeenCalledWith('join:salon', { salonId: 'salon-1' }));
   });
@@ -44,12 +47,13 @@ describe('SalonQueue (customer app)', () => {
   it('updates live when the salon room says something changed', async () => {
     given();
     renderQueue();
-    await screen.findByText('3 लोग इंतज़ार में');
+    await screen.findByRole('heading', { name: 'Milan Hair Salon' });
+    expect(tile('इंतज़ार में')).toHaveTextContent('3');
 
     given({ waitingCount: 2, nowServingToken: 8 });
     act(() => fireSocket('queue:updated', { salonId: 'salon-1' }));
-    expect(await screen.findByText('2 लोग इंतज़ार में')).toBeInTheDocument();
-    expect(screen.getByText('#8')).toBeInTheDocument();
+    await waitFor(() => expect(tile('इंतज़ार में')).toHaveTextContent('2'));
+    expect(tile('अभी चल रहा')).toHaveTextContent('#8');
   });
 
   it('cannot join when the barber switched app tokens off, and says why', async () => {
@@ -94,7 +98,7 @@ describe('SalonQueue (customer app)', () => {
   it('keeps the salon in "My salons"', async () => {
     given();
     renderQueue();
-    await screen.findByText('3 लोग इंतज़ार में');
+    await screen.findByRole('heading', { name: 'Milan Hair Salon' });
     expect(getMySalons().map((s) => s.code)).toEqual([CODE]);
   });
 
@@ -113,6 +117,24 @@ describe('SalonQueue (customer app)', () => {
     renderQueue();
 
     await userEvent.click(await screen.findByRole('button', { name: 'फिर से कोशिश करें' }));
-    expect(await screen.findByText('3 लोग इंतज़ार में')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Milan Hair Salon' });
+    expect(tile('इंतज़ार में')).toHaveTextContent('3');
+  });
+
+  it('shows the heading only after the queue has loaded', async () => {
+    let finish: (q: PublicQueue) => void = () => {};
+    vi.mocked(salons.fetchPublicQueue).mockReturnValue(new Promise((r) => (finish = r)));
+    renderQueue();
+    expect(await screen.findByRole('heading', { name: 'सैलून की लाइन' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('लाइन देख रहे हैं');
+    act(() => finish(queue()));
+    expect(await screen.findByRole('heading', { name: 'Milan Hair Salon' })).toBeInTheDocument();
+  });
+
+  it('says so when nobody is waiting', async () => {
+    given({ waitingCount: 0, estimatedWaitMinutes: 0 });
+    renderQueue();
+    expect(await screen.findByText(/कोई इंतज़ार में नहीं/)).toBeInTheDocument();
+    expect(within(tile('इंतज़ार में')).getByText('0')).toBeInTheDocument();
   });
 });
