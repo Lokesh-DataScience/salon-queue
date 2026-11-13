@@ -17,6 +17,8 @@ export const updateSalonProfileBodySchema = z
     openingTime: hhmm,
     closingTime: hhmm,
     averageServiceMinutes: z.number().int().min(1).max(240),
+    // Settings switch: "Allow joining from app". A real boolean only, never "true"/1.
+    allowAppJoin: z.boolean(),
   })
   .strict()
   .partial()

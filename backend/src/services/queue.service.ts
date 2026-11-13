@@ -21,6 +21,8 @@ const JOIN_ERROR_MESSAGES: Record<string, string> = {
   LANE_PAUSED: 'That barber is on a break right now. Please choose another barber, or pick Any barber.',
   CUSTOMER_DETAILS_REQUIRED: 'Please enter your name and mobile number.',
   CONSENT_REQUIRED: 'Please tick the box to let the salon save your details.',
+  APP_JOIN_DISABLED: 'This salon is not taking tokens from the app right now. Please scan the QR code at the salon.',
+  ALREADY_IN_QUEUE: 'You already have a token at this salon today. Please open it on the phone you used to join.',
 };
 
 export interface JoinCustomerInput {
@@ -28,6 +30,7 @@ export interface JoinCustomerInput {
   phone?: string;
   consent?: boolean;
   rememberToken?: string;
+  source?: 'qr' | 'app';
 }
 
 export async function joinQueue(
@@ -48,6 +51,7 @@ export async function joinQueue(
         p_phone: customer.phone ?? null,
         p_consent: customer.consent ?? false,
         p_remember_token: customer.rememberToken ?? null,
+        p_source: customer.source ?? 'qr',
       })
     : serviceIds?.length
       ? await supabase.rpc('join_queue_with_services', {
@@ -78,6 +82,8 @@ export async function joinQueue(
     accessToken: row.access_token,
     status: row.status,
     joinedAt: row.joined_at,
+    // true = this customer already had an active ticket here today; this IS that ticket, not a new one.
+    existing: row.existing === true,
     // Only present when a NEW remember token was issued (first join at this salon, or a new device).
     ...(row.remember_token ? { rememberToken: row.remember_token as string } : {}),
   };

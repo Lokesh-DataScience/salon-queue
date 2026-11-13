@@ -66,6 +66,59 @@ export async function getSalonQueueSnapshot(salonId: string) {
   return { currentToken: queue.current_token, waitingCount: count ?? 0 };
 }
 
+// The customer app's view of one salon: is it open, can I join from here, how long is the wait.
+// Counts and token numbers only. Never names, phones, prizes or access tokens.
+// Returns null for an unknown salon, and { suspended: true } for a salon the founder suspended.
+export async function getPublicQueue(salonId: string) {
+  const { data: salon, error } = await supabase
+    .from('salons')
+    .select('id, name, is_open, is_queue_active, opening_time, closing_time, allow_app_join, is_suspended')
+    .eq('id', salonId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!salon) return null;
+  if (salon.is_suspended) return { suspended: true as const };
+
+  const { data: queue } = await supabase
+    .from('queues')
+    .select('id, current_token, status')
+    .eq('salon_id', salonId)
+    .eq('date', todayISODate())
+    .maybeSingle();
+
+  let waitingCount = 0;
+  if (queue) {
+    const { count } = await supabase
+      .from('queue_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('queue_id', queue.id)
+      .eq('status', 'WAITING');
+    waitingCount = count ?? 0;
+  }
+
+  const lanes = await getPublicLanes(salonId);
+  const open = lanes.filter((l) => !l.isPaused);
+  // What a new customer joining "Any barber" would wait: the shortest line that is not on a break.
+  const estimatedWaitMinutes = open.length ? Math.min(...open.map((l) => l.estimatedWaitMinutes)) : null;
+
+  const isPaused = !salon.is_queue_active || queue?.status === 'PAUSED' || (lanes.length > 0 && open.length === 0);
+
+  return {
+    salon: {
+      salonId: salon.id as string,
+      name: salon.name as string,
+      isOpen: salon.is_open && isWithinHours(salon.opening_time, salon.closing_time),
+      isPaused,
+      allowAppJoin: salon.allow_app_join as boolean,
+      nowServingToken: (queue?.current_token as number | undefined) ?? 0,
+      waitingCount,
+      estimatedWaitMinutes,
+      // Only when there is a choice of barber; a one-barber salon shows none.
+      lanes: lanes.length > 1 ? lanes : null,
+    },
+  };
+}
+
 // The barber lines a customer can choose from (switched-off barbers are left out).
 // Only what a customer needs: a name and how long a new customer would wait. No staff details.
 export async function getPublicLanes(salonId: string) {

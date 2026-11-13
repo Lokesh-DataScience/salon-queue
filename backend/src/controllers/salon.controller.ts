@@ -1,7 +1,8 @@
 // backend/src/controllers/salon.controller.ts
 import { Request, Response, NextFunction } from 'express';
 import { nearbySalonsQuerySchema, salonIdParamSchema, salonCodeParamSchema } from '../validators/salon.validators';
-import { findNearbySalons, getSalonById, getSalonByQrCode, getSalonQueueSnapshot, getPublicLanes } from '../services/salon.service';
+import { findNearbySalons, getSalonById, getSalonByQrCode, getSalonQueueSnapshot, getPublicLanes, getPublicQueue } from '../services/salon.service';
+import { SALON_SUSPENDED_PUBLIC } from '../utils/suspension';
 import { listServices } from '../services/salonServices.service';
 
 export async function getNearbySalons(req: Request, res: Response, next: NextFunction) {
@@ -62,6 +63,22 @@ export async function getSalonLanes(req: Request, res: Response, next: NextFunct
     const { salonId } = salonIdParamSchema.parse(req.params);
     res.setHeader('Cache-Control', 'no-store');
     res.json({ lanes: await getPublicLanes(salonId) });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Customer app: one salon's live queue, and whether a token can be taken from the app.
+export async function getSalonPublicQueue(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { salonId } = salonIdParamSchema.parse(req.params);
+    const result = await getPublicQueue(salonId);
+    if (!result) return res.status(404).json({ message: 'Salon not found.' });
+    if ('suspended' in result) {
+      return res.status(409).json({ message: SALON_SUSPENDED_PUBLIC, code: 'SALON_SUSPENDED' });
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result);
   } catch (err) {
     next(err);
   }

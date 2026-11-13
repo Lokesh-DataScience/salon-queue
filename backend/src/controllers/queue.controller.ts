@@ -14,18 +14,26 @@ const CUSTOMER_INPUT_CODES = ['CUSTOMER_DETAILS_REQUIRED', 'CONSENT_REQUIRED'];
 export async function postJoinQueue(req: Request, res: Response, next: NextFunction) {
   try {
     const { salonId } = salonIdParamSchema.parse(req.params);
-    const { clientKey, serviceIds, laneId, name, phone, consent, rememberToken } = joinQueueBodySchema.parse(
-      req.body ?? {},
-    );
-    const ticket = await joinQueue(salonId, clientKey, serviceIds, laneId, { name, phone, consent, rememberToken });
-
-    // First customer in an empty queue starts now. A failure here must never lose the
-    // customer's ticket: the sweeper picks the queue up within about 10 seconds anyway.
-    await advanceSalonQueue(salonId).catch(() => {
-      console.error(`[queue] auto-start failed salon=${salonId}`);
+    const { clientKey, serviceIds, laneId, name, phone, consent, rememberToken, source } =
+      joinQueueBodySchema.parse(req.body ?? {});
+    const ticket = await joinQueue(salonId, clientKey, serviceIds, laneId, {
+      name,
+      phone,
+      consent,
+      rememberToken,
+      source,
     });
 
-    await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
+    // An existing ticket handed back: nothing in the queue changed, so nothing to start or broadcast.
+    if (!ticket.existing) {
+      // First customer in an empty queue starts now. A failure here must never lose the
+      // customer's ticket: the sweeper picks the queue up within about 10 seconds anyway.
+      await advanceSalonQueue(salonId).catch(() => {
+        console.error(`[queue] auto-start failed salon=${salonId}`);
+      });
+
+      await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
+    }
     res.status(201).json({ ticket });
   } catch (err) {
     // Admin Slice 2: the founder suspended this salon (raised by the queue_entries trigger).
@@ -36,7 +44,12 @@ export async function postJoinQueue(req: Request, res: Response, next: NextFunct
       if (CUSTOMER_INPUT_CODES.includes(err.code)) {
         return res.status(400).json({ message: err.message, code: err.code });
       }
-      return res.status(409).json({ message: err.message });
+      // The barber switched app joins off: the customer can still scan the wall QR.
+      if (err.code === 'APP_JOIN_DISABLED') {
+        return res.status(403).json({ message: err.message, code: err.code });
+      }
+      // code lets the app show its own (Hindi) text; older pages just show the message.
+      return res.status(409).json({ message: err.message, code: err.code });
     }
     next(err);
   }

@@ -35,6 +35,8 @@ export const joinQueueBodySchema = z.object({
   phone: phoneSchema.optional(),
   consent: z.boolean().optional(),
   rememberToken: z.string().regex(/^[a-f0-9]{64}$/, 'Invalid token.').optional(),
+  // Where the customer joined from: the wall QR (default) or the customer app.
+  source: z.enum(['qr', 'app']).optional(),
 });
 
 export const ticketParamSchema = z.object({

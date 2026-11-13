@@ -64,6 +64,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.get('/api/salons/by-code/:code', limits.nearby);
     app.post('/api/queues/:salonId/join', limits.join);
     app.use('/api/queue-tickets', limits.ticket);
+    app.get('/api/salons/:salonId/queue-public', limits.ticket); // customer app refetches on every live update
     app.post('/api/auth/barber/login', limits.login);
     app.post('/api/barber/me/password', limits.login); // only failed attempts count
     app.post('/api/auth/barber/register', limits.register);

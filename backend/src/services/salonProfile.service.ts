@@ -4,7 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import type { UpdateSalonProfileBody } from '../validators/salonProfile.validators';
 
 const COLUMNS =
-  'id, name, qr_code, phone, address, opening_time, closing_time, average_service_minutes';
+  'id, name, qr_code, phone, address, opening_time, closing_time, average_service_minutes, allow_app_join';
 
 interface SalonRow {
   id: string;
@@ -15,6 +15,7 @@ interface SalonRow {
   opening_time: string;
   closing_time: string;
   average_service_minutes: number;
+  allow_app_join: boolean;
 }
 
 // Superset of what GET /api/barber/salon already returned (id, name, qrCode).
@@ -28,6 +29,7 @@ function toProfile(r: SalonRow) {
     openingTime: r.opening_time.slice(0, 5), // tolerate "09:00:00"
     closingTime: r.closing_time.slice(0, 5),
     averageServiceMinutes: r.average_service_minutes,
+    allowAppJoin: r.allow_app_join, // customers can take a token from the app (from home)
   };
 }
 
@@ -59,6 +61,7 @@ export async function updateSalonProfile(salonId: string, patch: UpdateSalonProf
   if (patch.averageServiceMinutes !== undefined) {
     update.average_service_minutes = patch.averageServiceMinutes;
   }
+  if (patch.allowAppJoin !== undefined) update.allow_app_join = patch.allowAppJoin;
 
   const { data, error } = await supabase
     .from('salons')
