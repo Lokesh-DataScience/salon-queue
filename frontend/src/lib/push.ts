@@ -74,3 +74,12 @@ export async function enablePushAfterJoin(ticketId: string, accessToken: string)
   if (!config.enabled || !config.publicKey) return;
   await enablePush(ticketId, accessToken, config.publicKey);
 }
+
+// "Send a test notification": the server pushes a test to the subscription saved on this ticket.
+// Throws ApiError with code NO_SUBSCRIPTION / TOO_SOON / EXPIRED / PUSH_DISABLED when it can't.
+export function sendTestPush(ticketId: string, accessToken: string, lang: 'hi' | 'en') {
+  return apiFetch<{ ok: boolean }>(`/api/queue-tickets/${ticketId}/test-push`, {
+    method: 'POST',
+    body: JSON.stringify({ accessToken, lang }),
+  });
+}

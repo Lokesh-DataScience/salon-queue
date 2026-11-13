@@ -1,10 +1,14 @@
 // frontend/src/components/countdown.tsx
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '../lib/i18n';
+
+const TEXT = { hi: { finishing: 'बस हो गया...' }, en: { finishing: 'Finishing up...' } };
 
 export default function Countdown({ endAtMs, onExpired }: { endAtMs: number; onExpired: () => void }) {
   const [now, setNow] = useState(() => Date.now());
   // The end time we ran out at. Once set, the countdown never goes back to counting.
   const [expiredAt, setExpiredAt] = useState<number | null>(null);
+  const t = useT(TEXT);
   const callback = useRef(onExpired);
   callback.current = onExpired;
 
@@ -37,7 +41,7 @@ export default function Countdown({ endAtMs, onExpired }: { endAtMs: number; onE
 
   return (
     <p role="timer" className={`font-extrabold tabular-nums text-ink ${expired ? 'text-2xl' : 'text-5xl'}`}>
-      {expired ? 'Finishing up...' : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`}
+      {expired ? t.finishing : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`}
     </p>
   );
 }

@@ -9,6 +9,10 @@ import { saveTicket, getTickets } from '../lib/activeTickets';
 import * as tickets from '../api/tickets';
 import * as push from '../lib/push';
 import * as feed from '../api/feed';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 vi.mock('../lib/socket', () => import('../test/fakeSocket'));
 vi.mock('../api/tickets', () => ({

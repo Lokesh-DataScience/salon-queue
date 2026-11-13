@@ -7,6 +7,7 @@ import { pushSubscriptionBodySchema, joinQueueBodySchema } from '../validators/q
 import { savePushSubscription, removePushSubscription, forgetMyDetails } from '../services/queue.service';
 import { advanceSalonQueue } from '../services/queueAutomation.service';
 import { SALON_SUSPENDED_PUBLIC, isSalonSuspendedError } from '../utils/suspension';
+import { sendTestPush } from '../services/testPush.service';
 
 // Missing details / consent are the customer's to fix: 400 plus a code the join page can react to.
 const CUSTOMER_INPUT_CODES = ['CUSTOMER_DETAILS_REQUIRED', 'CONSENT_REQUIRED'];
@@ -113,6 +114,31 @@ export async function deletePushSubscription(req: Request, res: Response, next: 
     const ok = await removePushSubscription(ticketId, accessToken);
     if (!ok) return res.status(404).json({ message: 'Ticket not found or access denied.' });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Customer app polish 3a: "Send a test notification" from the ticket page.
+const TEST_PUSH_ERRORS = {
+  PUSH_DISABLED: { status: 409, message: 'Notifications are not available right now.' },
+  NO_SUBSCRIPTION: { status: 409, message: 'Notifications are not turned on for this ticket.' },
+  TOO_SOON: { status: 429, message: 'Please wait a little before sending another test.' },
+  EXPIRED: { status: 410, message: 'This phone stopped accepting notifications. Please turn them on again.' },
+  FAILED: { status: 502, message: 'The test could not be sent. Please try again.' },
+} as const;
+
+export async function postTestPush(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { ticketId } = ticketParamSchema.parse(req.params);
+    // Token in the body (not the URL) so it stays out of logs and history.
+    const { accessToken } = ticketAccessQuerySchema.parse({ accessToken: req.body?.accessToken });
+    const lang = req.body?.lang === 'en' ? 'en' : 'hi';
+    const result = await sendTestPush(ticketId, accessToken, lang);
+    if (result.ok) return res.json({ ok: true });
+    if (result.reason === 'NOT_FOUND') return res.status(404).json({ message: 'Ticket not found or access denied.' });
+    const e = TEST_PUSH_ERRORS[result.reason];
+    res.status(e.status).json({ message: e.message, code: result.reason });
   } catch (err) {
     next(err);
   }

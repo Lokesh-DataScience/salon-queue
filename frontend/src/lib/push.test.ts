@@ -1,6 +1,6 @@
 // frontend/src/lib/push.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { enablePush, disablePush, pushSupport } from './push';
+import { enablePush, disablePush, pushSupport, sendTestPush } from './push';
 import { apiFetch } from '../api/client';
 
 vi.mock('../api/client', () => ({ apiFetch: vi.fn() }));
@@ -79,5 +79,17 @@ describe('pushSupport', () => {
     delete (navigator as unknown as Record<string, unknown>).serviceWorker;
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)');
     expect(pushSupport()).toBe('ios-install');
+  });
+});
+
+describe('sendTestPush', () => {
+  it('posts the token and language in the body, never in the URL', async () => {
+    vi.mocked(apiFetch).mockResolvedValue({ ok: true });
+    await sendTestPush('t1', 'secret-token', 'hi');
+    const [path, init] = vi.mocked(apiFetch).mock.calls[0];
+    expect(path).toBe('/api/queue-tickets/t1/test-push');
+    expect(String(path)).not.toContain('secret-token');
+    expect(init).toMatchObject({ method: 'POST' });
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ accessToken: 'secret-token', lang: 'hi' });
   });
 });

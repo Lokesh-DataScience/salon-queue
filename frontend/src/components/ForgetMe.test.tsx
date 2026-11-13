@@ -5,6 +5,10 @@ import ForgetMe from './ForgetMe';
 import { forgetMyDetails } from '../api/tickets';
 import { ApiError } from '../api/client';
 import { getRememberToken, saveRememberToken } from '../lib/rememberToken';
+import { setLang } from '../lib/i18n';
+
+// These tests check the English wording; the Hindi default has its own tests.
+beforeEach(() => setLang('en'));
 
 vi.mock('../api/tickets', () => ({ forgetMyDetails: vi.fn() }));
 const forget = vi.mocked(forgetMyDetails);
