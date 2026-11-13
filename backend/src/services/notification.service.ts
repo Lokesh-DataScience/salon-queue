@@ -42,14 +42,45 @@ export interface PushMessage {
 }
 
 // Wording avoids numbers: the tracking page and the notification count "people ahead" slightly differently.
+// App customers (the customer app speaks Hindi, and they may still be at home) get Hindi text.
+function buildAppMessage(
+  event: NotificationEvent,
+  n: number,
+  data: { peopleAhead?: number } | undefined,
+  url: string,
+): PushMessage {
+  switch (event) {
+    case 'TURN_NOW':
+      return { title: 'आपकी बारी आ गई', body: `टोकन #${n}: कृपया अभी काउंटर पर आएँ।`, url };
+    case 'QUEUE_APPROACHING':
+      return (data?.peopleAhead ?? 0) <= env.NOTIFY_NEXT_AT
+        ? { title: 'आप अगले हैं', body: `टोकन #${n}: सैलून पहुँच जाइए।`, url }
+        : { title: 'आपकी बारी करीब है — अभी निकलें', body: `टोकन #${n}: सैलून के लिए अभी निकलें।`, url };
+    case 'QUEUE_CANCELLED':
+      return {
+        title: 'आपका टोकन रद्द हुआ',
+        body: `सैलून ने टोकन #${n} रद्द कर दिया। गलती लगे तो सैलून से बात करें।`,
+        url,
+      };
+    case 'MOVED_BACK':
+      return {
+        title: 'आप सैलून में नहीं मिले',
+        body: `टोकन #${n} को 2 जगह पीछे किया गया है। कृपया जल्दी सैलून पहुँचें।`,
+        url,
+      };
+  }
+}
+
 export function buildPushMessage(
   event: NotificationEvent,
   target: NotificationTarget,
   data: { peopleAhead?: number } | undefined,
   accessToken: string,
+  source: string = 'qr',
 ): PushMessage {
   const url = `/tickets/${target.entryId}?accessToken=${accessToken}`;
   const n = target.tokenNumber;
+  if (source === 'app') return buildAppMessage(event, n, data, url);
   switch (event) {
     case 'TURN_NOW':
       return { title: "It's your turn", body: `Token #${n}: please head to the counter now.`, url };
@@ -83,7 +114,7 @@ export class WebPushProvider implements NotificationProvider {
 
     const { data: row, error } = await supabase
       .from('queue_entries')
-      .select('push_subscription, access_token')
+      .select('push_subscription, access_token, join_source')
       .eq('id', target.entryId)
       .maybeSingle();
     if (error) throw error;
@@ -91,7 +122,7 @@ export class WebPushProvider implements NotificationProvider {
 
     // The payload is end-to-end encrypted to the customer's device, so the access token
     // in the link is not readable by the push service.
-    const message = buildPushMessage(event, target, data, row.access_token);
+    const message = buildPushMessage(event, target, data, row.access_token, row.join_source ?? 'qr');
     try {
       await webpush.sendNotification(
         row.push_subscription as webpush.PushSubscription,

@@ -7,11 +7,13 @@ import { compareServeOrder } from '../utils/serveOrder';
 
 // Stages: 0 none, 1 "getting close", 2 "you're next", 3 "your turn".
 // "People ahead" is INCLUSIVE: WAITING + CALLED + SERVING entries before you.
-function desiredStage(status: string, peopleAhead: number): number {
+// App customers may still be at home, so their "getting close" comes earlier (they need travel time).
+export function desiredStage(status: string, peopleAhead: number, source: string = 'qr'): number {
   if (status === 'CALLED' || status === 'SERVING') return 3;
   if (status !== 'WAITING') return 0;
   if (peopleAhead <= env.NOTIFY_NEXT_AT) return 2;
-  if (peopleAhead <= env.NOTIFY_CLOSE_AT) return 1;
+  const closeAt = source === 'app' ? Math.max(env.APP_JOIN_APPROACH_AHEAD, env.NOTIFY_CLOSE_AT) : env.NOTIFY_CLOSE_AT;
+  if (peopleAhead <= closeAt) return 1;
   return 0;
 }
 
@@ -30,7 +32,7 @@ export async function evaluateNotifications(
 
     const { data: entries } = await supabase
       .from('queue_entries')
-      .select('id, token_number, status, notified_stage, priority_at, order_key, lane_id')
+      .select('id, token_number, status, notified_stage, priority_at, order_key, lane_id, join_source')
       .eq('queue_id', queue.id)
       .in('status', ['WAITING', 'CALLED', 'SERVING'])
       .order('token_number', { ascending: true });
@@ -47,7 +49,7 @@ export async function evaluateNotifications(
       const ordered = [...line].sort(compareServeOrder);
       for (let i = 0; i < ordered.length; i++) {
         const e = ordered[i];
-        const stage = desiredStage(e.status, i); // i = active entries ahead of this one, in this line
+        const stage = desiredStage(e.status, i, e.join_source); // i = active entries ahead of this one, in this line
         if (stage <= e.notified_stage) continue;
 
         // Atomic claim: a single conditional UPDATE. If two evaluations race,

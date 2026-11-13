@@ -18,6 +18,7 @@ const envSchema = z.object({
   // "Getting close" at <= CLOSE_AT people ahead, "you're next" at <= NEXT_AT. Keep NEXT_AT < CLOSE_AT.
   NOTIFY_CLOSE_AT: z.coerce.number().int().min(1).default(2),
   NOTIFY_NEXT_AT: z.coerce.number().int().min(0).default(1),
+  APP_JOIN_APPROACH_AHEAD: z.coerce.number().int().min(1).default(4),
     // Number of reverse-proxy hops in front of the app (Render/Railway/Fly = 1). 0 for local dev.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(10).default(900),
