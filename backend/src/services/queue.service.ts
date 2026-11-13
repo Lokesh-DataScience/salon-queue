@@ -125,7 +125,7 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
 
   const { data: salon } = await supabase
     .from('salons')
-    .select('average_service_minutes')
+    .select('average_service_minutes, name, qr_code')
     .eq('id', entry.queues.salon_id)
     .single();
   // Several barbers: show whose line this is, and "now serving" for that line only.
@@ -198,6 +198,10 @@ export async function getTicketStatus(ticketId: string, accessToken: string) {
     durationMinutes: entry.duration_minutes ?? avg,
     services: (chosen ?? []).map((s) => ({ name: s.name, durationMinutes: s.duration_minutes })),
     queueStatus: entry.queues.status,
+    // Lets any browser or app that opens this ticket add the salon to the customer app's "My salons".
+    // Only the ticket holder (secret token) gets these; the code is the one printed on the salon's wall.
+    salonName: (salon?.name as string | undefined) ?? null,
+    salonCode: (salon?.qr_code as string | undefined) ?? null,
     lane: multiLane && myLane ? { id: myLane.id as string, name: myLane.name as string } : null, // null when the salon has one line
     notificationsOn: !!entry.push_subscription, // a flag only, never the subscription itself
     prize,

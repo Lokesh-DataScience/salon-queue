@@ -6,6 +6,7 @@ import { fetchTicketStatus, leaveTicket } from '../api/tickets';
 import { socket } from '../lib/socket';
 import { ApiError } from '../api/client';
 import { saveTicket, removeTicket } from '../lib/activeTickets';
+import { saveMySalon } from '../lib/mySalons';
 import NotifyMe from '../components/NotifyMe';
 import PageShell from '../components/PageShell';
 import { CUSTOMER_DISCOVERY } from '../lib/features';
@@ -194,6 +195,14 @@ export default function QueueTracking() {
   useEffect(() => {
     if (error instanceof ApiError && error.status === 404 && ticketId) removeTicket(ticketId);
   }, [error, ticketId]);
+
+  // Opening a ticket (in any browser, or in the installed app) adds its salon to "My salons",
+  // so the app still lists the salon after this ticket is finished.
+  useEffect(() => {
+    if (ticket?.salonId && ticket.salonCode && ticket.salonName) {
+      saveMySalon({ salonId: ticket.salonId, code: ticket.salonCode, name: ticket.salonName });
+    }
+  }, [ticket?.salonId, ticket?.salonCode, ticket?.salonName]);
   // Inside the installed customer app, "home" is the My salons list.
   const inApp = isInstalledApp();
   const homeTo = inApp ? '/c' : '/';
