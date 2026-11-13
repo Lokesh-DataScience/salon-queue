@@ -13,6 +13,7 @@ import LocalNews from '../components/LocalNews';
 import Countdown from '../components/Countdown';
 import ForgetMe from '../components/ForgetMe';
 import { isInstalledApp } from '../lib/appManifest';
+import InstallAppBanner from '../components/InstallAppBanner';
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -244,6 +245,9 @@ export default function QueueTracking() {
           {ticket.status === 'COMPLETED' && ticket.prize && (
             <PrizeCard prize={ticket.prize} status={ticket.status} />
           )}
+          <div className="text-left">
+            <InstallAppBanner />
+          </div>
           <div className="mt-6">
             <ForgetMe ticketId={ticket.ticketId} accessToken={accessToken} salonId={ticket.salonId} />
           </div>
@@ -277,6 +281,9 @@ export default function QueueTracking() {
         {ticket.lane && <p className="text-lg font-bold">with {ticket.lane.name}</p>}
         <div aria-hidden="true" className="mx-auto mt-4 border-t-2 border-dashed border-ink/40" />
       </section>
+
+      {/* Right under the token number: get the customer app (hidden inside the app itself). */}
+      <InstallAppBanner />
 
       {ticket.queueStatus === 'PAUSED' && (
         <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="status">

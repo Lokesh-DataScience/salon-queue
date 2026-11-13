@@ -5,9 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import './index.css';
 import { applyManifest } from './lib/appManifest';
+import { startInstallCapture } from './lib/installPrompt';
 
 // Before the first paint, so the browser never sees the wrong app's manifest on a customer page.
 applyManifest(window.location.pathname);
+// Chrome's "can be installed" event can fire before React starts: catch it now.
+startInstallCapture();
 
 const queryClient = new QueryClient();
 
