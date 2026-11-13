@@ -16,6 +16,10 @@ vi.mock('../components/NotifyMe', () => ({ default: () => null }));
 vi.mock('../components/LocalNews', () => ({ default: () => null }));
 vi.mock('../components/InstallAppBanner', () => ({ default: () => null }));
 vi.mock('../components/ForgetMe', () => ({ default: () => null }));
+vi.mock('../api/ratings', () => ({
+  fetchMyRating: vi.fn().mockResolvedValue({ stars: null, canRate: true }),
+  rateVisit: vi.fn(),
+}));
 
 const TOKEN = 'a'.repeat(40);
 const base = {
@@ -169,5 +173,20 @@ describe('Full-screen turn alert', () => {
     renderTicket('t9');
     await screen.findByText('आपकी बारी है');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('rating a finished visit', () => {
+  it('a completed ticket asks for stars', async () => {
+    given({ status: 'COMPLETED' });
+    renderTicket();
+    expect(await screen.findByRole('heading', { name: 'आपकी सेवा कैसी रही?' })).toBeInTheDocument();
+  });
+
+  it('a cancelled ticket does not', async () => {
+    given({ status: 'CANCELLED' });
+    renderTicket();
+    await screen.findByText('आपने लाइन छोड़ दी।');
+    expect(screen.queryByRole('heading', { name: 'आपकी सेवा कैसी रही?' })).not.toBeInTheDocument();
   });
 });

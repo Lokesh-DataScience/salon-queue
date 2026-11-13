@@ -54,6 +54,7 @@ export interface PublicQueue {
   openingTime?: string | null; // "HH:mm", India time
   closingTime?: string | null;
   location?: { lat: number; lng: number } | null;
+  rating?: { average: number; count: number } | null; // only from 5 ratings
 }
 
 export function fetchPublicQueue(salonId: string) {

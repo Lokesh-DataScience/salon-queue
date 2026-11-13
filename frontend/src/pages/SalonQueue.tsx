@@ -31,6 +31,8 @@ const TEXT = {
     noServer: 'सर्वर से जुड़ नहीं पाए। इंटरनेट चालू करके फिर से कोशिश करें।',
     retry: 'फिर से कोशिश करें',
     info: 'सैलून की जानकारी',
+    rating: (a: string, n: number) => `${a} · ${n} रेटिंग`,
+    ratingLabel: (a: string, n: number) => `${n} ग्राहकों की औसत रेटिंग: 5 में से ${a}`,
     hours: (h: string) => `रोज़ ${h}`,
     map: 'नक्शा',
     call: 'कॉल करें',
@@ -62,6 +64,8 @@ const TEXT = {
     noServer: "Couldn't reach the server. Turn on your internet and try again.",
     retry: 'Try again',
     info: 'Salon details',
+    rating: (a: string, n: number) => `${a} · ${n} ratings`,
+    ratingLabel: (a: string, n: number) => `Average rating from ${n} customers: ${a} out of 5`,
     hours: (h: string) => `Daily ${h}`,
     map: 'Map',
     call: 'Call',
@@ -147,6 +151,13 @@ function InfoCard({ q }: { q: PublicQueue }) {
           </span>
         )}
       </div>
+      {q.rating && (
+        <p className="flex items-center gap-1.5 text-base font-semibold text-ink">
+          <span aria-hidden="true" className="text-lg text-brand-dark">★</span>
+          <span aria-hidden="true">{t.rating(q.rating.average.toFixed(1), q.rating.count)}</span>
+          <span className="sr-only">{t.ratingLabel(q.rating.average.toFixed(1), q.rating.count)}</span>
+        </p>
+      )}
       {q.address && (
         <p className="flex items-start gap-1.5 text-base text-gray-700">
           <Icon name="mapPin" size={18} className="mt-0.5 shrink-0" />

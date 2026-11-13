@@ -198,4 +198,19 @@ describe('SalonQueue (customer app)', () => {
     expect(screen.getByRole('button', { name: 'पिन हटाएँ' })).toHaveAttribute('aria-pressed', 'true');
     expect(getMySalons()[0]).toMatchObject({ code: CODE, pinned: true });
   });
+
+  it('shows the salon rating once it has 5 ratings', async () => {
+    given({ rating: { average: 4.25, count: 12 } });
+    renderQueue();
+    const info = await screen.findByRole('region', { name: 'सैलून की जानकारी' });
+    expect(info).toHaveTextContent('4.3 · 12 रेटिंग');
+    expect(info).toHaveTextContent('12 ग्राहकों की औसत रेटिंग: 5 में से 4.3');
+  });
+
+  it('shows no rating when there are fewer than 5', async () => {
+    given({ rating: null });
+    renderQueue();
+    const info = await screen.findByRole('region', { name: 'सैलून की जानकारी' });
+    expect(info).not.toHaveTextContent('रेटिंग');
+  });
 });

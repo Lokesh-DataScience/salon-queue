@@ -21,6 +21,7 @@ const KEYS = [
   'nowServingToken',
   'openingTime',
   'phone',
+  'rating',
   'salonId',
   'waitingCount',
 ];

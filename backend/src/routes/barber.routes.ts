@@ -30,6 +30,7 @@ import { getCustomers, removeCustomer } from '../controllers/customers.controlle
 import { postRedeemPrize } from '../controllers/barber.controller';
 import { postBugReport, getMyBugReports } from '../controllers/bugReports.controller';
 import { getBarberFlags } from '../controllers/testTools.controller';
+import { getOwnerRating } from '../controllers/ratings.controller';
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in staff member
@@ -46,6 +47,7 @@ router.get('/flags', getBarberFlags);
 router.get('/salon', requireOwner, getProfile);
 router.patch('/salon', requireOwner, patchProfile);
 router.get('/stats', requireOwner, getStats);
+router.get('/rating', requireOwner, getOwnerRating); // customer star ratings, always visible to the owner
 router.get('/customers', requireOwner, getCustomers);
 router.delete('/customers/:customerId', requireOwner, removeCustomer);
 router.get('/services', requireOwner, getServices);

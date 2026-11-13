@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase';
 import { todayISODate } from '../utils/date';
 import { isWithinHours } from '../utils/hours';
 import { publicSalonInfo } from '../utils/salonInfo';
+import { getRatingStats, publicRating } from './ratings.service';
 
 export async function findNearbySalons(lat: number, lng: number, radiusKm: number) {
   const { data, error } = await supabase.rpc('nearby_salons', {
@@ -101,6 +102,8 @@ export async function getPublicQueue(salonId: string) {
   }
 
   const lanes = await getPublicLanes(salonId);
+  // Stars from customers; shown only from 5 ratings. A ratings problem never hides the queue.
+  const rating = await getRatingStats(salonId).then(publicRating, () => null);
   const open = lanes.filter((l) => !l.isPaused);
   // What a new customer joining "Any barber" would wait: the shortest line that is not on a break.
   const estimatedWaitMinutes = open.length ? Math.min(...open.map((l) => l.estimatedWaitMinutes)) : null;
@@ -120,6 +123,7 @@ export async function getPublicQueue(salonId: string) {
       // Only when there is a choice of barber; a one-barber salon shows none.
       lanes: lanes.length > 1 ? lanes : null,
       ...publicSalonInfo(salon),
+      rating, // { average, count } or null below 5 ratings
     },
   };
 }

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import PageShell from '../components/PageShell';
 import BackLink from '../components/BackLink';
+import OwnerRatingCard from '../components/OwnerRatingCard';
 import {
   fetchBarberSalonProfile,
   updateBarberSalonProfile,
@@ -139,6 +140,7 @@ export default function BarberProfile() {
       <BackLink />
       <h1 className="mb-1 text-2xl font-bold">Salon profile</h1>
       <p className="mb-5 text-sm text-gray-600">What customers see when they scan your QR.</p>
+      <OwnerRatingCard />
 
       {isLoading ? (
         <p role="status" className="text-gray-600">Loading your salon...</p>

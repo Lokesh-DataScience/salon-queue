@@ -20,6 +20,7 @@ import Countdown from '../components/Countdown';
 import ForgetMe from '../components/ForgetMe';
 import TurnAlert from '../components/TurnAlert';
 import ShareTicket from '../components/ShareTicket';
+import RateVisit from '../components/RateVisit';
 import { isInstalledApp } from '../lib/appManifest';
 import InstallAppBanner from '../components/InstallAppBanner';
 import { useT } from '../lib/i18n';
@@ -360,6 +361,7 @@ export default function QueueTracking() {
           <span aria-hidden="true" className="mb-2 block text-4xl">{icon}</span>
           <p className="text-5xl font-bold tabular-nums text-gray-500">#{ticket.tokenNumber}</p>
           <p className="mt-4 text-lg text-gray-800" role="status">{message}</p>
+          {ticket.status === 'COMPLETED' && <RateVisit ticketId={ticket.ticketId} accessToken={accessToken} />}
           {ticket.status === 'COMPLETED' && ticket.prize && <PrizeCard prize={ticket.prize} status={ticket.status} />}
           <div className="text-left">
             <InstallAppBanner />
