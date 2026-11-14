@@ -3,6 +3,9 @@ import { z } from 'zod';
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:mm, e.g. 09:00');
 
+// 0 = Sunday ... 6 = Saturday. Whole numbers only, never "2".
+const weekday = z.number().int().min(0).max(6);
+
 // .strict() rejects any key not listed here (salonId, is_open, qr_code...), so a
 // tampered request cannot change anything beyond the profile fields.
 export const updateSalonProfileBodySchema = z
@@ -19,6 +22,12 @@ export const updateSalonProfileBodySchema = z
     averageServiceMinutes: z.number().int().min(1).max(240),
     // Settings switch: "Allow joining from app". A real boolean only, never "true"/1.
     allowAppJoin: z.boolean(),
+    // Settings: "Weekly off day". [] = open every day. Stored sorted, without repeats.
+    weeklyOffDays: z
+      .array(weekday)
+      .max(7)
+      .refine((d) => new Set(d).size < 7, 'Keep at least one day open')
+      .transform((d) => [...new Set(d)].sort((a, b) => a - b)),
   })
   .strict()
   .partial()

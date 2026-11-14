@@ -1,7 +1,7 @@
 // backend/src/services/salon.service.ts
 import { supabase } from '../config/supabase';
 import { todayISODate } from '../utils/date';
-import { isWithinHours } from '../utils/hours';
+import { isWithinHours, isOffDay } from '../utils/hours';
 import { publicSalonInfo } from '../utils/salonInfo';
 import { getRatingStats, publicRating } from './ratings.service';
 
@@ -21,8 +21,14 @@ export async function getSalonById(salonId: string) {
   if (error) return null;
   // The QR code is only for the salon's own dashboard, so it never goes out on this public route.
   const { qr_code: _qrCode, ...publicSalon } = data;
-  // "Open" means switched on AND inside today's opening hours.
-  return { ...publicSalon, is_open: data.is_open && isWithinHours(data.opening_time, data.closing_time) };
+  // "Open" means switched on, not a weekly off day, AND inside today's opening hours.
+  // weekly_off_days (0 = Sunday ... 6 = Saturday) comes along in publicSalon, so a page can say why.
+  const offDay = isOffDay(data.weekly_off_days);
+  return {
+    ...publicSalon,
+    is_open: data.is_open && !offDay && isWithinHours(data.opening_time, data.closing_time),
+    is_off_day: offDay,
+  };
 }
 
 // What a scan of the wall QR needs: which salon, and its name. Nothing else.
@@ -76,7 +82,7 @@ export async function getPublicQueue(salonId: string) {
   const { data: salon, error } = await supabase
     .from('salons')
     .select(
-      'id, name, is_open, is_queue_active, opening_time, closing_time, allow_app_join, is_suspended, address, phone, latitude, longitude',
+      'id, name, is_open, is_queue_active, opening_time, closing_time, allow_app_join, is_suspended, address, phone, latitude, longitude, weekly_off_days',
     )
     .eq('id', salonId)
     .maybeSingle();
@@ -108,13 +114,16 @@ export async function getPublicQueue(salonId: string) {
   // What a new customer joining "Any barber" would wait: the shortest line that is not on a break.
   const estimatedWaitMinutes = open.length ? Math.min(...open.map((l) => l.estimatedWaitMinutes)) : null;
 
+  const offDay = isOffDay(salon.weekly_off_days as number[] | null);
   const isPaused = !salon.is_queue_active || queue?.status === 'PAUSED' || (lanes.length > 0 && open.length === 0);
 
   return {
     salon: {
       salonId: salon.id as string,
       name: salon.name as string,
-      isOpen: salon.is_open && isWithinHours(salon.opening_time, salon.closing_time),
+      isOpen: salon.is_open && !offDay && isWithinHours(salon.opening_time, salon.closing_time),
+      isOffDay: offDay, // closed today because of the weekly off, so the app can say "Weekly off"
+      weeklyOffDays: [...((salon.weekly_off_days as number[] | null) ?? [])].sort((a, b) => a - b),
       isPaused,
       allowAppJoin: salon.allow_app_join as boolean,
       nowServingToken: (queue?.current_token as number | undefined) ?? 0,
@@ -151,4 +160,3 @@ export async function getPublicLanes(salonId: string) {
       isPaused: l.is_paused, // on a break: shown, but not selectable
     }));
 }
-
