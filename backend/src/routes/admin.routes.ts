@@ -16,7 +16,7 @@ import {
 import { getActivity, patchSalesInfo } from '../controllers/sales.controller';
 import { getOnboardingFunnel } from '../controllers/onboarding.controller';
 import { getLeads, postLead, patchLead, removeLead } from '../controllers/leads.controller';
-import { getHealth } from '../controllers/tech.controller';
+import { getHealth, getCommits } from '../controllers/tech.controller';
 import { getEvents } from '../controllers/techEvents.controller';
 import { getQueueChecks, getTechSalons, getTechSalonQueue } from '../controllers/queueHealth.controller';
 import { getBugs, patchBug } from '../controllers/bugReports.controller';
@@ -93,6 +93,8 @@ tech.post('/test/:salonId/push', postTestPush);
 tech.post('/test/:salonId/clear', postTestClear);
 tech.get('/flags', getFlags);
 tech.patch('/flags/:key', patchFlag);
+// Code history: GitHub commits and which one is live (read-only)
+tech.get('/commits', getCommits);
 
 router.use('/founder', founder);
 router.use('/sales', sales);

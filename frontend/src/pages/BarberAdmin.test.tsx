@@ -38,6 +38,7 @@ vi.mock('../api/admin', () => ({
   fetchTestSalons: vi.fn(),
   runTestAction: vi.fn(),
   fetchFlags: vi.fn(),
+  fetchGitHistory: vi.fn(),
   updateFlag: vi.fn(),
 }));
 

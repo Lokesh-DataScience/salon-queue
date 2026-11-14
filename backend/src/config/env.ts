@@ -2,6 +2,10 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// "FOO=" in .env or an empty field on the host means "not set", not "invalid".
+const blankAsUnset = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? undefined : v), schema.optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
@@ -37,6 +41,15 @@ const envSchema = z.object({
   OUTBOUND_USER_AGENT: z.string().default('SalonVirtualQueue/1.0 (+https://salonqueue.onrender.com)'),
   // optional: leave empty to get OpenStreetMap's local-language place names
   GEOCODE_ACCEPT_LANGUAGE: z.string().default('en'),
+
+  // Tech tab "Code history". Public repo: only GITHUB_REPO (owner/name) is needed.
+  // Empty values count as "not set". GITHUB_BRANCH falls back to Render's branch, then main.
+  GITHUB_REPO: blankAsUnset(
+    z.string().trim().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/, 'GITHUB_REPO must look like owner/name'),
+  ),
+  GITHUB_BRANCH: blankAsUnset(z.string().trim().regex(/^[A-Za-z0-9._/-]{1,100}$/, 'GITHUB_BRANCH is not a valid branch name')),
+  // Only needed if the repo ever becomes private (read-only, this repo only).
+  GITHUB_TOKEN: blankAsUnset(z.string().trim().min(1)),
 });
 
 const parsed = envSchema.safeParse(process.env);

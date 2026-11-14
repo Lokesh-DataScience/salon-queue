@@ -497,3 +497,35 @@ export function fetchFlags() {
 export function updateFlag(key: string, patch: { enabled?: boolean; value?: string }) {
   return apiFetch<{ ok: true }>(`/api/admin/tech/flags/${key}`, { method: 'PATCH', body: JSON.stringify(patch) });
 }
+
+// ── Tech: code history (GitHub commits + live version) ────────────────────
+export type CommitState = 'not_deployed' | 'live' | 'older' | 'unknown';
+
+export interface CommitItem {
+  sha: string;
+  shortSha: string;
+  message: string; // first line only
+  author: string;
+  date: string;
+  url: string;
+  state: CommitState;
+}
+
+export type GitHistory =
+  | { configured: false; reason: string }
+  | {
+      configured: true;
+      repo: string;
+      branch: string;
+      deployedCommit: string | null;
+      deployedInList: boolean;
+      notDeployed: number | null;
+      fetchedAt: string;
+      stale: boolean;
+      warning: string | null;
+      commits: CommitItem[];
+    };
+
+export function fetchGitHistory(refresh = false) {
+  return apiFetch<GitHistory>(`/api/admin/tech/commits${refresh ? '?refresh=1' : ''}`);
+}

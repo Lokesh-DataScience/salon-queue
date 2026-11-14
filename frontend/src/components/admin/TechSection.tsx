@@ -1,11 +1,12 @@
 // frontend/src/components/admin/TechSection.tsx
-// The Tech tab: Health (7), Errors & sign-ins (8), Queues (9), Bugs (10) and Tools & flags (11). Kept in the address (?view=).
+// The Tech tab: Health (7), Errors & sign-ins (8), Queues (9), Bugs (10), Tools & flags (11) and Code history. Kept in the address (?view=).
 import { useSearchParams } from 'react-router-dom';
 import TechPanel from './TechPanel';
 import EventsPanel from './EventsPanel';
 import QueueHealthPanel from './QueueHealthPanel';
 import BugsPanel from './BugsPanel';
 import ToolsPanel from './ToolsPanel';
+import CodeHistoryPanel from './CodeHistoryPanel';
 
 const VIEWS = [
   { id: 'health', label: 'Health' },
@@ -13,6 +14,7 @@ const VIEWS = [
   { id: 'queues', label: 'Queues' },
   { id: 'bugs', label: 'Bugs' },
   { id: 'tools', label: 'Tools & flags' },
+  { id: 'code', label: 'Code history' },
 ] as const;
 type View = (typeof VIEWS)[number]['id'];
 
@@ -29,7 +31,7 @@ export default function TechSection() {
 
   return (
     <div className="grid gap-4">
-      <div role="group" aria-label="Tech view" className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div role="group" aria-label="Tech view" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {VIEWS.map((v) => {
           const on = v.id === view;
           return (
@@ -47,6 +49,7 @@ export default function TechSection() {
       {view === 'queues' && <QueueHealthPanel />}
       {view === 'bugs' && <BugsPanel />}
       {view === 'tools' && <ToolsPanel />}
+      {view === 'code' && <CodeHistoryPanel />}
     </div>
   );
 }
