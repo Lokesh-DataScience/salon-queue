@@ -16,6 +16,7 @@ import {
   redeemPrizeForEntry,
   markNotHere,
 } from '../api/barber';
+import { fetchPublicQueue } from '../api/salons';
 import BarberLaneSwitcher from '../components/BarberLaneSwitcher';
 import ChangePassword from '../components/ChangePassword';
 import CustomerLine from '../components/CustomerLine';
@@ -72,6 +73,18 @@ export default function BarberDashboard() {
   useEffect(() => {
     if (selectedLane && error instanceof ApiError && error.status === 404) chooseLane(null);
   }, [error, selectedLane]);
+
+  // Weekly off today? Read from the salon's public view, so the owner and staff both see it.
+  // Only a banner: it never blocks the dashboard, and +1 walk-ins keep working.
+  const { data: publicView } = useQuery({
+    queryKey: ['publicQueue', queue?.salonId],
+    queryFn: () => fetchPublicQueue(queue!.salonId),
+    enabled: !!queue?.salonId,
+    retry: false,
+    refetchInterval: 5 * 60_000, // the day changes at midnight
+  });
+  const offDayToday = !!publicView?.isOffDay;
+
   const refetching = useRef(false);
   const refetchAgain = useRef(false);
   async function refetch() {
@@ -336,6 +349,13 @@ export default function BarberDashboard() {
 
         {queue.lanes && queue.lanes.length > 1 && (
           <BarberLaneSwitcher lanes={queue.lanes} selectedId={selectedLane} onSelect={chooseLane} />
+        )}
+
+        {offDayToday && (
+          <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-base text-amber-900">
+            <strong>Today is your weekly off.</strong> Customers can't take a token from the QR or the app. You can
+            still add walk-ins with +1.
+          </p>
         )}
 
         {actionError && (

@@ -1,22 +1,24 @@
 // frontend/src/components/SalonStatus.tsx
-// Open / paused / closed, always as a dot AND words (never colour alone).
+// Open / paused / closed / weekly off, always as a dot AND words (never colour alone).
 import { useT } from '../lib/i18n';
 
-export type SalonState = 'open' | 'paused' | 'closed';
+export type SalonState = 'open' | 'paused' | 'closed' | 'offday';
 
-export function salonState(q: { isOpen: boolean; isPaused: boolean }): SalonState {
+export function salonState(q: { isOpen: boolean; isPaused: boolean; isOffDay?: boolean }): SalonState {
+  if (q.isOffDay) return 'offday';
   return !q.isOpen ? 'closed' : q.isPaused ? 'paused' : 'open';
 }
 
 const TEXT = {
-  hi: { open: 'खुला है', paused: 'लाइन रुकी हुई है', closed: 'अभी बंद है' },
-  en: { open: 'Open', paused: 'Queue paused', closed: 'Closed now' },
+  hi: { open: 'खुला है', paused: 'लाइन रुकी हुई है', closed: 'अभी बंद है', offday: 'आज छुट्टी है' },
+  en: { open: 'Open', paused: 'Queue paused', closed: 'Closed now', offday: 'Weekly off today' },
 };
 
 const STYLE: Record<SalonState, { dot: string; text: string }> = {
   open: { dot: 'bg-green-600', text: 'text-green-800' },
   paused: { dot: 'bg-amber-500', text: 'text-amber-800' },
   closed: { dot: 'bg-gray-400', text: 'text-gray-700' },
+  offday: { dot: 'bg-gray-400', text: 'text-gray-700' },
 };
 
 export default function SalonStatus({ state, className = '' }: { state: SalonState; className?: string }) {

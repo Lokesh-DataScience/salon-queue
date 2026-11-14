@@ -17,7 +17,7 @@ import { socket } from '../lib/socket';
 import { getTickets } from '../lib/activeTickets';
 import { isSalonPinned, saveMySalon, setSalonPinned } from '../lib/mySalons';
 import { useLang, useT } from '../lib/i18n';
-import { callHref, formatHours, formatRupees, mapsHref } from '../lib/salonInfo';
+import { callHref, formatDays, formatHours, formatRupees, mapsHref } from '../lib/salonInfo';
 
 const ticketUrl = (ticketId: string, accessToken: string) => `/tickets/${ticketId}?accessToken=${accessToken}`;
 
@@ -34,6 +34,10 @@ const TEXT = {
     rating: (a: string, n: number) => `${a} · ${n} रेटिंग`,
     ratingLabel: (a: string, n: number) => `${n} ग्राहकों की औसत रेटिंग: 5 में से ${a}`,
     hours: (h: string) => `रोज़ ${h}`,
+    hoursNotDaily: (h: string) => `समय ${h}`,
+    weeklyOff: (d: string) => `साप्ताहिक छुट्टी: ${d}`,
+    offToday: (d: string | null) =>
+      d ? `आज साप्ताहिक छुट्टी है (हर ${d})। किसी और दिन टोकन लें।` : 'आज साप्ताहिक छुट्टी है। किसी और दिन टोकन लें।',
     map: 'नक्शा',
     call: 'कॉल करें',
     pin: 'ऊपर पिन करें',
@@ -67,6 +71,10 @@ const TEXT = {
     rating: (a: string, n: number) => `${a} · ${n} ratings`,
     ratingLabel: (a: string, n: number) => `Average rating from ${n} customers: ${a} out of 5`,
     hours: (h: string) => `Daily ${h}`,
+    hoursNotDaily: (h: string) => `Open ${h}`,
+    weeklyOff: (d: string) => `Weekly off: ${d}`,
+    offToday: (d: string | null) =>
+      d ? `Today is the weekly off (every ${d}). Take a token on another day.` : 'Today is the weekly off. Take a token on another day.',
     map: 'Map',
     call: 'Call',
     pin: 'Pin to top',
@@ -135,6 +143,7 @@ function InfoCard({ q }: { q: PublicQueue }) {
   const t = useT(TEXT);
   const lang = useLang();
   const hours = formatHours(q.openingTime, q.closingTime, lang);
+  const offDays = formatDays(q.weeklyOffDays, lang); // null = open every day
   const map = mapsHref(q);
   const call = callHref(q.phone);
   const action =
@@ -147,10 +156,11 @@ function InfoCard({ q }: { q: PublicQueue }) {
         {hours && (
           <span className="inline-flex items-center gap-1.5 text-base text-gray-700">
             <Icon name="clock" size={18} />
-            {t.hours(hours)}
+            {offDays ? t.hoursNotDaily(hours) : t.hours(hours)}
           </span>
         )}
       </div>
+      {offDays && <p className="text-base text-gray-700">{t.weeklyOff(offDays)}</p>}
       {q.rating && (
         <p className="flex items-center gap-1.5 text-base font-semibold text-ink">
           <span aria-hidden="true" className="text-lg text-brand-dark">★</span>
@@ -221,6 +231,7 @@ export default function SalonQueue() {
   const { code = '' } = useParams<{ code: string }>();
   const queryClient = useQueryClient();
   const t = useT(TEXT);
+  const lang = useLang();
 
   const salonQ = useQuery({ queryKey: ['salonByCode', code], queryFn: () => fetchSalonByCode(code), retry: false });
   const salonId = salonQ.data?.id;
@@ -296,7 +307,12 @@ export default function SalonQueue() {
   const q = queueQ.data;
   const state = salonState(q);
   const mine = getTickets(q.salonId)[0] ?? null; // this phone already holds a ticket here
-  const blocked = state === 'closed' ? t.closed : state === 'paused' ? t.paused : !q.allowAppJoin ? t.appOff : null;
+  const blocked =
+    state === 'offday'
+      ? t.offToday(formatDays(q.weeklyOffDays, lang))
+      : state === 'closed'
+        ? t.closed
+        : state === 'paused' ? t.paused : !q.allowAppJoin ? t.appOff : null;
 
   return (
     <PageShell title={q.name}>

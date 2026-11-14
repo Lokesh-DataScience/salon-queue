@@ -48,4 +48,23 @@ export function callHref(phone: string | null | undefined): string | null {
   return /^\d{10}$/.test(d) ? `tel:+91${d}` : `tel:${d}`;
 }
 
-export const formatRupees = (p: number) => `₹${p.toLocaleString('en-IN')}`;
+// Weekday names, indexed 0 = Sunday ... 6 = Saturday (the same numbers the server uses).
+export const DAY_NAMES: Record<Lang, readonly string[]> = {
+  hi: ['रविवार', 'सोमवार', 'मंगलवार', 'बुधवार', 'गुरुवार', 'शुक्रवार', 'शनिवार'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+};
+
+// The week as people in India read it: Monday first, Sunday last.
+export const WEEK_MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0] as const;
+
+// [2] -> "Tuesday" / "मंगलवार";  [0, 2] -> "Tuesday and Sunday" / "मंगलवार और रविवार".
+// null when there are no valid days.
+export function formatDays(days: readonly number[] | null | undefined, lang: Lang): string | null {
+  const valid = [...new Set(days ?? [])].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const names = WEEK_MONDAY_FIRST.filter((d) => valid.includes(d)).map((d) => DAY_NAMES[lang][d]);
+  if (names.length === 0) return null;
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(', ')}${lang === 'hi' ? ' और ' : ' and '}${names[names.length - 1]}`;
+}
+
+export const formatRupees =(p: number) => `₹${p.toLocaleString('en-IN')}`;

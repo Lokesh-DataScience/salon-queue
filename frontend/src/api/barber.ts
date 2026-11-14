@@ -88,12 +88,21 @@ export interface BarberSalonProfile extends BarberSalon {
   closingTime: string;
   averageServiceMinutes: number;
   allowAppJoin: boolean; // customers may take a token from the app (from home)
+  // Days the salon is closed every week: 0 = Sunday ... 6 = Saturday. Missing or [] = open every day.
+  weeklyOffDays?: number[];
 }
 
 export type SalonProfileUpdate = Partial<
   Pick<
     BarberSalonProfile,
-    'name' | 'phone' | 'address' | 'openingTime' | 'closingTime' | 'averageServiceMinutes' | 'allowAppJoin'
+    | 'name'
+    | 'phone'
+    | 'address'
+    | 'openingTime'
+    | 'closingTime'
+    | 'averageServiceMinutes'
+    | 'allowAppJoin'
+    | 'weeklyOffDays'
   >
 >;
 

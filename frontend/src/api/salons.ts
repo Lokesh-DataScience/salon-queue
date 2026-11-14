@@ -43,6 +43,8 @@ export interface PublicQueue {
   name: string;
   isOpen: boolean;
   isPaused: boolean;
+  isOffDay?: boolean; // closed today because it is the salon's weekly off (isOpen is false too)
+  weeklyOffDays?: number[]; // 0 = Sunday ... 6 = Saturday; [] = open every day
   allowAppJoin: boolean;
   nowServingToken: number;
   waitingCount: number;

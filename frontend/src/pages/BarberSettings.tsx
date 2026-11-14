@@ -9,6 +9,7 @@ import type { BarberSalonProfile } from '../api/barber';
 import { fetchAdminMe, type AdminRole } from '../api/admin';
 import { MULTI_BARBER } from '../lib/multiBarber';
 import { fetchBarberFlags, flagOn } from '../api/flags';
+import { DAY_NAMES, WEEK_MONDAY_FIRST, formatDays } from '../lib/salonInfo';
 
 type Row = { to: string; title: string; hint: string };
 
@@ -109,6 +110,80 @@ function AppJoinSwitch() {
   );
 }
 
+// Owner's weekly off: on these days customers cannot take a token (QR or app).
+// Each tap saves straight away, like the switch above. The +1 walk-in still works on an off day.
+function WeeklyOffDays() {
+  const queryClient = useQueryClient();
+  const { data: profile, isLoading } = useQuery({ queryKey: PROFILE_KEY, queryFn: fetchBarberSalonProfile, retry: false });
+  const [error, setError] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (weeklyOffDays: number[]) => updateBarberSalonProfile({ weeklyOffDays }),
+    onMutate: () => setError(null),
+    onSuccess: (salon) => {
+      queryClient.setQueryData<BarberSalonProfile>(PROFILE_KEY, salon);
+      // The dashboard's "weekly off today" banner reads the public view; refresh it.
+      void queryClient.invalidateQueries({ queryKey: ['publicQueue'] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  if (isLoading || !profile) return null;
+  const saved = profile.weeklyOffDays ?? [];
+  const days = save.isPending && save.variables ? save.variables : saved; // show the new choice while saving
+  const named = formatDays(days, 'en');
+
+  function toggle(day: number) {
+    if (save.isPending) return;
+    const next = days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b);
+    if (next.length >= 7) {
+      setError('Keep at least one day open.');
+      return;
+    }
+    save.mutate(next);
+  }
+
+  return (
+    <section aria-labelledby="weekly-off-title" className="card overflow-hidden p-0">
+      <div className="px-4 pt-3">
+        <h2 id="weekly-off-title" className="text-base font-semibold">Weekly off day (साप्ताहिक छुट्टी)</h2>
+        <p className="text-sm text-gray-600">
+          {named
+            ? `Closed every ${named}. Customers can't take a token that day.`
+            : 'Open every day. Tap a day to close the salon on it every week.'}
+        </p>
+      </div>
+      <div role="group" aria-label="Weekly off days" className="grid grid-cols-7 gap-1.5 px-4 py-3">
+        {WEEK_MONDAY_FIRST.map((d) => {
+          const off = days.includes(d);
+          return (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={off}
+              aria-label={DAY_NAMES.en[d]}
+              disabled={save.isPending}
+              onClick={() => toggle(d)}
+              className={`min-h-12 rounded-xl border-2 text-sm font-bold disabled:opacity-60 ${
+                off ? 'border-ink bg-ink text-white' : 'border-gray-300 bg-white text-ink hover:bg-brand-soft'
+              }`}
+            >
+              {DAY_NAMES.en[d].slice(0, 3)}
+            </button>
+          );
+        })}
+      </div>
+      {named && (
+        <p className="px-4 pb-3 text-sm text-gray-600">You can still add walk-ins with +1 if you open anyway.</p>
+      )}
+      {error && (
+        <p role="alert" className="border-t border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function LogoutRow() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -149,6 +224,7 @@ export default function BarberSettings() {
       <nav aria-label="Settings" className="grid gap-6">
         <RowList rows={salonRows} />
         {me?.role === 'OWNER' && <AppJoinSwitch />}
+        {me?.role === 'OWNER' && <WeeklyOffDays />}
         <RowList rows={tools} />
         {flagOn(flags, 'bug_reports', true) && (
           <RowList rows={[{ to: '/barber/report', title: 'Report a problem', hint: 'Tell us what went wrong or what you need' }]} />

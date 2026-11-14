@@ -5,7 +5,8 @@
 // Salons with services (or several barbers) show a picker next; salons without join straight away.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchSalonByCode, fetchSalonLanes, type PublicLane } from '../api/salons';
+import { fetchPublicQueue, fetchSalonByCode, fetchSalonLanes, type PublicLane } from '../api/salons';
+import { formatDays } from '../lib/salonInfo';
 import { fetchSalonServices, type PublicService } from '../api/publicServices';
 import { fetchTicketStatus, joinSalonQueue } from '../api/tickets';
 import { ApiError } from '../api/client';
@@ -36,6 +37,18 @@ async function loadLanes(salonId: string): Promise<PublicLane[]> {
   }
 }
 
+// Is today the salon's weekly off? Returns its off days if so, otherwise null.
+// Like the barber list, this must never block a join: any failure means "not an off day",
+// and the server still refuses the join if it really is one.
+async function offDaysIfClosedToday(salonId: string): Promise<number[] | null> {
+  try {
+    const q = await fetchPublicQueue(salonId);
+    return q.isOffDay ? (q.weeklyOffDays ?? []) : null;
+  } catch {
+    return null;
+  }
+}
+
 type SalonInfo = { id: string; name: string };
 
 // Messages are kept as keys (or the server's text + code) and translated when shown,
@@ -48,7 +61,8 @@ type View =
   | { kind: 'working'; salonName?: string }
   | { kind: 'details'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; notice?: Msg; error?: Msg }
   | { kind: 'choose'; salon: SalonInfo; services: PublicService[]; lanes: PublicLane[]; error?: Msg }
-  | { kind: 'error'; title: 'notRecognised' | 'cantGet' | 'cantOpen'; message: Msg; salonName?: string; canRetry: boolean };
+  | { kind: 'error'; title: 'notRecognised' | 'cantGet' | 'cantOpen'; message: Msg; salonName?: string; canRetry: boolean }
+  | { kind: 'offday'; salonName: string; days: number[] };
 
 // Refusals the server marks with a code get our own Hindi text. In English (and for codes we
 // don't know) the server's own message is shown.
@@ -58,6 +72,7 @@ const HINDI_CODES: Record<string, string> = {
   SALON_SUSPENDED: 'यह सैलून अभी टोकन नहीं ले रहा है।',
   CONSENT_REQUIRED: 'आगे बढ़ने के लिए कृपया टिक बॉक्स पर निशान लगाएँ।',
   CUSTOMER_DETAILS_REQUIRED: 'कृपया अपना नाम और मोबाइल नंबर भरें।',
+  SALON_CLOSED: 'सैलून अभी बंद है।',
 };
 
 const TEXT = {
@@ -77,6 +92,11 @@ const TEXT = {
     busy: 'टोकन ले रहे हैं...',
     working: 'आपका टोकन ले रहे हैं...',
     wait: 'एक पल रुकें। साइन-अप की ज़रूरत नहीं।',
+    offTitle: 'आज सैलून बंद है',
+    offBody: (days: string | null) =>
+      days
+        ? `आज साप्ताहिक छुट्टी है। सैलून हर ${days} को बंद रहता है। किसी और दिन फिर से QR स्कैन करें।`
+        : 'आज साप्ताहिक छुट्टी है। किसी और दिन फिर से QR स्कैन करें।',
   },
   en: {
     network: 'We could not reach the server. Please check your internet connection and try again.',
@@ -94,6 +114,11 @@ const TEXT = {
     busy: 'Getting your token...',
     working: 'Getting your token...',
     wait: 'Please wait a moment. No sign-up needed.',
+    offTitle: 'Closed today',
+    offBody: (days: string | null) =>
+      days
+        ? `Today is the weekly off. The salon is closed every ${days}. Please scan again on another day.`
+        : 'Today is the weekly off. Please scan again on another day.',
   },
 };
 
@@ -161,6 +186,9 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
       // Remember the salon for the customer app's "My salons" (salon details only, nothing about the customer).
       saveMySalon({ salonId: salon.id, code: code ?? '', name: salon.name });
 
+      // Started now so it runs alongside the ticket check below (it never throws).
+      const offCheck = offDaysIfClosedToday(salon.id);
+
       await withSalonLock(salon.id, async () => {
         // Scanning again must never hand out a second token: go back to the ticket this phone already holds.
         for (const stored of getTickets(salon.id)) {
@@ -175,6 +203,14 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
             if (err instanceof ApiError && err.status === 404) removeTicket(stored.ticketId);
             // Any other failure (e.g. offline): we can't prove the ticket is dead, so keep it and try the next one.
           }
+        }
+
+        // Weekly off day: say so plainly instead of asking for details that would only be refused.
+        // (Checked after the resume above, so a ticket this phone already holds still opens.)
+        const offDays = await offCheck;
+        if (offDays) {
+          setView({ kind: 'offday', salonName: salon.name, days: offDays });
+          return;
         }
 
         const [services, lanes] = await Promise.all([
@@ -366,6 +402,19 @@ export default function ScanLanding({ source = 'qr' }: { source?: 'qr' | 'app' }
             </button>
           </>
         )}
+      </PageShell>
+    );
+  }
+
+  if (view.kind === 'offday') {
+    return (
+      <PageShell title={t.offTitle}>
+        <CustomerHeader title={t.offTitle} subtitle={view.salonName} />
+        <div className="flex min-h-[50dvh] flex-col justify-center text-center">
+          <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-base text-amber-900">
+            {t.offBody(formatDays(view.days, lang))}
+          </p>
+        </div>
       </PageShell>
     );
   }
