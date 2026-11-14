@@ -13,6 +13,7 @@ export interface FeedItem {
 export interface GeoPlace {
   district: string | null;
   state: string | null;
+  address?: string | null; // street/area line, once /api/geo/reverse returns it
 }
 
 export function fetchSalonFeed(salonId: string) {

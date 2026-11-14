@@ -172,30 +172,32 @@ export async function revokeRefreshToken(refreshToken: string | undefined) {
 
 export async function registerSalon(input: RegisterSalonBody) {
   const passwordHash = await bcrypt.hash(input.password, 12);
+  // Customers see the plain 10-digit number; the login keeps the normalized +91 form.
+  const salonPhone = input.phone.startsWith('+91') ? input.phone.slice(3) : input.phone;
 
-  const { data, error } = await supabase.rpc('register_salon', {
+  const { data, error } = await supabase.rpc('register_salon_by_phone', {
     p_name: input.salonName,
-    p_phone: input.phone,
+    p_salon_phone: salonPhone,
+    p_login_phone: input.phone,
     p_address: input.address,
-    p_latitude: input.latitude,
-    p_longitude: input.longitude,
+    p_latitude: input.latitude ?? null,
+    p_longitude: input.longitude ?? null,
     p_opening: input.openingTime,
     p_closing: input.closingTime,
     p_avg: input.averageServiceMinutes,
     p_owner_name: input.ownerName,
-    p_email: input.email,
     p_password_hash: passwordHash,
   });
 
   if (error) {
-    if (error.message?.includes('EMAIL_TAKEN')) {
-      throw new AppError('An account with this email already exists. Try signing in instead.', 409);
+    if (error.message?.includes('PHONE_TAKEN')) {
+      throw new AppError('This mobile number is already registered. Try signing in instead.', 409);
     }
     throw error;
   }
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row) throw new Error('register_salon returned no row');
-    if (input.district || input.state) {
+  if (!row) throw new Error('register_salon_by_phone returned no row');
+  if (input.district || input.state) {
     try {
       await assignPlaceToSalon(row.o_salon_id, { district: input.district, state: input.state });
     } catch {
@@ -208,7 +210,7 @@ export async function registerSalon(input: RegisterSalonBody) {
     staff: {
       id: row.o_staff_id as string,
       name: input.ownerName,
-      email: input.email,
+      email: null,
       role: 'OWNER' as const,
       salonId: row.o_salon_id as string,
     },

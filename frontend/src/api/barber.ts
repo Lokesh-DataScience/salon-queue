@@ -68,15 +68,13 @@ export interface BarberSalon {
 
 export interface RegisterSalonInput {
   salonName: string;
-  phone: string;
+  phone: string; // also the owner's login
   address: string;
-  area?: string;
   district?: string;
   state?: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number; // only when the barber allowed location
+  longitude?: number;
   ownerName: string;
-  email: string;
   password: string;
   openingTime: string;
   closingTime: string;
