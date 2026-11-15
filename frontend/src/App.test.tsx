@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-
 // Keep the real socket out of these routing tests.
 vi.mock('./lib/socket', () => ({
   socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), connected: false },
@@ -22,8 +21,10 @@ async function renderApp(route: string) {
 beforeEach(() => {
   vi.resetModules();
   vi.unstubAllEnvs();
+  // Each test loads a fresh copy of the app, which reads the language from storage: pick English.
+  // (The shared test setup clears storage after every test.)
+  localStorage.setItem('svq.lang.v1', 'en');
 });
-
 describe('customer routes with discovery switched off (default)', () => {
   it('home asks the customer to scan the salon QR code', async () => {
     await renderApp('/');

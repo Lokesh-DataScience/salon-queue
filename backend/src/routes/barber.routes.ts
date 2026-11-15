@@ -31,6 +31,7 @@ import { postRedeemPrize } from '../controllers/barber.controller';
 import { postBugReport, getMyBugReports } from '../controllers/bugReports.controller';
 import { getBarberFlags } from '../controllers/testTools.controller';
 import { getOwnerRating } from '../controllers/ratings.controller';
+import { putStaffPush, deleteStaffPush, postStaffPushTest } from '../controllers/staffPush.controller';
 const router = Router();
 
 router.use(requireAuth); // every route below requires a logged-in staff member
@@ -42,6 +43,10 @@ router.get('/bug-reports', getMyBugReports);
 router.post('/bug-reports', postBugReport);
 // Admin Slice 11: feature flags the barber app reads (on/off + short text only)
 router.get('/flags', getBarberFlags);
+// "New token" alerts on this device (any signed-in staff member, for themselves only)
+router.put('/push-subscription', putStaffPush);
+router.delete('/push-subscription', deleteStaffPush);
+router.post('/push-subscription/test', postStaffPushTest);
 
 // ── Owner only: salon settings, services, stats, offers, team ──
 router.get('/salon', requireOwner, getProfile);
@@ -79,3 +84,4 @@ router.patch('/offers/expected', requireOwner, patchExpected);
 router.patch('/offers/:offerId', requireOwner, patchOffer);
 router.delete('/offers/:offerId', requireOwner, removeOffer);
 export default router;
+

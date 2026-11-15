@@ -10,6 +10,8 @@ import { fetchAdminMe, type AdminRole } from '../api/admin';
 import { MULTI_BARBER } from '../lib/multiBarber';
 import { fetchBarberFlags, flagOn } from '../api/flags';
 import { DAY_NAMES, WEEK_MONDAY_FIRST, formatDays } from '../lib/salonInfo';
+import BarberAlertsSwitch from '../components/BarberAlertsSwitch';
+import { disableBarberAlerts } from '../lib/barberPush';
 
 type Row = { to: string; title: string; hint: string };
 
@@ -191,6 +193,8 @@ function LogoutRow() {
 
   async function handleLogout() {
     setBusy(true);
+    // While still signed in: stop this phone getting the salon's alerts after logout.
+    await disableBarberAlerts().catch(() => {});
     await logoutBarber().catch(() => {});
     navigate('/barber/login', { replace: true });
     queryClient.clear();
@@ -223,6 +227,7 @@ export default function BarberSettings() {
 
       <nav aria-label="Settings" className="grid gap-6">
         <RowList rows={salonRows} />
+        <BarberAlertsSwitch />
         {me?.role === 'OWNER' && <AppJoinSwitch />}
         {me?.role === 'OWNER' && <WeeklyOffDays />}
         <RowList rows={tools} />

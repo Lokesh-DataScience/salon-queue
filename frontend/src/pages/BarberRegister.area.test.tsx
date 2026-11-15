@@ -6,11 +6,27 @@ import BarberRegister from './BarberRegister';
 import { renderPage } from '../test/utils';
 import * as barber from '../api/barber';
 import * as feed from '../api/feed';
+import { englishForEachTest } from '../test/english';
+englishForEachTest();
 
 vi.mock('../api/barber', () => ({ registerSalon: vi.fn() }));
 vi.mock('../api/feed', () => ({ fetchSalonFeed: vi.fn(), reverseGeocode: vi.fn() }));
 
 const renderRegister = () => renderPage(<BarberRegister />, { path: '/barber/register', route: '/barber/register' });
+
+type User = ReturnType<typeof userEvent.setup>;
+
+// Everything Register checks before it sends (district and state are optional).
+async function fillRequired(user: User) {
+  await user.type(screen.getByLabelText('Salon name'), 'Style Point');
+  await user.type(screen.getByLabelText('Salon mobile number'), '9876543210');
+  await user.type(screen.getByLabelText('Salon address'), 'Main Road, near the bus stand');
+  await user.type(screen.getByLabelText('Your name'), 'Ravi');
+  await user.type(screen.getByLabelText('Password'), 'secret1');
+  await user.type(screen.getByLabelText('Confirm password'), 'secret1');
+}
+
+const fillButton = () => screen.getByRole('button', { name: /fill automatically/i });
 
 beforeEach(() => {
   vi.mocked(barber.registerSalon).mockReset().mockResolvedValue({ staff: {} as never });
@@ -25,19 +41,22 @@ beforeEach(() => {
 });
 
 describe('BarberRegister: district prefill', () => {
-  it('fills district, district and state from the location, and sends them on submit', async () => {
+  it('fills district and state from the location, and sends them on submit', async () => {
     vi.mocked(feed.reverseGeocode).mockResolvedValue({ district: 'कोरबा', state: 'छत्तीसगढ़' });
     const user = userEvent.setup();
     renderRegister();
 
-    await user.click(screen.getByRole('button', { name: /use my current location/i }));
+    await user.click(fillButton());
     await waitFor(() => expect(screen.getByLabelText('District')).toHaveValue('कोरबा'));
     expect(screen.getByLabelText('State')).toHaveValue('छत्तीसगढ़');
     expect(feed.reverseGeocode).toHaveBeenCalledWith(22.410114, 82.60959);
 
+    await fillRequired(user);
     await user.click(screen.getByRole('button', { name: 'Register salon' }));
-    expect(barber.registerSalon).toHaveBeenCalledWith(
-      expect.objectContaining({ district: 'कोरबा', state: 'छत्तीसगढ़' }),
+    await waitFor(() =>
+      expect(barber.registerSalon).toHaveBeenCalledWith(
+        expect.objectContaining({ district: 'कोरबा', state: 'छत्तीसगढ़' }),
+      ),
     );
   });
 
@@ -47,9 +66,9 @@ describe('BarberRegister: district prefill', () => {
     renderRegister();
 
     await user.type(screen.getByLabelText('District'), 'Korba');
-    await user.click(screen.getByRole('button', { name: /use my current location/i }));
-    await waitFor(() => expect(screen.getByLabelText('District')).toHaveValue('Korba'));
-    expect(screen.getByLabelText('District')).toHaveValue('Korba');
+    await user.click(fillButton());
+    await waitFor(() => expect(screen.getByLabelText('State')).toHaveValue('Chhattisgarh'));
+    expect(screen.getByLabelText('District')).toHaveValue('Korba'); // typed, so left alone (not "KorbaKorba")
   });
 
   it('a failed lookup shows a note and does not block typing or registering', async () => {
@@ -57,10 +76,13 @@ describe('BarberRegister: district prefill', () => {
     const user = userEvent.setup();
     renderRegister();
 
-    await user.click(screen.getByRole('button', { name: /use my current location/i }));
+    await user.click(fillButton());
     expect(await screen.findByText(/please type it in/i)).toBeInTheDocument();
     await user.type(screen.getByLabelText('District'), 'Korba');
+    await fillRequired(user);
     await user.click(screen.getByRole('button', { name: 'Register salon' }));
-    expect(barber.registerSalon).toHaveBeenCalledWith(expect.objectContaining({ district: 'Korba' }));
+    await waitFor(() =>
+      expect(barber.registerSalon).toHaveBeenCalledWith(expect.objectContaining({ district: 'Korba' })),
+    );
   });
 });

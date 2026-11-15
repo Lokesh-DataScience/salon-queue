@@ -12,7 +12,9 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(msg.title, {
       body: msg.body,
-      tag: 'queue-update', // a newer update replaces the old one instead of stacking
+      // Customer updates share one tag (a newer one replaces the old). Barber "New token" alerts
+      // send their own tag per token, so several new customers stack instead of hiding each other.
+      tag: typeof msg.tag === 'string' && msg.tag ? msg.tag : 'queue-update',
       renotify: true,
       data: { url: msg.url },
     }),

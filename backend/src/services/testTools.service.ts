@@ -8,6 +8,7 @@ import { broadcastQueueUpdate } from './queue.service';
 import { advanceSalonQueue } from './queueAutomation.service';
 import { NotificationService } from './notification.service';
 import { logAdminAction } from './admin.service';
+import { notifyStaffNewToken } from './staffPush.service';
 import type { Actor } from './founderSalons.service';
 
 export async function listTestSalons() {
@@ -84,6 +85,7 @@ export async function simulateScan(actor: Actor, salonId: string) {
     .single();
   if (eErr) throw eErr;
   await afterChange(salonId);
+  await notifyStaffNewToken(salonId, entry.id as string); // same "New token" alert a real scan sends
   await log(actor, 'scan', salon, { token: entry.token_number });
   // Internal test salon only: the link opens the test customer's ticket page.
   return {
@@ -162,3 +164,4 @@ export async function clearToday(actor: Actor, salonId: string) {
   await log(actor, 'clear', salon, { cancelled: (data ?? []).length });
   return { cancelled: (data ?? []).length };
 }
+

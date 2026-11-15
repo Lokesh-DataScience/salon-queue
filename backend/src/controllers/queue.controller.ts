@@ -8,6 +8,7 @@ import { savePushSubscription, removePushSubscription, forgetMyDetails } from '.
 import { advanceSalonQueue } from '../services/queueAutomation.service';
 import { SALON_SUSPENDED_PUBLIC, isSalonSuspendedError } from '../utils/suspension';
 import { sendTestPush } from '../services/testPush.service';
+import { notifyStaffNewToken } from '../services/staffPush.service';
 
 // Missing details / consent are the customer's to fix: 400 plus a code the join page can react to.
 const CUSTOMER_INPUT_CODES = ['CUSTOMER_DETAILS_REQUIRED', 'CONSENT_REQUIRED'];
@@ -34,6 +35,10 @@ export async function postJoinQueue(req: Request, res: Response, next: NextFunct
       });
 
       await broadcastQueueUpdate(salonId, { silentEntryId: ticket.ticketId });
+
+      // "New token" alert on the barbers' phones. Not awaited: the customer's ticket must not wait
+      // for push services. It never throws.
+      void notifyStaffNewToken(salonId, ticket.ticketId);
     }
     res.status(201).json({ ticket });
   } catch (err) {
@@ -143,3 +148,4 @@ export async function postTestPush(req: Request, res: Response, next: NextFuncti
     next(err);
   }
 }
+

@@ -10,6 +10,8 @@ import { ApiError } from '../api/client';
 import * as tickets from '../api/tickets';
 import * as salons from '../api/salons';
 import * as active from '../hooks/useActiveTickets';
+import { englishForEachTest } from '../test/english';
+englishForEachTest();
 
 vi.mock('../api/tickets', () => ({ joinSalonQueue: vi.fn() }));
 vi.mock('../api/salons', () => ({ fetchSalonLanes: vi.fn() }));
