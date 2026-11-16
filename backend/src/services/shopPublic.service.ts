@@ -3,7 +3,8 @@
 // Everything here is behind the shop_enabled flag; when it is off the routes answer 404.
 import { supabase } from '../config/supabase';
 import { listFlags } from './flags.service';
-import { publicImageUrl } from './shopAdmin.service';
+import { AppError } from '../middleware/errorHandler';
+import { publicImageUrl, shopDbError } from './shopAdmin.service';
 
 export const SHOP_FLAG = 'shop_enabled';
 export const LOW_STOCK_AT = 3; // "Only a few left" at 3 or fewer sellable units
@@ -86,4 +87,102 @@ export async function listPublicCategories() {
   return (cats ?? [])
     .filter((c) => inUse.has(c.id as string))
     .map((c) => ({ id: c.id as string, slug: c.slug as string, nameEn: c.name_en as string, nameHi: c.name_hi as string }));
+}
+
+// ── Product details (C3) ─────────────────────────────────────────────────
+
+export async function getPublicProduct(productId: string) {
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, brand, description, category_id, mrp_paise, selling_price_paise, stock_on_hand, stock_reserved, stock_buffer, max_per_order, same_day_eligible, product_images (storage_path, sort_order, alt)')
+    .eq('id', productId)
+    .eq('is_visible', true)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError('This product is not available.', 404);
+  const r = data as unknown as Row & { description: string; max_per_order: number; same_day_eligible: boolean };
+  const images = [...(r.product_images ?? [])]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((i) => ({ url: publicImageUrl(i.storage_path), alt: i.alt || r.name }));
+  return {
+    ...toPublic(r),
+    description: r.description,
+    images,
+    maxPerOrder: r.max_per_order,
+    sameDayEligible: r.same_day_eligible,
+  };
+}
+
+// ── Server quote (C3, §8.1). Reads only; reserves nothing. ────────────────
+
+export type LineProblem = 'UNAVAILABLE' | 'NOT_ENOUGH_STOCK' | 'OVER_LIMIT';
+
+interface QuoteLineRow {
+  product_id: string;
+  qty: number;
+  problem: LineProblem | null;
+  max_qty: number | null;
+  unit_price_paise: number | null;
+  mrp_paise: number | null;
+  line_total_paise: number | null;
+}
+interface QuoteRow {
+  lines: QuoteLineRow[];
+  subtotal_paise: number;
+  delivery_fee_paise: number;
+  total_paise: number;
+  order_problems: string[];
+  cod_max_order_paise: number | null;
+  ok: boolean;
+  same_day_requestable: boolean;
+}
+
+export async function quoteCart(items: { productId: string; qty: number }[]) {
+  const { data, error } = await supabase.rpc('price_cart', {
+    p_items: items.map((i) => ({ product_id: i.productId, qty: i.qty })),
+  });
+  if (error) {
+    if (error.message === 'SHOP_INVALID_CART') throw new AppError('Your cart could not be read. Please try again.', 400);
+    shopDbError(error);
+  }
+  const q = data as QuoteRow;
+
+  // Names and photos for the cart screen (public fields only, same as the catalog).
+  const ids = q.lines.map((l) => l.product_id);
+  const { data: rows, error: e2 } = await supabase
+    .from('products')
+    .select('id, name, brand, is_visible, deleted_at, product_images (storage_path, sort_order, alt)')
+    .in('id', ids);
+  if (e2) throw e2;
+  const info = new Map(
+    ((rows ?? []) as unknown as { id: string; name: string; brand: string; is_visible: boolean; deleted_at: string | null; product_images: Row['product_images'] }[])
+      .filter((r) => r.is_visible && !r.deleted_at)
+      .map((r) => {
+        const first = [...(r.product_images ?? [])].sort((a, b) => a.sort_order - b.sort_order)[0];
+        return [r.id, { name: r.name, brand: r.brand, image: first ? { url: publicImageUrl(first.storage_path), alt: first.alt || r.name } : null }];
+      }),
+  );
+
+  return {
+    lines: q.lines.map((l) => ({
+      productId: l.product_id,
+      qty: l.qty,
+      problem: l.problem,
+      maxQty: l.max_qty,
+      unitPricePaise: l.unit_price_paise,
+      mrpPaise: l.mrp_paise,
+      lineTotalPaise: l.line_total_paise,
+      name: info.get(l.product_id)?.name ?? null, // null for products that are no longer sold
+      brand: info.get(l.product_id)?.brand ?? null,
+      image: info.get(l.product_id)?.image ?? null,
+    })),
+    subtotalPaise: q.subtotal_paise,
+    deliveryFeePaise: q.delivery_fee_paise,
+    totalPaise: q.total_paise,
+    orderProblems: q.order_problems,
+    codMaxOrderPaise: q.cod_max_order_paise,
+    ok: q.ok,
+    sameDayRequestable: q.same_day_requestable,
+  };
 }

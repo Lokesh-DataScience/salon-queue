@@ -31,6 +31,8 @@ import MyTickets from './pages/MyTickets';
 import ScanQr from './pages/ScanQr';
 import VisitHistory from './pages/VisitHistory';
 import ShopHome from './pages/ShopHome';
+import ShopProduct from './pages/ShopProduct';
+import ShopCart from './pages/ShopCart';
 import CustomerChrome from './components/CustomerChrome';
 import { applyManifest } from './lib/appManifest';
 
@@ -80,6 +82,8 @@ function App() {
       <Route path="/c/scan" element={<ScanQr />} />
       <Route path="/c/history" element={<VisitHistory />} />
       <Route path="/c/shop" element={<ShopHome />} />
+      <Route path="/c/shop/p/:productId" element={<ShopProduct />} />
+      <Route path="/c/shop/cart" element={<ShopCart />} />
       <Route path="/c/s/:code" element={<SalonQueue />} />
       <Route path="/c/s/:code/join" element={<ScanLanding source="app" />} />
       <Route path="/barber/login" element={<BarberLogin />} />

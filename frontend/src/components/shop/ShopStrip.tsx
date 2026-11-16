@@ -55,7 +55,7 @@ export default function ShopStrip({ salonId }: { salonId: string }) {
       <ul className="flex gap-3 overflow-x-auto px-4 pb-4 pt-3">
         {items.map((p) => (
           <li key={p.id} className="w-36 shrink-0">
-            <Link to="/c/shop" aria-label={`${p.name} — ${t.all}`} className="block h-full">
+            <Link to={`/c/shop/p/${p.id}`} className="block h-full">
               <ProductCard p={p} compact />
             </Link>
           </li>

@@ -1,5 +1,5 @@
 // frontend/src/pages/ShopHome.tsx — customer app "Shop" tab (/c/shop), Commerce Phase 1, C2.
-// Browse only for now: products, prices and availability. Cart and ordering arrive in C3/C4.
+// Products, prices and availability; tap a product to open it (C3). Ordering arrives in C4.
 // Works in the installed app and in a browser tab (D5). Switched off → a friendly "not open yet" page.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import PageShell from '../components/PageShell';
 import CustomerHeader from '../components/CustomerHeader';
 import ProductCard from '../components/shop/ProductCard';
+import CartButton from '../components/shop/CartButton';
 import { fetchCatalog, fetchCatalogCategories } from '../api/shop';
 import { ApiError } from '../api/client';
 import { useLang, useT } from '../lib/i18n';
@@ -24,7 +25,6 @@ const TEXT = {
     closedTitle: 'दुकान अभी नहीं खुली',
     closedBody: 'हम जल्द ही यहाँ ग्रूमिंग का सामान लाएँगे।',
     back: 'मेरे सैलून',
-    soon: 'ऑर्डर करना जल्द शुरू होगा।',
   },
   en: {
     title: 'Shop',
@@ -38,7 +38,6 @@ const TEXT = {
     closedTitle: "The shop isn't open yet",
     closedBody: "We'll bring grooming products here soon.",
     back: 'My salons',
-    soon: 'Ordering starts soon.',
   },
 };
 
@@ -72,7 +71,7 @@ export default function ShopHome() {
   const cats = categories.data ?? [];
   return (
     <PageShell title={t.title}>
-      <CustomerHeader title={t.title} subtitle={t.subtitle} />
+      <CustomerHeader title={t.title} subtitle={t.subtitle} action={<CartButton />} />
 
       {cats.length > 0 && (
         <div role="group" aria-label={t.categories} className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -114,11 +113,12 @@ export default function ShopHome() {
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label={t.title}>
             {products.data.map((p) => (
               <li key={p.id}>
-                <ProductCard p={p} />
+                <Link to={`/c/shop/p/${p.id}`} className="block h-full rounded-2xl focus-visible:outline-4">
+                  <ProductCard p={p} />
+                </Link>
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-center text-sm text-gray-600">{t.soon}</p>
         </>
       )}
     </PageShell>

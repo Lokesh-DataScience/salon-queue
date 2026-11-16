@@ -19,7 +19,8 @@ export function isCustomerPath(pathname: string): boolean {
 // The join flow (/c/s/:code/join) stays focused: no bar while the customer fills it in.
 export function showsBottomNav(pathname: string, installed: boolean): boolean {
   const p = pathname.replace(/\/+$/, '') || '/';
-  if (p === '/c' || p === '/c/tokens' || p === '/c/scan' || p === '/c/history' || p === '/c/shop') return true;
+  if (p === '/c' || p === '/c/tokens' || p === '/c/scan' || p === '/c/history') return true;
+  if (/^\/c\/shop(\/|$)/.test(p)) return true; // shop, product pages, cart
   if (/^\/c\/s\/[^/]+$/.test(p)) return true;
   return installed && p.startsWith('/tickets/');
 }

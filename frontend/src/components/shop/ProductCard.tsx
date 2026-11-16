@@ -1,5 +1,5 @@
 // frontend/src/components/shop/ProductCard.tsx — one product in the customer shop (grid or strip).
-// C2: browse only. Tapping a product opens its details from C3.
+// The parent wraps it in a link to the product page (C3).
 import type { ShopCatalogProduct } from '../../api/shop';
 import { rupees } from '../../lib/money';
 import { useT } from '../../lib/i18n';

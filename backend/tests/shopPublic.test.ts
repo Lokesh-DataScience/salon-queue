@@ -6,7 +6,7 @@ import request from 'supertest';
 import { app, makeSalon, cleanupSalons } from './helpers';
 import { supabase } from '../src/config/supabase';
 import { listFlags } from '../src/services/flags.service';
-import { founderSession, productBody, shopApi, softDeleteProducts } from './shopHelpers';
+import { ORIGIN, founderSession, productBody, shopApi, softDeleteProducts } from './shopHelpers';
 
 type Session = Awaited<ReturnType<typeof founderSession>>;
 let founder: Session;
@@ -106,5 +106,72 @@ describe('Customer shop — switched on', () => {
     await setFlag(true, 'all');
     expect((await request(app).get(`/api/shop/status?salonId=${real}`)).body).toEqual({ enabled: true, showStrip: true });
     expect((await request(app).get('/api/shop/status?salonId=not-a-uuid')).status).toBe(400);
+  }, 120_000);
+});
+
+describe('Customer shop — product page and quote (C3)', () => {
+  const quote = (items: object[], headers: Record<string, string> = { Origin: ORIGIN }) =>
+    request(app).post('/api/shop/quote').set(headers).send({ items });
+
+  it('product page: visible products only, public fields only', async () => {
+    await setFlag(true, 'internal');
+    const shown = await product({ description: 'Nice oil', maxPerOrder: 3 }, true);
+    const hidden = await product({}, false);
+    const r = await request(app).get(`/api/shop/products/${shown}`);
+    expect(r.status).toBe(200);
+    expect(r.body.product).toMatchObject({ id: shown, description: 'Nice oil', maxPerOrder: 3, images: [] });
+    expect(JSON.stringify(r.body).toLowerCase()).not.toMatch(/wholesale|sku|stock_on_hand|stockonhand|margin|supplier/);
+    expect((await request(app).get(`/api/shop/products/${hidden}`)).status).toBe(404);
+    expect((await request(app).get('/api/shop/products/not-a-uuid')).status).toBe(400);
+  }, 120_000);
+
+  it('prices on the server and flags problems per line', async () => {
+    await setFlag(true, 'internal');
+    const a = await product({ mrpPaise: 25000, sellingPricePaise: 22000, initialStock: 6, stockBuffer: 1, maxPerOrder: 3 }, true);
+    const b = await product({ mrpPaise: 15000, sellingPricePaise: 12950, initialStock: 2 }, true);
+    const hidden = await product({}, false);
+
+    const ok = await quote([{ productId: a, qty: 2 }, { productId: b, qty: 1 }]);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.quote).toMatchObject({ ok: true, subtotalPaise: 56950, deliveryFeePaise: 0, totalPaise: 56950 });
+    expect(ok.body.quote.lines[0]).toMatchObject({ productId: a, qty: 2, unitPricePaise: 22000, lineTotalPaise: 44000, problem: null });
+
+    const bad = await quote([{ productId: a, qty: 4 }, { productId: b, qty: 3 }, { productId: hidden, qty: 1 }]);
+    expect(bad.body.quote.ok).toBe(false);
+    expect(bad.body.quote.lines.map((l: { problem: string; maxQty: number | null }) => [l.problem, l.maxQty])).toEqual([
+      ['OVER_LIMIT', 3],
+      ['NOT_ENOUGH_STOCK', 2],
+      ['UNAVAILABLE', null],
+    ]);
+    expect(bad.body.quote.lines[2]).toMatchObject({ name: null, unitPricePaise: null });
+    expect(bad.body.quote.totalPaise).toBe(0);
+  }, 120_000);
+
+  it('a quote reserves nothing and writes no stock history', async () => {
+    await setFlag(true, 'internal');
+    const a = await product({ initialStock: 5 }, true);
+    await quote([{ productId: a, qty: 2 }]);
+    const p = (await shopApi(founder).get(`/products/${a}`)).body.product;
+    expect(p).toMatchObject({ stockOnHand: 5, stockReserved: 0 });
+    const { count } = await supabase.from('inventory_movements').select('id', { count: 'exact', head: true }).eq('product_id', a);
+    expect(count).toBe(1); // just INITIAL_STOCK
+  }, 120_000);
+
+  it('quote input rules: same origin, JSON, sane quantities, no duplicates', async () => {
+    await setFlag(true, 'internal');
+    const a = await product({}, true);
+    expect((await quote([{ productId: a, qty: 1 }], {})).status).toBe(403); // no Origin/Referer
+    expect((await quote([{ productId: a, qty: 1 }], { Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await quote([])).status).toBe(400);
+    expect((await quote([{ productId: a, qty: 0 }])).status).toBe(400);
+    expect((await quote([{ productId: a, qty: 21 }])).status).toBe(400);
+    expect((await quote([{ productId: a, qty: 1 }, { productId: a, qty: 1 }])).status).toBe(400);
+  }, 120_000);
+
+  it('everything is 404 while the shop is off', async () => {
+    const a = await product({}, true);
+    await setFlag(false, 'internal');
+    expect((await request(app).get(`/api/shop/products/${a}`)).status).toBe(404);
+    expect((await quote([{ productId: a, qty: 1 }])).status).toBe(404);
   }, 120_000);
 });

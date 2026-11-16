@@ -73,6 +73,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.post('/api/auth/barber/register', limits.register);
     app.use('/api/admin', limits.admin);
     app.use('/api/shop', limits.shop); // customer catalog (Commerce C2)
+    app.post('/api/shop/quote', limits.shopQuote);
     // The founder's own password is checked here; only wrong attempts count (same rules as login).
     app.post('/api/admin/founder/staff/:staffId/password', limits.login);
     const news = createNewsLimiters();

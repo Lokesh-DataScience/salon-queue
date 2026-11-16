@@ -59,6 +59,13 @@ export function createRateLimiters() {
       limit: 120,
       message: 'Too many requests. Please wait a moment and try again.',
     }),
+    // Cart quotes (Commerce C3, §9.5): 60/min per network until C4 adds per-customer limits.
+    shopQuote: limiter({
+      name: 'shop_quote',
+      windowMs: 60_000,
+      limit: 60,
+      message: 'Too many requests. Please wait a moment and try again.',
+    }),
     ticket: limiter({
       name: 'ticket',
       windowMs: 60_000,
