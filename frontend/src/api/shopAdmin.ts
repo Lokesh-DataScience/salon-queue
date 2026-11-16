@@ -232,6 +232,7 @@ export interface AdminOrderDetail {
   order: {
     id: string;
     orderNumber: string;
+    customerId: string;
     status: AdminOrderStatus;
     paymentMethod: string;
     paymentStatus: string;
@@ -252,9 +253,11 @@ export interface AdminOrderDetail {
     cancelReason: string | null;
     cancelledBy: string | null;
     remindersSent: number;
+    supplierSettled: boolean;
   };
   items: AdminOrderItem[];
-  finance: { costPaise: number; grossProfitPaise: number; costsConfirmed: boolean };
+  finance: { costPaise: number; grossProfitPaise: number; costsConfirmed: boolean; expensesPaise: number; netProfitPaise: number };
+  expenses: OrderExpense[];
   events: { id: string; type: string; from: string | null; to: string | null; customerVisible: boolean; note: string; actorType: string; at: string }[];
 }
 
@@ -285,6 +288,107 @@ export const setShopDeliveryExpectation = (
 ) => json('POST', `/orders/${id}/delivery-expectation`, input) as Promise<AdminOrderDetail>;
 export const recordShopCod = (id: string, input: { amountPaise: number; mismatchNote: string }) =>
   json('POST', `/orders/${id}/cod-collection`, input) as Promise<AdminOrderDetail>;
+
+// ── Money and recovery (C5b) ─────────────────────────────────────────────
+export type ExpenseKind = 'TRAVEL' | 'PACKAGING' | 'DELIVERY' | 'OTHER';
+export interface OrderExpense {
+  id: string;
+  kind: ExpenseKind;
+  amountPaise: number;
+  note: string;
+  createdAt: string;
+  voidedAt: string | null;
+  voidReason: string;
+}
+export const addShopExpense = (orderId: string, input: { kind: ExpenseKind; amountPaise: number; note: string }) =>
+  json('POST', `/orders/${orderId}/expenses`, input) as Promise<AdminOrderDetail>;
+export const voidShopExpense = (expenseId: string, reason: string) =>
+  json('POST', `/expenses/${expenseId}/void`, { reason }) as Promise<AdminOrderDetail>;
+
+export interface PendingSettlementOrder {
+  id: string;
+  orderNumber: string;
+  deliveredAt: string;
+  totalPaise: number;
+  supplierId: string | null;
+  supplierName: string | null;
+  payablePaise: number;
+}
+export type SettlementMethod = 'CASH' | 'UPI' | 'BANK' | 'OTHER';
+export interface Settlement {
+  id: string;
+  paidAt: string;
+  amountPaise: number;
+  payablePaise: number;
+  orderCount: number;
+  method: SettlementMethod;
+  reference: string;
+  note: string;
+  supplierName: string | null;
+  orderNumbers: string[];
+}
+export const fetchPendingSettlement = () =>
+  apiFetch<{ orders: PendingSettlementOrder[]; totalPayablePaise: number }>(`${BASE}/settlements/pending`);
+export const fetchSettlements = () => apiFetch<{ settlements: Settlement[] }>(`${BASE}/settlements`);
+export const recordSettlement = (input: { orderIds: string[]; amountPaise: number; method: SettlementMethod; reference: string; note: string }) =>
+  json('POST', '/settlements', input) as Promise<{ settlementId: string; payablePaise: number; orderCount: number }>;
+
+export interface ShopReport {
+  from: string;
+  to: string;
+  deliveredOrders: number;
+  cancelledOrders: number;
+  salesPaise: number;
+  collectedPaise: number;
+  supplierCostPaise: number;
+  expensesPaise: number;
+  refundsPaidPaise: number;
+  grossMarginPaise: number;
+  netProfitPaise: number;
+  owedToSupplierPaise: number;
+  owedOrders: number;
+  orders: {
+    id: string;
+    orderNumber: string;
+    day: string;
+    totalPaise: number;
+    collectedPaise: number;
+    costPaise: number;
+    expensesPaise: number;
+    profitPaise: number;
+    settled: boolean;
+  }[];
+}
+export const fetchShopReport = (from: string, to: string) =>
+  apiFetch<ShopReport>(`${BASE}/report?${new URLSearchParams({ from, to })}`);
+
+export interface ShopCustomerAccess {
+  customer: {
+    id: string;
+    name: string;
+    phone: string;
+    addressLine1: string;
+    addressLine2: string;
+    landmark: string;
+    pincode: string;
+    phoneVerifiedAt: string | null;
+    createdAt: string;
+  };
+  orders: { id: string; orderNumber: string; status: AdminOrderStatus; createdAt: string }[];
+  devices: {
+    label: string;
+    verifiedAt: string | null;
+    verifiedBy: string | null;
+    placedOrders: number;
+    keys: { id: string; createdAt: string; lastSeenAt: string; revokedAt: string | null }[];
+  }[];
+  recoveryCodes: { createdAt: string; expiresAt: string; usedAt: string | null; wrongTries: number }[];
+}
+export const fetchShopCustomer = (id: string) => apiFetch<ShopCustomerAccess>(`${BASE}/customers/${id}`);
+export const createRecoveryCode = (customerId: string) =>
+  json('POST', `/customers/${customerId}/recovery-code`, {}) as Promise<{ code: string; expiresAt: string }>;
+export const revokeShopKey = (customerId: string, keyId: string) =>
+  json('POST', `/customers/${customerId}/keys/${keyId}/revoke`, {}) as Promise<ShopCustomerAccess>;
 
 export { rupees } from '../lib/money';
 

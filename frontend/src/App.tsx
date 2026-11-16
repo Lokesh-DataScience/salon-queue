@@ -37,6 +37,7 @@ import ShopCheckout from './pages/ShopCheckout';
 import ShopOrders from './pages/ShopOrders';
 import ShopOrder from './pages/ShopOrder';
 import ShopLink from './pages/ShopLink';
+import ShopRecover from './pages/ShopRecover';
 import CustomerChrome from './components/CustomerChrome';
 import { applyManifest } from './lib/appManifest';
 
@@ -92,6 +93,7 @@ function App() {
       <Route path="/c/shop/orders" element={<ShopOrders />} />
       <Route path="/c/shop/orders/:orderId" element={<ShopOrder />} />
       <Route path="/c/shop/link" element={<ShopLink />} />
+      <Route path="/c/shop/recover" element={<ShopRecover />} />
       <Route path="/c/s/:code" element={<SalonQueue />} />
       <Route path="/c/s/:code/join" element={<ScanLanding source="app" />} />
       <Route path="/barber/login" element={<BarberLogin />} />

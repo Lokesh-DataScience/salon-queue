@@ -8,7 +8,15 @@ import { issueAdminCsrfToken } from '../middleware/shopSecurity.middleware';
 import type { Actor } from '../services/founderSalons.service';
 import * as shop from '../services/shopAdmin.service';
 import * as orders from '../services/shopOrdersAdmin.service';
+import * as money from '../services/shopMoneyAdmin.service';
 import {
+  shopCustomerIdParamSchema,
+  shopCustomerKeyParamSchema,
+  shopExpenseBodySchema,
+  shopExpenseIdParamSchema,
+  shopReportQuerySchema,
+  shopSettlementBodySchema,
+  shopVoidExpenseBodySchema,
   shopCodCollectionBodySchema,
   shopDeliveryExpectationBodySchema,
   shopOrderIdParamSchema,
@@ -136,4 +144,32 @@ export const postDeliveryExpectation = wrap(async (req, res) => {
 export const postCodCollection = wrap(async (req, res) => {
   const { orderId } = shopOrderIdParamSchema.parse(req.params);
   return orders.recordCodCollection(actorOf(req, res), orderId, shopCodCollectionBodySchema.parse(req.body));
+});
+
+// ── Money and recovery (C5b) ─────────────────────────────────────────────
+
+export const getPendingSettlement = wrap(async () => money.pendingSettlement());
+export const getSettlements = wrap(async () => money.listSettlements());
+export const postSettlement = wrap(async (req, res) => money.recordSettlement(actorOf(req, res), shopSettlementBodySchema.parse(req.body)));
+export const postExpense = wrap(async (req, res) => {
+  const { orderId } = shopOrderIdParamSchema.parse(req.params);
+  await money.addExpense(actorOf(req, res), orderId, shopExpenseBodySchema.parse(req.body));
+  return orders.getOrder(orderId);
+});
+export const postVoidExpense = wrap(async (req, res) => {
+  const { expenseId } = shopExpenseIdParamSchema.parse(req.params);
+  const { orderId } = await money.voidExpense(actorOf(req, res), expenseId, shopVoidExpenseBodySchema.parse(req.body).reason);
+  return orders.getOrder(orderId);
+});
+export const getReport = wrap(async (req) => {
+  const { from, to } = shopReportQuerySchema.parse(req.query);
+  return money.report(from, to);
+});
+export const getCustomer = wrap(async (req) => money.getCustomer(shopCustomerIdParamSchema.parse(req.params).customerId));
+export const postRecoveryCode = wrap(async (req, res) =>
+  money.createRecoveryCode(actorOf(req, res), shopCustomerIdParamSchema.parse(req.params).customerId),
+);
+export const postRevokeKey = wrap(async (req, res) => {
+  const { customerId, keyId } = shopCustomerKeyParamSchema.parse(req.params);
+  return money.revokeKey(actorOf(req, res), customerId, keyId);
 });

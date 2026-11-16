@@ -66,4 +66,15 @@ shop.post('/orders/:orderId/transition', c.postOrderTransition);
 shop.post('/orders/:orderId/delivery-expectation', c.postDeliveryExpectation);
 shop.post('/orders/:orderId/cod-collection', c.postCodCollection);
 
+// C5b: money and recovery
+shop.post('/orders/:orderId/expenses', c.postExpense);
+shop.post('/expenses/:expenseId/void', c.postVoidExpense);
+shop.get('/settlements/pending', c.getPendingSettlement);
+shop.get('/settlements', c.getSettlements);
+shop.post('/settlements', c.postSettlement);
+shop.get('/report', c.getReport);
+shop.get('/customers/:customerId', c.getCustomer);
+shop.post('/customers/:customerId/recovery-code', c.postRecoveryCode);
+shop.post('/customers/:customerId/keys/:keyId/revoke', c.postRevokeKey);
+
 export default shop;

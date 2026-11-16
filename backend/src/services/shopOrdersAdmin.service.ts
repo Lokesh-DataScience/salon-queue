@@ -92,7 +92,7 @@ async function statusCounts(): Promise<Record<string, number>> {
 }
 
 export async function getOrder(orderId: string) {
-  const [{ data: o, error: e1 }, { data: items, error: e2 }, { data: events, error: e3 }] = await Promise.all([
+  const [{ data: o, error: e1 }, { data: items, error: e2 }, { data: events, error: e3 }, { data: expenses, error: e4 }] = await Promise.all([
     supabase.from('orders').select('*, suppliers (name, phone)').eq('id', orderId).maybeSingle(),
     supabase
       .from('order_items')
@@ -105,10 +105,13 @@ export async function getOrder(orderId: string) {
       .eq('order_id', orderId)
       .order('created_at')
       .order('id'),
+    // C5b: before step24b this table doesn't exist yet: the order still opens.
+    supabase.from('order_expenses').select('id, kind, amount_paise, note, created_at, voided_at, void_reason').eq('order_id', orderId).order('created_at'),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
   if (e3) throw e3;
+  if (e4 && e4.code !== '42P01' && e4.code !== 'PGRST205') throw e4;
   if (!o) throw new AppError('Order not found. Refresh the list.', 404);
 
   const lines = (items ?? []).map((i) => {
@@ -131,11 +134,22 @@ export async function getOrder(orderId: string) {
   const costPaise = lines.reduce((n, l) => n + (l.confirmedUnitCostPaise ?? l.expectedUnitCostPaise) * l.quantity, 0);
   const allConfirmed = lines.every((l) => l.confirmedUnitCostPaise !== null);
   const supplier = o.suppliers as { name: string; phone: string } | null;
+  const expenseRows = (e4 ? [] : (expenses ?? [])).map((x) => ({
+    id: x.id as string,
+    kind: x.kind as string,
+    amountPaise: x.amount_paise as number,
+    note: x.note as string,
+    createdAt: x.created_at as string,
+    voidedAt: x.voided_at as string | null,
+    voidReason: x.void_reason as string,
+  }));
+  const expensesPaise = expenseRows.filter((x) => !x.voidedAt).reduce((n, x) => n + x.amountPaise, 0);
 
   return {
     order: {
       id: o.id as string,
       orderNumber: o.order_number as string,
+      customerId: o.customer_id as string,
       status: o.status as string,
       paymentMethod: o.payment_method as string,
       paymentStatus: o.payment_status as string,
@@ -167,10 +181,19 @@ export async function getOrder(orderId: string) {
       cancelReason: o.cancel_reason as string | null,
       cancelledBy: o.cancelled_by as string | null,
       remindersSent: o.placed_reminder_count as number,
+      supplierSettled: Boolean(o.supplier_settlement_id),
     },
     items: lines,
     // Expected until the supplier confirms rates (T3), then confirmed.
-    finance: { costPaise, grossProfitPaise: (o.total_paise as number) - costPaise, costsConfirmed: allConfirmed },
+    // net uses the cash actually collected once delivered; before that, the order total
+    finance: {
+      costPaise,
+      grossProfitPaise: (o.total_paise as number) - costPaise,
+      costsConfirmed: allConfirmed,
+      expensesPaise,
+      netProfitPaise: ((o.cod_collected_paise as number | null) ?? (o.total_paise as number)) - costPaise - expensesPaise,
+    },
+    expenses: expenseRows,
     events: (events ?? []).map((e) => ({
       id: e.id as string,
       type: e.event_type as string,

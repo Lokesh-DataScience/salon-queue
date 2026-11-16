@@ -25,13 +25,13 @@ vi.mock('../../../api/shopAdmin', async (orig) => {
 function detail(status: AdminOrderStatus, over: Partial<AdminOrderDetail['order']> = {}): AdminOrderDetail {
   return {
     order: {
-      id: 'o1', orderNumber: 'SQ-1042', status, paymentMethod: 'COD', paymentStatus: 'COD_PENDING',
+      id: 'o1', orderNumber: 'SQ-1042', customerId: 'c1', status, paymentMethod: 'COD', paymentStatus: 'COD_PENDING',
       createdAt: '2026-11-16T05:00:00Z', updatedAt: '2026-11-16T05:00:00Z', deliveredAt: null,
       customer: { name: 'Ravi', phone: '+919876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: 'temple', pincode: '495001' },
       subtotalPaise: 44000, deliveryFeePaise: 0, totalPaise: 44000, sameDayState: 'NOT_REQUESTED',
       expectedDeliveryDate: null, expectedDeliveryNote: '', cod: { collectedPaise: null, collectedAt: null, mismatchNote: '' },
       supplier: { name: 'Sharma Traders', phone: '9800000000' }, supplierContactedAt: null, fromSalon: false,
-      cancelReason: null, cancelledBy: null, remindersSent: 0, ...over,
+      cancelReason: null, cancelledBy: null, remindersSent: 0, supplierSettled: false, ...over,
     },
     items: [
       {
@@ -39,7 +39,8 @@ function detail(status: AdminOrderStatus, over: Partial<AdminOrderDetail['order'
         lineTotalPaise: 44000, expectedUnitCostPaise: 18000, confirmedUnitCostPaise: null, stockState: 'RESERVED', lineProfitPaise: 8000,
       },
     ],
-    finance: { costPaise: 36000, grossProfitPaise: 8000, costsConfirmed: false },
+    finance: { costPaise: 36000, grossProfitPaise: 8000, costsConfirmed: false, expensesPaise: 0, netProfitPaise: 8000 },
+    expenses: [],
     events: [{ id: 'e1', type: 'placed', from: null, to: 'PLACED', customerVisible: true, note: '', actorType: 'CUSTOMER', at: '2026-11-16T05:00:00Z' }],
   };
 }

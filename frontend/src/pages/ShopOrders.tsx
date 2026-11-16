@@ -20,6 +20,7 @@ const TEXT = {
     shop: 'सामान देखें',
     items: (n: number) => `${n} सामान`,
     otherPhone: 'दूसरे फ़ोन पर भी देखें',
+    lostPhone: 'फ़ोन बदल गया या खो गया? ऑर्डर वापस पाएँ',
   },
   en: {
     title: 'My Orders',
@@ -30,6 +31,7 @@ const TEXT = {
     shop: 'Browse products',
     items: (n: number) => `${n} item${n === 1 ? '' : 's'}`,
     otherPhone: 'See these orders on another phone',
+    lostPhone: 'New or lost phone? Get your orders back',
   },
 };
 
@@ -68,6 +70,7 @@ export default function ShopOrders() {
         </ul>
       )}
       <Link to="/c/shop/link" className="btn-secondary mt-4 min-h-12 w-full">{t.otherPhone}</Link>
+      <Link to="/c/shop/recover" className="mt-3 block min-h-11 py-2 text-center text-base text-blue-800 underline">{t.lostPhone}</Link>
     </PageShell>
   );
 }

@@ -308,6 +308,32 @@ export async function redeemLinkCode(access: ShopAccess, code: string): Promise<
   return { kind: r.result as 'INVALID_CODE' | 'SAME_PROFILE' | 'HAS_OWN_ORDERS' };
 }
 
+// ── C5b: founder-callback recovery (§9.4) ───────────────────────────────
+// The founder calls the customer's number and reads out a 6-digit code. The code is bound to the phone in its
+// hash, so a code only works together with its own number. Every failure gets the same answer.
+export const recoveryCodeHash = (phoneE164: string, code: string) => sha256(`recovery:${phoneE164}:${code}`);
+
+export async function redeemRecovery(
+  access: ShopAccess,
+  phoneE164: string,
+  code: string,
+): Promise<{ kind: 'LINKED'; access: ShopAccess; newCookie: string } | { kind: 'INVALID_CODE' }> {
+  const digits = code.replace(/\D/g, '');
+  if (!/^\d{6}$/.test(digits)) return { kind: 'INVALID_CODE' };
+  const raw = randomBytes(32).toString('base64url');
+  const { data, error } = await supabase.rpc('redeem_recovery_code', {
+    p_current_profile_id: access.profileId,
+    p_current_key_id: access.keyId,
+    p_phone_e164: phoneE164,
+    p_code_hash: recoveryCodeHash(phoneE164, digits),
+    p_new_key_hash: sha256(raw),
+  });
+  if (error) shopDbError(error);
+  const r = data as { result: string; key_id?: string };
+  if (r.result === 'LINKED') return { kind: 'LINKED', access: { profileId: access.profileId, keyId: r.key_id! }, newCookie: raw };
+  return { kind: 'INVALID_CODE' };
+}
+
 // ── C4b: verified phones and saved details (§10) ─────────────────────────
 
 export async function verifiedCustomer(access: ShopAccess | null) {

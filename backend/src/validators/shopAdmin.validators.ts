@@ -206,3 +206,35 @@ export const shopDeliveryExpectationBodySchema = z
 export const shopCodCollectionBodySchema = z
   .object({ amountPaise: z.number().int().min(1).max(100_000_000), mismatchNote: reason.default('') })
   .strict();
+
+// ── Money and recovery (Commerce C5b) ────────────────────────────────────
+
+export const shopSettlementBodySchema = z
+  .object({
+    orderIds: z.array(z.string().uuid()).min(1, 'Choose at least one order.').max(200),
+    amountPaise: z.number().int().min(1).max(100_000_000),
+    method: z.enum(['CASH', 'UPI', 'BANK', 'OTHER']),
+    reference: z.string().trim().max(100).default(''),
+    note: z.string().trim().max(300).default(''),
+    paidAt: z.string().datetime({ offset: true }).optional(),
+  })
+  .strict();
+
+export const shopExpenseBodySchema = z
+  .object({
+    kind: z.enum(['TRAVEL', 'PACKAGING', 'DELIVERY', 'OTHER']),
+    amountPaise: z.number().int().min(1).max(10_000_000),
+    note: z.string().trim().max(300).default(''),
+  })
+  .strict();
+
+export const shopExpenseIdParamSchema = z.object({ expenseId: z.string().uuid() });
+export const shopVoidExpenseBodySchema = z.object({ reason: z.string().trim().max(300) }).strict();
+
+export const shopReportQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD.'),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD.'),
+});
+
+export const shopCustomerIdParamSchema = z.object({ customerId: z.string().uuid() });
+export const shopCustomerKeyParamSchema = z.object({ customerId: z.string().uuid(), keyId: z.string().uuid() });

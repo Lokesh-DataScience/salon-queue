@@ -3,6 +3,7 @@
 // Hiding buttons is cosmetic: the server refuses every Cofounder change.
 import { useSearchParams } from 'react-router-dom';
 import { SHOP_READ_ONLY_NOTE, useShopReadOnly } from './useShopReadOnly';
+import ShopMoney from './ShopMoney';
 import ShopOrders from './ShopOrders';
 import ShopProducts from './ShopProducts';
 import ShopStockCheck from './ShopStockCheck';
@@ -10,6 +11,7 @@ import ShopSettingsPanel from './ShopSettingsPanel';
 
 const VIEWS = [
   { id: 'orders', label: 'Orders' },
+  { id: 'money', label: 'Money' },
   { id: 'products', label: 'Products' },
   { id: 'stock', label: 'Stock check' },
   { id: 'settings', label: 'Settings' },
@@ -40,7 +42,7 @@ export default function ShopSection() {
           {SHOP_READ_ONLY_NOTE}
         </p>
       )}
-      <div role="group" aria-label="Shop view" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div role="group" aria-label="Shop view" className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {VIEWS.map((v) => {
           const on = v.id === view;
           return (
@@ -59,6 +61,7 @@ export default function ShopSection() {
         })}
       </div>
       {view === 'orders' && <ShopOrders readOnly={readOnly} />}
+      {view === 'money' && <ShopMoney readOnly={readOnly} />}
       {view === 'products' && <ShopProducts readOnly={readOnly} />}
       {view === 'stock' && <ShopStockCheck readOnly={readOnly} />}
       {view === 'settings' && <ShopSettingsPanel readOnly={readOnly} />}

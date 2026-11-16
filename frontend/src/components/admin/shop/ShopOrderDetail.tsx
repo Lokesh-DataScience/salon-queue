@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  addShopExpense,
   fetchShopOrder,
   fetchSupplierText,
   paiseToInput,
@@ -12,9 +13,12 @@ import {
   setShopDeliveryExpectation,
   toPaise,
   transitionShopOrder,
+  voidShopExpense,
   type AdminOrderDetail,
+  type ExpenseKind,
   type TransitionInput,
 } from '../../../api/shopAdmin';
+import ShopCustomerAccess from './ShopCustomerAccess';
 import { StatusPill } from './ShopOrders';
 import { eventLabel, fmtWhen } from './orderLabels';
 
@@ -106,6 +110,7 @@ function OrderBody({ d, readOnly }: { d: Detail; readOnly: boolean }) {
         <p className="text-sm text-gray-800">
           {[c.addressLine1, c.addressLine2, c.landmark && `Near ${c.landmark}`, c.pincode].filter(Boolean).join(', ')}
         </p>
+        <CustomerAccessToggle customerId={o.customerId} readOnly={readOnly} />
       </section>
 
       <section className="card grid gap-2" aria-label="Items">
@@ -130,7 +135,17 @@ function OrderBody({ d, readOnly }: { d: Detail; readOnly: boolean }) {
           Cost {rupees(d.finance.costPaise)} · Profit <strong>{rupees(d.finance.grossProfitPaise)}</strong>{' '}
           {d.finance.costsConfirmed ? '' : '(expected — confirmed once the supplier gives rates)'}
         </p>
+        {d.finance.expensesPaise > 0 && (
+          <p className="text-sm">
+            After expenses ({rupees(d.finance.expensesPaise)}): <strong>{rupees(d.finance.netProfitPaise)}</strong>
+          </p>
+        )}
+        {o.status === 'DELIVERED' && (
+          <p className="text-sm text-gray-700">Supplier: {o.supplierSettled ? 'paid' : 'not paid yet (Money tab)'}</p>
+        )}
       </section>
+
+      <Expenses d={d} readOnly={readOnly} />
 
       {!readOnly && !finished && <Actions d={d} />}
       {!readOnly && !finished && <DeliveryBox d={d} />}
@@ -459,6 +474,7 @@ function ReasonForm(props: {
   danger?: boolean;
   initial?: string;
   extra?: string;
+  cancelLabel?: string;
 }) {
   const [text, setText] = useState(props.initial ?? '');
   const [problem, setProblem] = useState('');
@@ -488,10 +504,131 @@ function ReasonForm(props: {
         </button>
         {props.onCancel && (
           <button type="button" className="btn-secondary min-h-12" onClick={props.onCancel}>
-            Keep the order
+            {props.cancelLabel ?? 'Keep the order'}
           </button>
         )}
       </div>
     </form>
+  );
+}
+
+function CustomerAccessToggle({ customerId, readOnly }: { customerId: string; readOnly: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 grid gap-2">
+      <button type="button" aria-expanded={open} className="btn-secondary min-h-11 justify-self-start" onClick={() => setOpen(!open)}>
+        {open ? 'Hide phones & recovery' : 'Phones & recovery…'}
+      </button>
+      {open && <ShopCustomerAccess customerId={customerId} readOnly={readOnly} />}
+    </div>
+  );
+}
+
+const EXPENSE_KINDS: { id: ExpenseKind; label: string }[] = [
+  { id: 'TRAVEL', label: 'Travel / petrol' },
+  { id: 'PACKAGING', label: 'Packaging' },
+  { id: 'DELIVERY', label: 'Delivery help' },
+  { id: 'OTHER', label: 'Other' },
+];
+const kindLabel = (k: ExpenseKind) => EXPENSE_KINDS.find((x) => x.id === k)?.label ?? k;
+
+// Optional (Q10): costs of this order beyond the supplier's rate. Wrong ones are voided with a reason, never deleted.
+function Expenses({ d, readOnly }: { d: Detail; readOnly: boolean }) {
+  const o = d.order;
+  const add = useOrderAction(o.id, (input: { kind: ExpenseKind; amountPaise: number; note: string }) => addShopExpense(o.id, input));
+  const voidIt = useOrderAction(o.id, (input: { id: string; reason: string }) => voidShopExpense(input.id, input.reason));
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<ExpenseKind>('TRAVEL');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [problem, setProblem] = useState('');
+  const [voiding, setVoiding] = useState<string | null>(null);
+  if (readOnly && d.expenses.length === 0) return null;
+
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    const paise = toPaise(amount);
+    if (paise === null || paise <= 0) return setProblem('Enter the amount, like 30.');
+    setProblem('');
+    add.mutate({ kind, amountPaise: paise, note: note.trim() }, { onSuccess: () => { setAmount(''); setNote(''); setOpen(false); } });
+  }
+
+  return (
+    <section className="card grid gap-2" aria-label="Expenses">
+      <h3 className="text-lg font-semibold">Expenses</h3>
+      {d.expenses.length === 0 && <p className="text-sm text-gray-700">None recorded. Optional: petrol, packaging and so on.</p>}
+      <ul className="grid gap-1 text-sm">
+        {d.expenses.map((x) => (
+          <li key={x.id} className={x.voidedAt ? 'text-gray-500' : ''}>
+            <span className={x.voidedAt ? 'line-through' : 'font-medium'}>
+              {kindLabel(x.kind)} {rupees(x.amountPaise)}
+            </span>
+            {x.note ? ` · ${x.note}` : ''} · {fmtWhen(x.createdAt)}
+            {x.voidedAt && <span className="block">Removed: {x.voidReason}</span>}
+            {!x.voidedAt && !readOnly && voiding !== x.id && (
+              <button type="button" className="ml-2 text-blue-800 underline" onClick={() => setVoiding(x.id)}>
+                Remove…
+              </button>
+            )}
+            {voiding === x.id && (
+              <ReasonForm
+                label="Why remove it? (it stays in the history)"
+                button="Remove expense"
+                danger
+                busy={voidIt.isPending}
+                onSubmit={(reason) => voidIt.mutate({ id: x.id, reason }, { onSuccess: () => setVoiding(null) })}
+                onCancel={() => setVoiding(null)}
+                cancelLabel="Keep it"
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+      {(add.isError || voidIt.isError) && (
+        <p role="alert" className="text-red-700">
+          {errText(add.error ?? voidIt.error)}
+        </p>
+      )}
+      {!readOnly && !open && (
+        <button type="button" className="btn-secondary min-h-12 justify-self-start" onClick={() => setOpen(true)}>
+          Add an expense…
+        </button>
+      )}
+      {!readOnly && open && (
+        <form className="grid gap-2" onSubmit={save}>
+          <label className="grid gap-1 text-sm font-medium">
+            What for
+            <select className="field min-h-12" value={kind} onChange={(e) => setKind(e.target.value as ExpenseKind)}>
+              {EXPENSE_KINDS.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Amount (₹)
+            <input className="field min-h-12" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Note (optional)
+            <input className="field min-h-12" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          {problem && (
+            <p role="alert" className="text-red-700">
+              {problem}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className="btn-primary min-h-12" disabled={add.isPending}>
+              Save expense
+            </button>
+            <button type="button" className="btn-secondary min-h-12" onClick={() => setOpen(false)}>
+              Close
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }

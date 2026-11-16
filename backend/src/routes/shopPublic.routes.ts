@@ -4,6 +4,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { normalizePhone } from '../utils/phone';
 import { notifyShopNewOrder } from '../services/staffPush.service';
@@ -28,6 +29,7 @@ import {
   placeOrder,
   prefillFor,
   redeemLinkCode,
+  redeemRecovery,
   saveDetails,
   verifiedCustomer,
   type ShopAccess,
@@ -89,6 +91,7 @@ const checkoutBody = z
   .strict();
 const cancelBody = z.object({ reason: z.string().trim().max(300).default('') }).strict();
 const redeemBody = z.object({ code: z.string().trim().min(8).max(12) }).strict();
+const recoveryBody = z.object({ phone: z.string().trim().max(20), code: z.string().trim().max(12) }).strict();
 // Saved details replace the whole record, so every field must be sent: a missing field is an error,
 // never "make it empty" (that would silently wipe a saved landmark or pincode).
 const detailsBody = z
@@ -152,6 +155,7 @@ const perProfile = (windowMs: number, limit: number, message: string) =>
   });
 const linkCodeLimit = perProfile(60 * 60_000, 10, 'Too many codes. Please try again later.');
 const redeemLimit = perProfile(15 * 60_000, 5, 'Too many tries. Please wait 15 minutes and try again.');
+const recoveryLimit = perProfile(15 * 60_000, 5, 'Too many tries. Please wait 15 minutes and try again.');
 
 const router = Router();
 
@@ -176,6 +180,18 @@ router.use(async (_req: Request, _res: Response, next: NextFunction) => {
   }
 });
 router.use(loadAccess);
+
+// C5b: the shop's own phone, for "call the shop" on the recovery page. A business number, set in Shop settings.
+router.get('/contact', async (_req, res, next) => {
+  try {
+    const { data, error } = await supabase.from('shop_settings').select('founder_contact_phone').eq('id', true).maybeSingle();
+    if (error) throw error;
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({ contactPhone: (data?.founder_contact_phone as string) || null });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/categories', async (_req, res, next) => {
   try {
@@ -336,6 +352,27 @@ router.post('/device-link/redeem', ...customerWrite, redeemLimit, async (req, re
       HAS_OWN_ORDERS: 'This phone already has its own orders. Make the code on THIS phone and enter it on the other one instead.',
     }[r.kind];
     res.status(r.kind === 'INVALID_CODE' ? 400 : 409).json({ code: r.kind, message });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// C5b: the founder called you and read out a code (§9.4). Same answer for every failure.
+router.post('/recovery/verify', ...customerWrite, recoveryLimit, async (req, res, next) => {
+  try {
+    const { phone, code } = recoveryBody.parse(req.body);
+    const e164 = normalizePhone(phone);
+    res.setHeader('Cache-Control', 'no-store');
+    const r = e164 ? await redeemRecovery(access(res)!, e164, code) : ({ kind: 'INVALID_CODE' } as const);
+    if (r.kind === 'LINKED') {
+      res.cookie(SHOP_ACCESS_COOKIE, r.newCookie, SHOP_ACCESS_COOKIE_OPTS);
+      res.json({ recovered: true, ...issueCustomerCsrfToken(r.access.keyId) });
+      return;
+    }
+    res.status(400).json({
+      code: 'INVALID_CODE',
+      message: 'That number and code do not match, or the code has expired. Ask the shop to call you again for a new code.',
+    });
   } catch (err) {
     next(err);
   }

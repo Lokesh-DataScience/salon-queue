@@ -31,6 +31,8 @@ export interface ShopStatus {
 export const fetchShopStatus = (salonId?: string) =>
   apiFetch<ShopStatus>(`/api/shop/status${salonId ? `?salonId=${encodeURIComponent(salonId)}` : ''}`);
 
+export const fetchShopContact = () => apiFetch<{ contactPhone: string | null }>('/api/shop/contact');
+
 export const fetchCatalog = (categoryId?: string) =>
   apiFetch<{ products: ShopCatalogProduct[] }>(
     `/api/shop/products${categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : ''}`,

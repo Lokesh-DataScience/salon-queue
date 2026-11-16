@@ -78,6 +78,14 @@ export async function redeemLinkCode(code: string) {
   return true;
 }
 
+// C5b: the shop called this customer and read out a 6-digit code (§9.4).
+export async function redeemRecoveryCode(phone: string, code: string) {
+  const r = await shopWrite('/api/shop/recovery/verify', { phone, code });
+  if (!r.ok) throw new ShopHttpError(r.status, r.body);
+  adoptShopCsrf(String(r.body.csrfToken), String(r.body.expiresAt));
+  return true;
+}
+
 export async function cancelMyOrder(id: string, reason: string): Promise<OrderDetail> {
   const r = await shopWrite(`/api/shop/orders/${encodeURIComponent(id)}/cancel`, { reason });
   if (!r.ok) throw new ShopHttpError(r.status, r.body);
