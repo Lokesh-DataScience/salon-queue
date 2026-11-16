@@ -13,6 +13,7 @@ import queueTicketRouter from './routes/ticket.routes';
 import barberAuthRouter from './routes/auth.routes';
 import barberRouter from './routes/barber.routes';
 import adminRouter from './routes/admin.routes';
+import shopPublicRouter from './routes/shopPublic.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { createRateLimiters } from './middleware/rateLimit';
 import { feedRouter, geoRouter } from './routes/feed.routes';
@@ -71,6 +72,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
     app.post('/api/barber/me/password', limits.login); // only failed attempts count
     app.post('/api/auth/barber/register', limits.register);
     app.use('/api/admin', limits.admin);
+    app.use('/api/shop', limits.shop); // customer catalog (Commerce C2)
     // The founder's own password is checked here; only wrong attempts count (same rules as login).
     app.post('/api/admin/founder/staff/:staffId/password', limits.login);
     const news = createNewsLimiters();
@@ -95,6 +97,7 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
   app.use('/api/auth/barber', barberAuthRouter);
   app.use('/api/barber', barberRouter);
   app.use('/api/admin', adminRouter); // internal admin pages; role checked in the DB on every request
+  app.use('/api/shop', shopPublicRouter); // customer shop (Commerce Phase 1); 404 while shop_enabled is off
   if (clientDir) {
     app.use(
       '/.well-known',

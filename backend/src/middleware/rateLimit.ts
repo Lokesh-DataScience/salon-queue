@@ -52,6 +52,13 @@ export function createRateLimiters() {
       limit: 60,
       message: 'Too many searches. Please wait a moment and try again.',
     }),
+    // Customer shop catalog (Commerce C2). Its own counter, so browsing never eats the ticket budget.
+    shop: limiter({
+      name: 'shop',
+      windowMs: 60_000,
+      limit: 120,
+      message: 'Too many requests. Please wait a moment and try again.',
+    }),
     ticket: limiter({
       name: 'ticket',
       windowMs: 60_000,

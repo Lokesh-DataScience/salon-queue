@@ -192,8 +192,7 @@ export const updateShopSupplier = (input: Partial<Omit<ShopSupplier, 'id'>>) =>
   json('PATCH', '/supplier', input) as Promise<SettingsResult>;
 
 // ── Money helpers (paise ⇄ rupees) ───────────────────────────────────────
-export const rupees = (paise: number) =>
-  `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+export { rupees } from '../lib/money';
 
 // "249" or "249.50" → 24950. Returns null for anything else.
 export function toPaise(text: string): number | null {

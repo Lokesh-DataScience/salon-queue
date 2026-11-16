@@ -10,6 +10,7 @@ import Icon, { type IconName } from './Icon';
 import { useLang, useT } from '../lib/i18n';
 import { useOnline } from '../hooks/useOnline';
 import { isInstalledApp } from '../lib/appManifest';
+import { useShopEnabled } from '../lib/shopStatus';
 
 export function isCustomerPath(pathname: string): boolean {
   return !/^\/barber(\/|$)/.test(pathname);
@@ -18,7 +19,7 @@ export function isCustomerPath(pathname: string): boolean {
 // The join flow (/c/s/:code/join) stays focused: no bar while the customer fills it in.
 export function showsBottomNav(pathname: string, installed: boolean): boolean {
   const p = pathname.replace(/\/+$/, '') || '/';
-  if (p === '/c' || p === '/c/tokens' || p === '/c/scan' || p === '/c/history') return true;
+  if (p === '/c' || p === '/c/tokens' || p === '/c/scan' || p === '/c/history' || p === '/c/shop') return true;
   if (/^\/c\/s\/[^/]+$/.test(p)) return true;
   return installed && p.startsWith('/tickets/');
 }
@@ -26,7 +27,7 @@ export function showsBottomNav(pathname: string, installed: boolean): boolean {
 interface Tab {
   to: string;
   icon: IconName;
-  key: 'salons' | 'tokens' | 'scan' | 'history';
+  key: 'salons' | 'tokens' | 'scan' | 'history' | 'shop';
   active: (p: string) => boolean;
 }
 
@@ -36,6 +37,8 @@ const TABS: Tab[] = [
   { to: '/c/scan', icon: 'camera', key: 'scan', active: (p) => p.startsWith('/c/scan') },
   { to: '/c/history', icon: 'clock', key: 'history', active: (p) => p.startsWith('/c/history') },
 ];
+// 5th tab (Commerce D6). Only while the shop is switched on; otherwise the bar is exactly the four above.
+const SHOP_TAB: Tab = { to: '/c/shop', icon: 'bag', key: 'shop', active: (p) => p.startsWith('/c/shop') };
 
 const TEXT = {
   hi: {
@@ -44,6 +47,7 @@ const TEXT = {
     tokens: 'टोकन',
     scan: 'QR स्कैन',
     history: 'इतिहास',
+    shop: 'दुकान',
     offline: 'इंटरनेट बंद है। लाइन अभी अपडेट नहीं हो रही।',
   },
   en: {
@@ -52,6 +56,7 @@ const TEXT = {
     tokens: 'Tokens',
     scan: 'Scan QR',
     history: 'History',
+    shop: 'Shop',
     offline: "You're offline. The queue isn't updating right now.",
   },
 };
@@ -63,6 +68,8 @@ export default function CustomerChrome() {
   const online = useOnline();
   const customer = isCustomerPath(pathname);
   const nav = customer && showsBottomNav(pathname, isInstalledApp());
+  const shopOn = useShopEnabled();
+  const tabs = shopOn ? [...TABS, SHOP_TAB] : TABS;
 
   useEffect(() => {
     document.body.classList.toggle('c-font', customer);
@@ -83,7 +90,7 @@ export default function CustomerChrome() {
       {nav && (
         <nav aria-label={t.nav} className="c-nav">
           <ul className="mx-auto flex max-w-md">
-            {TABS.map((tab) => {
+            {tabs.map((tab) => {
               const on = tab.active(pathname);
               return (
                 <li key={tab.key} className="flex-1">

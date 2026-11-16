@@ -45,6 +45,12 @@ const PATHS = {
       <circle cx="12" cy="10" r="2.5" />
     </>
   ),
+  bag: (
+    <>
+      <path d="M5 8h14l-1 12H6z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

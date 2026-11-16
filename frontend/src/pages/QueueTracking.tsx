@@ -1,7 +1,7 @@
 // frontend/src/pages/QueueTracking.tsx
 // The customer's ticket page (/tickets/:ticketId?accessToken=...), for wall-QR and app customers alike.
 // Hindi by default with an EN switch. Live over the socket; full-screen alert when called.
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { fetchTicketStatus, leaveTicket } from '../api/tickets';
@@ -24,6 +24,9 @@ import RateVisit from '../components/RateVisit';
 import { isInstalledApp } from '../lib/appManifest';
 import InstallAppBanner from '../components/InstallAppBanner';
 import { useT } from '../lib/i18n';
+
+// Commerce C2: loaded only when the ticket page renders it; shows nothing unless the shop is on for this salon.
+const ShopStrip = lazy(() => import('../components/shop/ShopStrip'));
 
 type SanitizedQueueEntry = { id: string; tokenNumber: number; status: string };
 type SanitizedQueueState = {
@@ -371,6 +374,11 @@ export default function QueueTracking() {
           </div>
           <Link to={homeTo} className="btn-secondary mt-6">{homeLabel}</Link>
         </div>
+        {ticket.status === 'COMPLETED' && (
+          <Suspense fallback={null}>
+            <ShopStrip salonId={ticket.salonId} />
+          </Suspense>
+        )}
       </PageShell>
     );
   }
@@ -536,6 +544,11 @@ export default function QueueTracking() {
         <ForgetMe ticketId={ticket.ticketId} accessToken={accessToken} salonId={ticket.salonId} />
       </div>
       {ticket.status === 'WAITING' && <LocalNews salonId={ticket.salonId} />}
+      {ticket.status === 'WAITING' && (
+        <Suspense fallback={null}>
+          <ShopStrip salonId={ticket.salonId} />
+        </Suspense>
+      )}
     </PageShell>
   );
 }
