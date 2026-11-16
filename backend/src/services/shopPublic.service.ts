@@ -127,7 +127,7 @@ interface QuoteLineRow {
   mrp_paise: number | null;
   line_total_paise: number | null;
 }
-interface QuoteRow {
+export interface QuoteRow {
   lines: QuoteLineRow[];
   subtotal_paise: number;
   delivery_fee_paise: number;
@@ -146,7 +146,11 @@ export async function quoteCart(items: { productId: string; qty: number }[]) {
     if (error.message === 'SHOP_INVALID_CART') throw new AppError('Your cart could not be read. Please try again.', 400);
     shopDbError(error);
   }
-  const q = data as QuoteRow;
+  return quoteFromRow(data as QuoteRow);
+}
+
+// Turns a shop_price_lines result into the customer DTO, with names and photos (public fields only).
+export async function quoteFromRow(q: QuoteRow) {
 
   // Names and photos for the cart screen (public fields only, same as the catalog).
   const ids = q.lines.map((l) => l.product_id);

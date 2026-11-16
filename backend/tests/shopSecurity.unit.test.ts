@@ -10,7 +10,10 @@ import {
   requireContentType,
   requireSameOrigin,
   verifyAdminCsrfToken,
+  issueCustomerCsrfToken,
+  verifyCustomerCsrfToken,
 } from '../src/middleware/shopSecurity.middleware';
+import { requestHash, type CheckoutInput } from '../src/services/shopCustomer.service';
 import { errorHandler } from '../src/middleware/errorHandler';
 import { shopDbError, sniffImageType } from '../src/services/shopAdmin.service';
 import { AppError } from '../src/middleware/errorHandler';
@@ -108,5 +111,34 @@ describe('database error mapping', () => {
     const unknown = { code: 'XX000', message: 'boom' };
     expect(map(unknown)).toBe(unknown);
     expect(map(unknown)).not.toBeInstanceOf(AppError);
+  });
+});
+
+describe('customer CSRF token (bound to the device key)', () => {
+  it('works for its own key only, and an admin token is not a customer token', () => {
+    const { csrfToken } = issueCustomerCsrfToken(STAFF);
+    expect(verifyCustomerCsrfToken(STAFF, csrfToken)).toBe(true);
+    expect(verifyCustomerCsrfToken(OTHER, csrfToken)).toBe(false);
+    expect(verifyCustomerCsrfToken(STAFF, issueAdminCsrfToken(STAFF).csrfToken)).toBe(false);
+    expect(verifyAdminCsrfToken(STAFF, csrfToken)).toBe(false);
+  });
+});
+
+describe('checkout request hash', () => {
+  const base: CheckoutInput = {
+    items: [{ productId: 'b', qty: 1 }, { productId: 'a', qty: 2 }],
+    expectedTotalPaise: 100,
+    customer: { name: 'A', phone: '+919876543210', addressLine1: 'x', addressLine2: '', landmark: '', pincode: '' },
+    consent: true,
+    requestSameDay: false,
+  };
+  it('ignores item order and the expected total; changes with anything else', () => {
+    const h = requestHash(base);
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    expect(requestHash({ ...base, items: [...base.items].reverse() })).toBe(h);
+    expect(requestHash({ ...base, expectedTotalPaise: 999 })).toBe(h);
+    expect(requestHash({ ...base, requestSameDay: true })).not.toBe(h);
+    expect(requestHash({ ...base, customer: { ...base.customer, landmark: 'temple' } })).not.toBe(h);
+    expect(requestHash({ ...base, items: [{ productId: 'a', qty: 3 }, { productId: 'b', qty: 1 }] })).not.toBe(h);
   });
 });

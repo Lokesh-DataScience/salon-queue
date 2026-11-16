@@ -25,6 +25,7 @@ const TEXT = {
     closedTitle: 'दुकान अभी नहीं खुली',
     closedBody: 'हम जल्द ही यहाँ ग्रूमिंग का सामान लाएँगे।',
     back: 'मेरे सैलून',
+    myOrders: 'मेरे ऑर्डर ›',
   },
   en: {
     title: 'Shop',
@@ -38,6 +39,7 @@ const TEXT = {
     closedTitle: "The shop isn't open yet",
     closedBody: "We'll bring grooming products here soon.",
     back: 'My salons',
+    myOrders: 'My Orders ›',
   },
 };
 
@@ -72,6 +74,9 @@ export default function ShopHome() {
   return (
     <PageShell title={t.title}>
       <CustomerHeader title={t.title} subtitle={t.subtitle} action={<CartButton />} />
+      <Link to="/c/shop/orders" className="mb-4 inline-flex min-h-11 items-center text-base font-semibold text-ink underline">
+        {t.myOrders}
+      </Link>
 
       {cats.length > 0 && (
         <div role="group" aria-label={t.categories} className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">

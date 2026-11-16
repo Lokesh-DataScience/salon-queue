@@ -20,7 +20,8 @@ export function isCustomerPath(pathname: string): boolean {
 export function showsBottomNav(pathname: string, installed: boolean): boolean {
   const p = pathname.replace(/\/+$/, '') || '/';
   if (p === '/c' || p === '/c/tokens' || p === '/c/scan' || p === '/c/history') return true;
-  if (/^\/c\/shop(\/|$)/.test(p)) return true; // shop, product pages, cart
+  if (p === '/c/shop/checkout') return false; // like the join flow: no bar while filling in the form
+  if (/^\/c\/shop(\/|$)/.test(p)) return true; // shop, product pages, cart, orders
   if (/^\/c\/s\/[^/]+$/.test(p)) return true;
   return installed && p.startsWith('/tickets/');
 }

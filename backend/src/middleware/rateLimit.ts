@@ -66,6 +66,19 @@ export function createRateLimiters() {
       limit: 60,
       message: 'Too many requests. Please wait a moment and try again.',
     }),
+    // Commerce C4 (§9.5): per-network ceilings, generous because many phones share mobile IPs in India.
+    shopSession: limiter({
+      name: 'shop_session',
+      windowMs: 60 * 60_000,
+      limit: 30,
+      message: 'Too many requests. Please try again later.',
+    }),
+    shopCheckout: limiter({
+      name: 'shop_checkout',
+      windowMs: 60 * 60_000,
+      limit: 60,
+      message: 'Too many orders from this network. Please try again later.',
+    }),
     ticket: limiter({
       name: 'ticket',
       windowMs: 60_000,

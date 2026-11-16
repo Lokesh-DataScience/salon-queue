@@ -1,7 +1,7 @@
 // frontend/src/pages/ShopCart.tsx — the cart (/c/shop/cart), Commerce C3.
 // The phone only knows product ids and quantities. Every time the cart is shown (and when the customer
 // comes back to the app) the server prices it again: current prices, stock, per-order limits, the COD limit.
-// A price that changed since the customer saw it is pointed out. Checkout arrives in C4.
+// A price that changed since the customer saw it is pointed out. Checkout: /c/shop/checkout (C4).
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import PageShell from '../components/PageShell';
@@ -39,8 +39,7 @@ const TEXT = {
     total: 'कुल (डिलीवरी पर नकद)',
     cod: (r: string) => `नकद भुगतान (COD) में एक ऑर्डर ${r} तक ही हो सकता है। कुछ सामान कम करें।`,
     fixFirst: 'ऊपर लाल वाली चीज़ें ठीक करें।',
-    checkout: 'ऑर्डर करें',
-    soon: 'ऑर्डर करना जल्द शुरू होगा।',
+    checkout: 'आगे बढ़ें',
     sameDay: 'आज डिलीवरी माँग सकते हैं (कन्फ़र्म होने पर ही पक्की)',
   },
   en: {
@@ -69,8 +68,7 @@ const TEXT = {
     total: 'Total (cash on delivery)',
     cod: (r: string) => `Cash-on-delivery orders can be up to ${r}. Please remove some items.`,
     fixFirst: 'Please fix the items marked in red.',
-    checkout: 'Place order',
-    soon: 'Ordering starts soon.',
+    checkout: 'Continue to checkout',
     sameDay: 'Same-day delivery can be requested (confirmed only after we check)',
   },
 };
@@ -199,10 +197,15 @@ export default function ShopCart() {
             <p role="alert" className="mt-3 text-base font-semibold text-red-800">{t.cod(rupees(quote.codMaxOrderPaise))}</p>
           )}
           {quote.lines.some((l) => l.problem) && <p className="mt-3 text-base text-red-800">{t.fixFirst}</p>}
-          <button type="button" className="btn-primary mt-4 min-h-12 w-full" disabled aria-describedby="checkout-soon">
-            {t.checkout}
-          </button>
-          <p id="checkout-soon" className="mt-2 text-center text-sm text-gray-600">{t.soon}</p>
+          {quote.ok ? (
+            <Link to="/c/shop/checkout" className="btn-primary mt-4 min-h-14 w-full text-lg">
+              {t.checkout}
+            </Link>
+          ) : (
+            <button type="button" className="btn-primary mt-4 min-h-14 w-full text-lg" disabled>
+              {t.checkout}
+            </button>
+          )}
         </>
       )}
     </PageShell>

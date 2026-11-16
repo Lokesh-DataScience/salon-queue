@@ -1,6 +1,7 @@
 // frontend/src/api/client.ts
 // The live site is served by the same server as the API, so production always uses its own address.
 const API_URL = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? 'http://localhost:4000') : '';
+export const apiUrl = (path: string) => `${API_URL}${path}`;
 
 export const SESSION_EXPIRED_EVENT = 'barber:session-expired';
 

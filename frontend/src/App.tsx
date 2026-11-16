@@ -33,6 +33,9 @@ import VisitHistory from './pages/VisitHistory';
 import ShopHome from './pages/ShopHome';
 import ShopProduct from './pages/ShopProduct';
 import ShopCart from './pages/ShopCart';
+import ShopCheckout from './pages/ShopCheckout';
+import ShopOrders from './pages/ShopOrders';
+import ShopOrder from './pages/ShopOrder';
 import CustomerChrome from './components/CustomerChrome';
 import { applyManifest } from './lib/appManifest';
 
@@ -84,6 +87,9 @@ function App() {
       <Route path="/c/shop" element={<ShopHome />} />
       <Route path="/c/shop/p/:productId" element={<ShopProduct />} />
       <Route path="/c/shop/cart" element={<ShopCart />} />
+      <Route path="/c/shop/checkout" element={<ShopCheckout />} />
+      <Route path="/c/shop/orders" element={<ShopOrders />} />
+      <Route path="/c/shop/orders/:orderId" element={<ShopOrder />} />
       <Route path="/c/s/:code" element={<SalonQueue />} />
       <Route path="/c/s/:code/join" element={<ScanLanding source="app" />} />
       <Route path="/barber/login" element={<BarberLogin />} />

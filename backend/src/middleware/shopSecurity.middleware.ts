@@ -90,3 +90,26 @@ export function requireAdminCsrf(req: Request, _res: Response, next: NextFunctio
   }
   next();
 }
+
+// ── Customer side (C4) ───────────────────────────────────────────────────
+// Token = "<issuedAtMs>.<hmac(accessKeyId|issuedAtMs)>", bound to THIS device's access key (§9.2).
+export const CUSTOMER_CSRF_HEADER = 'x-shop-csrf';
+export const CUSTOMER_CSRF_TTL_MS = 12 * 60 * 60 * 1000;
+
+export function issueCustomerCsrfToken(keyId: string, now = Date.now()) {
+  return { csrfToken: `${now}.${mac('customer', keyId, now)}`, expiresAt: new Date(now + CUSTOMER_CSRF_TTL_MS).toISOString() };
+}
+
+export function verifyCustomerCsrfToken(keyId: string, token: unknown, now = Date.now()): boolean {
+  if (typeof token !== 'string' || token.length > 200) return false;
+  const dot = token.indexOf('.');
+  if (dot <= 0) return false;
+  const issuedAt = Number(token.slice(0, dot));
+  if (!Number.isSafeInteger(issuedAt)) return false;
+  if (issuedAt > now + CLOCK_SKEW_MS || now - issuedAt > CUSTOMER_CSRF_TTL_MS) return false;
+  const expected = Buffer.from(mac('customer', keyId, issuedAt));
+  const given = Buffer.from(token.slice(dot + 1));
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
+export const SHOP_BLOCKED_MESSAGE = FORBIDDEN;

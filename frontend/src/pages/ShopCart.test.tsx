@@ -98,7 +98,7 @@ describe('Cart', () => {
     expect(shop.quoteCart).toHaveBeenCalledWith([{ productId: A, qty: 2 }]);
     expect(screen.getAllByText('₹440').length).toBeGreaterThan(0);
     expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Place order' })).toBeDisabled(); // C4
+    expect(screen.getByRole('link', { name: 'Continue to checkout' })).toHaveAttribute('href', '/c/shop/checkout');
   });
 
   it('points out a price change and remembers it once accepted', async () => {
