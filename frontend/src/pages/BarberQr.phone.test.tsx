@@ -1,5 +1,5 @@
 // frontend/src/pages/BarberQr.phone.test.tsx
-// The salon's phone is printed as plain text under the QR. The QR itself still holds only the join link.
+// The salon's phone is printed as plain text in the poster header. The QR itself still holds only the join link.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import BarberQr from './BarberQr';
@@ -21,8 +21,9 @@ describe('Salon QR poster: phone number', () => {
   it('prints the salon phone under the name', async () => {
     vi.mocked(barber.fetchBarberSalon).mockResolvedValue({ id: 's1', name: 'Style Studio', qrCode: 'abc123', phone: '+919876543210' });
     renderQr();
-    expect(await screen.findByText('Style Studio')).toBeInTheDocument();
+    expect(await screen.findByText('STYLE STUDIO')).toBeInTheDocument();
     expect(screen.getByText('+91 98765 43210')).toBeInTheDocument();
+    expect(screen.getByText(/Call:/)).toBeInTheDocument();
   });
 
   it('never puts the phone number in the QR: it holds only the join link', async () => {
@@ -36,7 +37,7 @@ describe('Salon QR poster: phone number', () => {
   it('shows no phone line when the salon has none', async () => {
     vi.mocked(barber.fetchBarberSalon).mockResolvedValue({ id: 's1', name: 'Style Studio', qrCode: 'abc123' });
     renderQr();
-    expect(await screen.findByText('Style Studio')).toBeInTheDocument();
+    expect(await screen.findByText('STYLE STUDIO')).toBeInTheDocument();
     expect(screen.queryByText(/Call:/)).not.toBeInTheDocument();
   });
 });
