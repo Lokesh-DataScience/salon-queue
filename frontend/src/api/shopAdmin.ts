@@ -192,6 +192,100 @@ export const updateShopSupplier = (input: Partial<Omit<ShopSupplier, 'id'>>) =>
   json('PATCH', '/supplier', input) as Promise<SettingsResult>;
 
 // ── Money helpers (paise ⇄ rupees) ───────────────────────────────────────
+// ── Orders (C5a) ─────────────────────────────────────────────────────────
+export type AdminOrderStatus =
+  | 'PLACED' | 'SUPPLIER_PENDING' | 'SUPPLIER_CONFIRMED' | 'COLLECTED' | 'OUT_FOR_DELIVERY' | 'DELIVERY_FAILED' | 'DELIVERED' | 'CANCELLED';
+export type SameDayState = 'NOT_REQUESTED' | 'REQUESTED' | 'CONFIRMED' | 'NOT_POSSIBLE';
+
+export interface AdminOrderSummary {
+  id: string;
+  orderNumber: string;
+  status: AdminOrderStatus;
+  paymentStatus: string;
+  totalPaise: number;
+  itemCount: number;
+  sameDayState: SameDayState;
+  expectedDeliveryDate: string | null;
+  customerName: string;
+  pincode: string;
+  createdAt: string;
+  updatedAt: string;
+  remindersSent: number;
+}
+
+export interface AdminOrderItem {
+  id: string;
+  productId: string | null;
+  productName: string;
+  sku: string;
+  mrpPaise: number;
+  unitPricePaise: number;
+  quantity: number;
+  lineTotalPaise: number;
+  expectedUnitCostPaise: number;
+  confirmedUnitCostPaise: number | null;
+  stockState: string;
+  lineProfitPaise: number;
+}
+
+export interface AdminOrderDetail {
+  order: {
+    id: string;
+    orderNumber: string;
+    status: AdminOrderStatus;
+    paymentMethod: string;
+    paymentStatus: string;
+    createdAt: string;
+    updatedAt: string;
+    deliveredAt: string | null;
+    customer: { name: string; phone: string; addressLine1: string; addressLine2: string; landmark: string; pincode: string };
+    subtotalPaise: number;
+    deliveryFeePaise: number;
+    totalPaise: number;
+    sameDayState: SameDayState;
+    expectedDeliveryDate: string | null;
+    expectedDeliveryNote: string;
+    cod: { collectedPaise: number | null; collectedAt: string | null; mismatchNote: string };
+    supplier: { name: string; phone: string } | null;
+    supplierContactedAt: string | null;
+    fromSalon: boolean;
+    cancelReason: string | null;
+    cancelledBy: string | null;
+    remindersSent: number;
+  };
+  items: AdminOrderItem[];
+  finance: { costPaise: number; grossProfitPaise: number; costsConfirmed: boolean };
+  events: { id: string; type: string; from: string | null; to: string | null; customerVisible: boolean; note: string; actorType: string; at: string }[];
+}
+
+export type OrderListFilter = 'open' | 'all' | AdminOrderStatus;
+
+export function fetchShopOrders(q: { status: OrderListFilter; search?: string }) {
+  const p = new URLSearchParams({ status: q.status });
+  if (q.search) p.set('search', q.search);
+  return apiFetch<{ orders: AdminOrderSummary[]; counts: Partial<Record<AdminOrderStatus, number>> }>(`${BASE}/orders?${p}`);
+}
+export const fetchShopOrder = (id: string) => apiFetch<AdminOrderDetail>(`${BASE}/orders/${id}`);
+export const fetchSupplierText = (id: string) =>
+  apiFetch<{ text: string; supplierName: string | null; whatsappUrl: string | null }>(`${BASE}/orders/${id}/supplier-text`);
+
+export interface TransitionInput {
+  expectedFrom: AdminOrderStatus;
+  to: Exclude<AdminOrderStatus, 'PLACED' | 'DELIVERED'>;
+  note?: string;
+  lines?: { itemId: string; confirmedUnitCostPaise: number }[];
+  delivery?: { date?: string | null; note?: string; sameDay?: 'CONFIRMED' | 'NOT_POSSIBLE' };
+  markOutOfStock?: boolean;
+}
+export const transitionShopOrder = (id: string, input: TransitionInput) =>
+  json('POST', `/orders/${id}/transition`, input) as Promise<AdminOrderDetail>;
+export const setShopDeliveryExpectation = (
+  id: string,
+  input: { date: string | null; note: string; sameDay: 'CONFIRMED' | 'NOT_POSSIBLE' | null },
+) => json('POST', `/orders/${id}/delivery-expectation`, input) as Promise<AdminOrderDetail>;
+export const recordShopCod = (id: string, input: { amountPaise: number; mismatchNote: string }) =>
+  json('POST', `/orders/${id}/cod-collection`, input) as Promise<AdminOrderDetail>;
+
 export { rupees } from '../lib/money';
 
 // "249" or "249.50" → 24950. Returns null for anything else.

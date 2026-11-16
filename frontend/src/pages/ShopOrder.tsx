@@ -37,7 +37,14 @@ const TEXT = {
     no: 'नहीं',
     cancelling: 'रद्द कर रहे हैं...',
     cancelledBy: { CUSTOMER: 'आपने रद्द किया', FOUNDER: 'दुकान ने रद्द किया' },
-    events: { placed: 'ऑर्डर मिला', cancelled: 'रद्द हुआ', same_day: 'आज डिलीवरी माँगी गई', status: 'स्थिति बदली' } as Record<string, string>,
+    events: {
+      placed: 'ऑर्डर मिला',
+      cancelled: 'रद्द हुआ',
+      'same_day:REQUESTED': 'आज डिलीवरी माँगी गई',
+      'same_day:CONFIRMED': 'आज ही डिलीवरी पक्की',
+      'same_day:NOT_POSSIBLE': 'आज डिलीवरी नहीं हो पाएगी — जल्द पहुँचाएँगे',
+      delivery_expectation: 'डिलीवरी की जानकारी अपडेट हुई',
+    } as Record<string, string>,
   },
   en: {
     title: 'Order',
@@ -63,9 +70,23 @@ const TEXT = {
     no: 'No',
     cancelling: 'Cancelling...',
     cancelledBy: { CUSTOMER: 'Cancelled by you', FOUNDER: 'Cancelled by the shop' },
-    events: { placed: 'Order received', cancelled: 'Cancelled', same_day: 'Same-day delivery requested', status: 'Status changed' } as Record<string, string>,
+    events: {
+      placed: 'Order received',
+      cancelled: 'Cancelled',
+      'same_day:REQUESTED': 'Same-day delivery requested',
+      'same_day:CONFIRMED': 'Same-day delivery confirmed',
+      'same_day:NOT_POSSIBLE': "Same-day isn't possible — we'll deliver soon",
+      delivery_expectation: 'Delivery details updated',
+    } as Record<string, string>,
   },
 };
+
+// 'status' events read as the status they moved to; same-day events by their decision.
+function eventText(events: Record<string, string>, lang: 'hi' | 'en', e: { type: string; to: string | null }) {
+  if (e.type === 'same_day') return events[`same_day:${e.to}`] ?? events['same_day:REQUESTED'];
+  if (e.type === 'status' && e.to) return STATUS_TEXT[lang][e.to as keyof (typeof STATUS_TEXT)['en']] ?? e.to;
+  return events[e.type] ?? (e.to ? STATUS_TEXT[lang][e.to as keyof (typeof STATUS_TEXT)['en']] ?? e.type : e.type);
+}
 
 function errText(e: unknown) {
   return e instanceof Error && e.message ? e.message : 'Something went wrong. Please try again.';
@@ -193,7 +214,7 @@ export default function ShopOrder() {
         <ol className="grid gap-1">
           {o.timeline.map((e, n) => (
             <li key={n} className="text-base">
-              <span className="font-medium">{t.events[e.type] ?? (e.to ? STATUS_TEXT[lang][e.to as keyof (typeof STATUS_TEXT)['en']] ?? e.type : e.type)}</span>
+              <span className="font-medium">{eventText(t.events, lang, e)}</span>
               <span className="text-sm text-gray-600"> · {fmtDateTime(e.at, lang)}</span>
               {e.note && <span className="block text-sm text-gray-700">{e.note}</span>}
             </li>

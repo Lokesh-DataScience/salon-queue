@@ -1,13 +1,15 @@
-// frontend/src/components/admin/shop/ShopSection.tsx — the Admin "Shop" tab (Commerce Phase 1, C1).
+// frontend/src/components/admin/shop/ShopSection.tsx — the Admin "Shop" tab (Commerce Phase 1, C1; Orders since C5a).
 // Founder: manages products, stock, photos and settings. Cofounder: sees everything (incl. cost and margin), changes nothing.
 // Hiding buttons is cosmetic: the server refuses every Cofounder change.
 import { useSearchParams } from 'react-router-dom';
 import { SHOP_READ_ONLY_NOTE, useShopReadOnly } from './useShopReadOnly';
+import ShopOrders from './ShopOrders';
 import ShopProducts from './ShopProducts';
 import ShopStockCheck from './ShopStockCheck';
 import ShopSettingsPanel from './ShopSettingsPanel';
 
 const VIEWS = [
+  { id: 'orders', label: 'Orders' },
   { id: 'products', label: 'Products' },
   { id: 'stock', label: 'Stock check' },
   { id: 'settings', label: 'Settings' },
@@ -17,13 +19,14 @@ type View = (typeof VIEWS)[number]['id'];
 export default function ShopSection() {
   const [params, setParams] = useSearchParams();
   const requested = params.get('view');
-  const view: View = VIEWS.some((v) => v.id === requested) ? (requested as View) : 'products';
+  const view: View = VIEWS.some((v) => v.id === requested) ? (requested as View) : 'orders';
   const readOnly = useShopReadOnly();
 
   function choose(v: View) {
     const next = new URLSearchParams(params);
     next.set('view', v);
     next.delete('product');
+    next.delete('order');
     setParams(next, { replace: true });
   }
 
@@ -37,7 +40,7 @@ export default function ShopSection() {
           {SHOP_READ_ONLY_NOTE}
         </p>
       )}
-      <div role="group" aria-label="Shop view" className="grid grid-cols-3 gap-2">
+      <div role="group" aria-label="Shop view" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {VIEWS.map((v) => {
           const on = v.id === view;
           return (
@@ -55,6 +58,7 @@ export default function ShopSection() {
           );
         })}
       </div>
+      {view === 'orders' && <ShopOrders readOnly={readOnly} />}
       {view === 'products' && <ShopProducts readOnly={readOnly} />}
       {view === 'stock' && <ShopStockCheck readOnly={readOnly} />}
       {view === 'settings' && <ShopSettingsPanel readOnly={readOnly} />}

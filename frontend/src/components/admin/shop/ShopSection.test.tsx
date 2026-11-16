@@ -27,7 +27,7 @@ const oil: ShopProduct = {
   sameDayEligible: true, lastStockCheckAt: null, deletedAt: null, updatedAt: '2026-11-16T08:00:00Z', images: [],
 };
 
-const render = () => renderPage(<ShopSection />, { path: '/barber/admin', route: '/barber/admin?tab=shop' });
+const render = () => renderPage(<ShopSection />, { path: '/barber/admin', route: '/barber/admin?tab=shop&view=products' });
 
 beforeEach(() => {
   vi.mocked(admin.fetchAdminMe).mockReset().mockResolvedValue({ role: 'FOUNDER', sections: ['founder', 'sales', 'tech'] });

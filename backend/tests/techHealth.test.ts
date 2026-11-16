@@ -43,7 +43,7 @@ describe('Tech health (Slice 7)', () => {
     expect(typeof body.database.responseMs).toBe('number');
     expect(body.server.nodeVersion).toMatch(/^v\d+/);
     expect(body.server.uptimeSeconds).toBeGreaterThanOrEqual(0);
-    expect(body.jobs.map((j: { name: string }) => j.name)).toEqual(['sweeper', 'cleanup', 'news', 'pinger']);
+    expect(body.jobs.map((j: { name: string }) => j.name)).toEqual(['sweeper', 'cleanup', 'news', 'shop_reminders', 'pinger']);
     expect(body).toHaveProperty('build.commit');
   }, 120_000);
 

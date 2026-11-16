@@ -7,7 +7,13 @@ import { adminRoleOf } from '../middleware/admin.middleware';
 import { issueAdminCsrfToken } from '../middleware/shopSecurity.middleware';
 import type { Actor } from '../services/founderSalons.service';
 import * as shop from '../services/shopAdmin.service';
+import * as orders from '../services/shopOrdersAdmin.service';
 import {
+  shopCodCollectionBodySchema,
+  shopDeliveryExpectationBodySchema,
+  shopOrderIdParamSchema,
+  shopOrderListQuerySchema,
+  shopOrderTransitionBodySchema,
   shopAvailabilityBodySchema,
   shopCategoryIdParamSchema,
   shopCreateCategoryBodySchema,
@@ -113,3 +119,21 @@ export const patchCategory = wrap(async (req, res) => {
 
 export const patchSettings = wrap(async (req, res) => shop.updateSettings(actorOf(req, res), shopSettingsBodySchema.parse(req.body)));
 export const patchSupplier = wrap(async (req, res) => shop.updateSupplier(actorOf(req, res), shopSupplierBodySchema.parse(req.body)));
+
+// ── Orders (C5a) ─────────────────────────────────────────────────────────
+
+export const getOrders = wrap(async (req) => orders.listOrders(shopOrderListQuerySchema.parse(req.query)));
+export const getOrder = wrap(async (req) => orders.getOrder(shopOrderIdParamSchema.parse(req.params).orderId));
+export const getSupplierText = wrap(async (req) => orders.getSupplierText(shopOrderIdParamSchema.parse(req.params).orderId));
+export const postOrderTransition = wrap(async (req, res) => {
+  const { orderId } = shopOrderIdParamSchema.parse(req.params);
+  return orders.transitionOrder(actorOf(req, res), orderId, shopOrderTransitionBodySchema.parse(req.body));
+});
+export const postDeliveryExpectation = wrap(async (req, res) => {
+  const { orderId } = shopOrderIdParamSchema.parse(req.params);
+  return orders.setDeliveryExpectation(actorOf(req, res), orderId, shopDeliveryExpectationBodySchema.parse(req.body));
+});
+export const postCodCollection = wrap(async (req, res) => {
+  const { orderId } = shopOrderIdParamSchema.parse(req.params);
+  return orders.recordCodCollection(actorOf(req, res), orderId, shopCodCollectionBodySchema.parse(req.body));
+});

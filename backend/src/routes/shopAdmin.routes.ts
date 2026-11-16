@@ -58,4 +58,12 @@ shop.get('/settings', c.getSettings);
 shop.patch('/settings', c.patchSettings);
 shop.patch('/supplier', c.patchSupplier);
 
+// C5a: orders
+shop.get('/orders', c.getOrders);
+shop.get('/orders/:orderId', c.getOrder);
+shop.get('/orders/:orderId/supplier-text', c.getSupplierText);
+shop.post('/orders/:orderId/transition', c.postOrderTransition);
+shop.post('/orders/:orderId/delivery-expectation', c.postDeliveryExpectation);
+shop.post('/orders/:orderId/cod-collection', c.postCodCollection);
+
 export default shop;

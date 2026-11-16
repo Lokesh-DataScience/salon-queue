@@ -8,6 +8,7 @@ import { initQueueSockets } from './sockets/queue.socket';
 import { startCleanupJob } from './jobs/cleanup.job';
 import { startNewsJob } from './jobs/news.job';
 import { startQueueSweeper } from './jobs/queueSweeper';
+import { startShopRemindersJob } from './jobs/shopReminders.job';
 
 const app = createApp();
 const httpServer = http.createServer(app);
@@ -28,4 +29,5 @@ httpServer.listen(env.PORT, () => {
   startCleanupJob();
   startNewsJob();
   startQueueSweeper();
+  startShopRemindersJob(); // Commerce C5a: reminders for orders still PLACED (D27)
 });

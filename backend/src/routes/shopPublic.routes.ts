@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { env } from '../config/env';
 import { normalizePhone } from '../utils/phone';
+import { notifyShopNewOrder } from '../services/staffPush.service';
 import { AppError } from '../middleware/errorHandler';
 import {
   CUSTOMER_CSRF_HEADER,
@@ -252,6 +253,8 @@ router.post('/orders', ...customerWrite, perProfileCheckout, async (req, res, ne
     switch (r.kind) {
       case 'CREATED':
       case 'EXISTING':
+        // After the commit, never awaited: a failed push never affects the order (§8.2 step 12, D18).
+        if (r.kind === 'CREATED') void notifyShopNewOrder(r.orderId, r.orderNumber);
         res.status(r.kind === 'CREATED' ? 201 : 200).json({ order: { id: r.orderId, orderNumber: r.orderNumber }, existing: r.kind === 'EXISTING' });
         return;
       case 'PRICE_CHANGED':

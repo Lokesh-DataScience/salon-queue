@@ -25,6 +25,7 @@ const JOBS: { name: HeartbeatName; label: string; schedule: string; lateAfterMs:
     lateAfterMs: (2 * env.CLEANUP_INTERVAL_MINUTES + 5) * 60_000,
   },
   { name: 'news', label: 'Local news refresh', schedule: 'every 15 minutes', lateAfterMs: 40 * 60_000 },
+  { name: 'shop_reminders', label: 'Shop order reminders', schedule: 'every 5 minutes', lateAfterMs: 15 * 60_000 },
   {
     name: 'pinger',
     label: 'Uptime pinger (cron-job.org)',

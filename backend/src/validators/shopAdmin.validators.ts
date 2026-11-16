@@ -162,3 +162,47 @@ export const shopSupplierBodySchema = z
 export const shopMovementsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
+
+// ── Orders (Commerce C5a) ────────────────────────────────────────────────
+
+export const SHOP_ORDER_STATUSES = [
+  'PLACED', 'SUPPLIER_PENDING', 'SUPPLIER_CONFIRMED', 'COLLECTED', 'OUT_FOR_DELIVERY', 'DELIVERY_FAILED', 'DELIVERED', 'CANCELLED',
+] as const;
+
+export const shopOrderIdParamSchema = z.object({ orderId: z.string().uuid() });
+
+export const shopOrderListQuerySchema = z.object({
+  // "open" = everything not finished; the default view
+  status: z.enum(['open', 'all', ...SHOP_ORDER_STATUSES]).default('open'),
+  search: z.string().trim().max(20).optional(), // order number, e.g. 1042 or SQ-1042
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+});
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD.');
+const reason = z.string().trim().max(300);
+
+export const shopOrderTransitionBodySchema = z
+  .object({
+    expectedFrom: z.enum(SHOP_ORDER_STATUSES),
+    to: z.enum(['SUPPLIER_PENDING', 'SUPPLIER_CONFIRMED', 'COLLECTED', 'OUT_FOR_DELIVERY', 'DELIVERY_FAILED', 'CANCELLED']),
+    note: reason.default(''),
+    lines: z.array(z.object({ itemId: z.string().uuid(), confirmedUnitCostPaise: paise })).max(20).optional(),
+    delivery: z
+      .object({ date: isoDate.nullable().optional(), note: z.string().trim().max(200).optional(), sameDay: z.enum(['CONFIRMED', 'NOT_POSSIBLE']).optional() })
+      .strict()
+      .optional(),
+    markOutOfStock: z.boolean().default(false),
+  })
+  .strict();
+
+export const shopDeliveryExpectationBodySchema = z
+  .object({
+    date: isoDate.nullable(),
+    note: z.string().trim().max(200).default(''),
+    sameDay: z.enum(['CONFIRMED', 'NOT_POSSIBLE']).nullable().default(null),
+  })
+  .strict();
+
+export const shopCodCollectionBodySchema = z
+  .object({ amountPaise: z.number().int().min(1).max(100_000_000), mismatchNote: reason.default('') })
+  .strict();

@@ -4,7 +4,7 @@
 // after a failure is written straight away, so recovery shows at once. Never throws.
 import { supabase } from '../config/supabase';
 
-export type HeartbeatName = 'sweeper' | 'cleanup' | 'news' | 'pinger';
+export type HeartbeatName = 'sweeper' | 'cleanup' | 'news' | 'pinger' | 'shop_reminders';
 
 export const PROCESS_STARTED_AT = new Date();
 

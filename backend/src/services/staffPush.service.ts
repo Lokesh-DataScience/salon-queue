@@ -208,6 +208,58 @@ export async function notifyStaffNewToken(salonId: string, entryId: string): Pro
   }
 }
 
+// ── Shop (Commerce C5a, §15) ─────────────────────────────────────────────
+// Payloads carry the order number and an admin link only: never a name, phone, address, cost or profit.
+
+const shopOrderUrl = (orderId: string) => `/barber/admin?tab=shop&view=orders&order=${orderId}`;
+
+export function buildShopNewOrderMessage(orderId: string, orderNumber: string): StaffPushMessage {
+  return { title: `New shop order ${orderNumber} (नया ऑर्डर)`, body: 'Open the Shop tab to confirm it with the supplier.', url: shopOrderUrl(orderId), tag: `shop-order-${orderId}` };
+}
+
+export function buildShopReminderMessage(orderId: string, orderNumber: string): StaffPushMessage {
+  return { title: `Order ${orderNumber} is waiting for your action`, body: 'It is still "Placed". Contact the supplier or call the customer.', url: shopOrderUrl(orderId), tag: `shop-reminder-${orderId}` };
+}
+
+// Every device of the given ACTIVE staff members (whatever salon they belong to). Never throws.
+export async function notifyStaffIds(staffIds: string[], message: StaffPushMessage, what: string): Promise<number> {
+  try {
+    if (staffIds.length === 0) return 0;
+    if (!sender) {
+      console.log(`[staff-notify] ${what} staff=${staffIds.length} (push off)`);
+      return 0;
+    }
+    const { data: rows, error } = await supabase
+      .from('staff_push_subscriptions')
+      .select('id, subscription, salon_staff!inner(is_active)')
+      .in('staff_id', staffIds)
+      .eq('salon_staff.is_active', true);
+    if (error) throw error;
+    const sent = await sendToRows(rows ?? [], message);
+    console.log(`[staff-notify] ${what} devices=${sent}/${rows?.length ?? 0}`);
+    return sent;
+  } catch (err) {
+    console.error(`[staff-notify] ${what} failed (${errName(err)})`);
+    return 0;
+  }
+}
+
+// FOUNDER and COFOUNDER for new orders (D18); FOUNDER only for reminders (the cofounder can't act).
+export async function shopStaffIds(roles: ('FOUNDER' | 'COFOUNDER')[]): Promise<string[]> {
+  const { data, error } = await supabase.from('staff_admin_roles').select('staff_id').in('role', roles);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.staff_id as string);
+}
+
+export async function notifyShopNewOrder(orderId: string, orderNumber: string) {
+  try {
+    return await notifyStaffIds(await shopStaffIds(['FOUNDER', 'COFOUNDER']), buildShopNewOrderMessage(orderId, orderNumber), `SHOP_NEW_ORDER ${orderNumber}`);
+  } catch (err) {
+    console.error(`[staff-notify] SHOP_NEW_ORDER failed (${errName(err)})`);
+    return 0;
+  }
+}
+
 // ── Test alert (from Settings) ───────────────────────────────────────────
 
 const lastTest = new Map<string, number>(); // staffId -> last test. In memory: a restart resets it.
