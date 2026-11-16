@@ -19,6 +19,7 @@ import {
   type TransitionInput,
 } from '../../../api/shopAdmin';
 import ShopCustomerAccess from './ShopCustomerAccess';
+import { Returns, StockDecisions } from './ShopOrderAfter';
 import { StatusPill } from './ShopOrders';
 import { eventLabel, fmtWhen } from './orderLabels';
 
@@ -126,8 +127,14 @@ function OrderBody({ d, readOnly }: { d: Detail; readOnly: boolean }) {
                 {rupees(i.confirmedUnitCostPaise ?? i.expectedUnitCostPaise)} {i.confirmedUnitCostPaise === null ? '(expected)' : '(confirmed)'}
               </span>
               {i.stockState === 'AWAITING_DISPOSITION' && (
-                <span className="block font-semibold text-amber-900">Waiting for your stock decision (comes in the next step)</span>
+                <span className="block font-semibold text-amber-900">Waiting for your stock decision</span>
               )}
+              {(i.cancelRestockQty > 0 || i.cancelWriteOffQty > 0) && (
+                <span className="block text-gray-700">
+                  Back to supplier {i.cancelRestockQty} · written off {i.cancelWriteOffQty}
+                </span>
+              )}
+              {i.returnedQty > 0 && <span className="block text-gray-700">Given back by the customer: {i.returnedQty}</span>}
             </li>
           ))}
         </ul>
@@ -140,10 +147,22 @@ function OrderBody({ d, readOnly }: { d: Detail; readOnly: boolean }) {
             After expenses ({rupees(d.finance.expensesPaise)}): <strong>{rupees(d.finance.netProfitPaise)}</strong>
           </p>
         )}
-        {o.status === 'DELIVERED' && (
+        {(d.finance.refundedPaise ?? 0) + (d.finance.refundPendingPaise ?? 0) > 0 && (
+          <p className="text-sm">
+            Refunds {rupees((d.finance.refundedPaise ?? 0) + (d.finance.refundPendingPaise ?? 0))} · after refunds and
+            expenses: <strong>{rupees(d.finance.netProfitPaise)}</strong>
+          </p>
+        )}
+        {o.status === 'CANCELLED' && d.finance.costPaise > 0 && !d.items.some((i) => i.stockState === 'AWAITING_DISPOSITION') && (
+          <p className="text-sm text-gray-800">Written-off goods cost you {rupees(d.finance.costPaise)} (owed to the supplier).</p>
+        )}
+        {(o.status === 'DELIVERED' || (o.status === 'CANCELLED' && d.finance.costPaise > 0)) && (
           <p className="text-sm text-gray-700">Supplier: {o.supplierSettled ? 'paid' : 'not paid yet (Money tab)'}</p>
         )}
       </section>
+
+      {!readOnly && <StockDecisions d={d} />}
+      <Returns d={d} readOnly={readOnly} />
 
       <Expenses d={d} readOnly={readOnly} />
 

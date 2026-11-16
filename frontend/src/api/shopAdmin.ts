@@ -211,6 +211,7 @@ export interface AdminOrderSummary {
   createdAt: string;
   updatedAt: string;
   remindersSent: number;
+  needs: 'STOCK_DECISION' | 'RETURN' | 'REFUND' | null;
 }
 
 export interface AdminOrderItem {
@@ -225,7 +226,28 @@ export interface AdminOrderItem {
   expectedUnitCostPaise: number;
   confirmedUnitCostPaise: number | null;
   stockState: string;
+  cancelRestockQty: number;
+  cancelWriteOffQty: number;
+  returnedQty: number;
+  keptUnits: number;
   lineProfitPaise: number;
+}
+
+export interface OrderReturn {
+  id: string;
+  itemId: string;
+  quantity: number;
+  status: 'RECEIVED' | 'RESOLVED' | 'REJECTED';
+  restockQty: number;
+  writeOffQty: number;
+  reason: string;
+  decisionNote: string;
+  refundPaise: number;
+  refundStatus: 'NONE' | 'PENDING' | 'PAID';
+  refundMethod: string | null;
+  refundPaidAt: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
 }
 
 export interface AdminOrderDetail {
@@ -256,17 +278,30 @@ export interface AdminOrderDetail {
     supplierSettled: boolean;
   };
   items: AdminOrderItem[];
-  finance: { costPaise: number; grossProfitPaise: number; costsConfirmed: boolean; expensesPaise: number; netProfitPaise: number };
+  finance: {
+    costPaise: number;
+    grossProfitPaise: number;
+    costsConfirmed: boolean;
+    expensesPaise: number;
+    netProfitPaise: number;
+    refundedPaise?: number;
+    refundPendingPaise?: number;
+  };
   expenses: OrderExpense[];
+  returns?: OrderReturn[];
   events: { id: string; type: string; from: string | null; to: string | null; customerVisible: boolean; note: string; actorType: string; at: string }[];
 }
 
-export type OrderListFilter = 'open' | 'all' | AdminOrderStatus;
+export type OrderListFilter = 'open' | 'all' | 'attention' | AdminOrderStatus;
 
 export function fetchShopOrders(q: { status: OrderListFilter; search?: string }) {
   const p = new URLSearchParams({ status: q.status });
   if (q.search) p.set('search', q.search);
-  return apiFetch<{ orders: AdminOrderSummary[]; counts: Partial<Record<AdminOrderStatus, number>> }>(`${BASE}/orders?${p}`);
+  return apiFetch<{
+    orders: AdminOrderSummary[];
+    counts: Partial<Record<AdminOrderStatus, number>>;
+    attention?: { stockDecisions: number; returns: number; refunds: number; total: number };
+  }>(`${BASE}/orders?${p}`);
 }
 export const fetchShopOrder = (id: string) => apiFetch<AdminOrderDetail>(`${BASE}/orders/${id}`);
 export const fetchSupplierText = (id: string) =>
@@ -308,6 +343,7 @@ export const voidShopExpense = (expenseId: string, reason: string) =>
 export interface PendingSettlementOrder {
   id: string;
   orderNumber: string;
+  status?: string;
   deliveredAt: string;
   totalPaise: number;
   supplierId: string | null;
@@ -343,6 +379,10 @@ export interface ShopReport {
   supplierCostPaise: number;
   expensesPaise: number;
   refundsPaidPaise: number;
+  writeOffsPaise?: number;
+  supplierOwesBackPaise?: number;
+  returnsWaiting?: number;
+  refundsPendingPaise?: number;
   grossMarginPaise: number;
   netProfitPaise: number;
   owedToSupplierPaise: number;
@@ -355,6 +395,7 @@ export interface ShopReport {
     collectedPaise: number;
     costPaise: number;
     expensesPaise: number;
+    refundedPaise?: number;
     profitPaise: number;
     settled: boolean;
   }[];
@@ -389,6 +430,18 @@ export const createRecoveryCode = (customerId: string) =>
   json('POST', `/customers/${customerId}/recovery-code`, {}) as Promise<{ code: string; expiresAt: string }>;
 export const revokeShopKey = (customerId: string, keyId: string) =>
   json('POST', `/customers/${customerId}/keys/${keyId}/revoke`, {}) as Promise<ShopCustomerAccess>;
+
+// ── Stock decisions, returns, refunds (C6) ───────────────────────────────
+export const disposeShopLine = (orderId: string, lineId: string, input: { backToSupplierQty: number; writeOffQty: number; note: string }) =>
+  json('POST', `/orders/${orderId}/lines/${lineId}/disposition`, input) as Promise<AdminOrderDetail>;
+export const recordShopReturn = (orderId: string, lineId: string, input: { quantity: number; reason: string }) =>
+  json('POST', `/orders/${orderId}/lines/${lineId}/returns`, input) as Promise<AdminOrderDetail>;
+export const resolveShopReturn = (
+  returnId: string,
+  input: { decision: 'RESOLVED' | 'REJECTED'; backToSupplierQty: number; writeOffQty: number; refundPaise: number; note: string },
+) => json('POST', `/returns/${returnId}/resolve`, input) as Promise<AdminOrderDetail>;
+export const markShopRefundPaid = (returnId: string, method: 'CASH' | 'UPI' | 'OTHER') =>
+  json('POST', `/returns/${returnId}/refund-paid`, { method }) as Promise<AdminOrderDetail>;
 
 export { rupees } from '../lib/money';
 

@@ -37,6 +37,7 @@ function detail(status: AdminOrderStatus, over: Partial<AdminOrderDetail['order'
       {
         id: 'i1', productId: 'p1', productName: 'Beard Oil 50 ml', sku: 'BRD-50', mrpPaise: 25000, unitPricePaise: 22000, quantity: 2,
         lineTotalPaise: 44000, expectedUnitCostPaise: 18000, confirmedUnitCostPaise: null, stockState: 'RESERVED', lineProfitPaise: 8000,
+        cancelRestockQty: 0, cancelWriteOffQty: 0, returnedQty: 0, keptUnits: 2,
       },
     ],
     finance: { costPaise: 36000, grossProfitPaise: 8000, costsConfirmed: false, expensesPaise: 0, netProfitPaise: 8000 },
@@ -56,7 +57,7 @@ beforeEach(() => {
       {
         id: 'o1', orderNumber: 'SQ-1042', status: 'PLACED', paymentStatus: 'COD_PENDING', totalPaise: 44000, itemCount: 2,
         sameDayState: 'REQUESTED', expectedDeliveryDate: null, customerName: 'Ravi', pincode: '495001',
-        createdAt: '2026-11-16T05:00:00Z', updatedAt: '2026-11-16T05:00:00Z', remindersSent: 0,
+        createdAt: '2026-11-16T05:00:00Z', updatedAt: '2026-11-16T05:00:00Z', remindersSent: 0, needs: null,
       },
     ],
   });

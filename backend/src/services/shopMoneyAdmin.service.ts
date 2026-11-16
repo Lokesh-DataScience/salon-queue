@@ -36,31 +36,22 @@ const audit = (actor: Actor, action: string, targetType: string, targetId: strin
 
 // ── Settlements ──────────────────────────────────────────────────────────
 
-const payable = (items: { quantity: number; confirmed_unit_cost_paise: number | null; expected_unit_cost_paise: number }[]) =>
-  items.reduce((n, i) => n + (i.confirmed_unit_cost_paise ?? i.expected_unit_cost_paise) * i.quantity, 0);
-
-// Delivered orders the supplier is still owed for, oldest first.
+// Orders the supplier is still owed for (delivered, or cancelled with written-off goods), oldest first.
 export async function pendingSettlement() {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('id, order_number, delivered_at, total_paise, supplier_id, suppliers (name), order_items (quantity, confirmed_unit_cost_paise, expected_unit_cost_paise)')
-    .eq('status', 'DELIVERED')
-    .is('supplier_settlement_id', null)
-    .order('delivered_at', { ascending: true })
-    .limit(200);
-  if (error) throw error;
-  const orders = (data ?? []).map((o) => {
-    const s = o.suppliers as unknown as { name: string } | null;
-    return {
-      id: o.id as string,
-      orderNumber: o.order_number as string,
-      deliveredAt: o.delivered_at as string,
-      totalPaise: o.total_paise as number,
-      supplierId: o.supplier_id as string | null,
-      supplierName: s?.name ?? null,
-      payablePaise: payable(o.order_items as never),
-    };
-  });
+  const rows = await rpc<
+    { id: string; order_number: string; status: string; delivered_at: string | null; updated_at: string; total_paise: number;
+      supplier_id: string | null; supplier_name: string | null; payable_paise: number }[]
+  >('shop_pending_settlement', {});
+  const orders = rows.map((o) => ({
+    id: o.id,
+    orderNumber: o.order_number,
+    status: o.status,
+    deliveredAt: o.delivered_at ?? o.updated_at,
+    totalPaise: o.total_paise,
+    supplierId: o.supplier_id,
+    supplierName: o.supplier_name,
+    payablePaise: o.payable_paise,
+  }));
   return { orders, totalPayablePaise: orders.reduce((n, o) => n + o.payablePaise, 0) };
 }
 
@@ -140,6 +131,10 @@ interface ReportRow {
   supplier_cost_paise: number;
   expenses_paise: number;
   refunds_paid_paise: number;
+  write_offs_paise: number;
+  supplier_owes_back_paise: number;
+  returns_waiting: number;
+  refunds_pending_paise: number;
   gross_margin_paise: number;
   net_profit_paise: number;
   owed_to_supplier_paise: number;
@@ -152,6 +147,7 @@ interface ReportRow {
     collected_paise: number;
     cost_paise: number;
     expenses_paise: number;
+    refunded_paise: number;
     profit_paise: number;
     settled: boolean;
   }[];
@@ -172,6 +168,10 @@ export async function report(from: string, to: string) {
     supplierCostPaise: r.supplier_cost_paise,
     expensesPaise: r.expenses_paise,
     refundsPaidPaise: r.refunds_paid_paise,
+    writeOffsPaise: r.write_offs_paise,
+    supplierOwesBackPaise: r.supplier_owes_back_paise,
+    returnsWaiting: r.returns_waiting,
+    refundsPendingPaise: r.refunds_pending_paise,
     grossMarginPaise: r.gross_margin_paise,
     netProfitPaise: r.net_profit_paise,
     owedToSupplierPaise: r.owed_to_supplier_paise,
@@ -184,6 +184,7 @@ export async function report(from: string, to: string) {
       collectedPaise: o.collected_paise,
       costPaise: o.cost_paise,
       expensesPaise: o.expenses_paise,
+      refundedPaise: o.refunded_paise,
       profitPaise: o.profit_paise,
       settled: o.settled,
     })),

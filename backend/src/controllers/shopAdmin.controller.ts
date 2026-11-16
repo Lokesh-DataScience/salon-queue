@@ -10,6 +10,12 @@ import * as shop from '../services/shopAdmin.service';
 import * as orders from '../services/shopOrdersAdmin.service';
 import * as money from '../services/shopMoneyAdmin.service';
 import {
+  shopDispositionBodySchema,
+  shopOrderLineParamSchema,
+  shopRefundPaidBodySchema,
+  shopResolveReturnBodySchema,
+  shopReturnBodySchema,
+  shopReturnIdParamSchema,
   shopCustomerIdParamSchema,
   shopCustomerKeyParamSchema,
   shopExpenseBodySchema,
@@ -172,4 +178,23 @@ export const postRecoveryCode = wrap(async (req, res) =>
 export const postRevokeKey = wrap(async (req, res) => {
   const { customerId, keyId } = shopCustomerKeyParamSchema.parse(req.params);
   return money.revokeKey(actorOf(req, res), customerId, keyId);
+});
+
+// ── Stock decisions, returns, refunds (C6) ───────────────────────────────
+
+export const postDisposition = wrap(async (req, res) => {
+  const { orderId, lineId } = shopOrderLineParamSchema.parse(req.params);
+  return orders.disposeLine(actorOf(req, res), orderId, lineId, shopDispositionBodySchema.parse(req.body));
+});
+export const postReturn = wrap(async (req, res) => {
+  const { orderId, lineId } = shopOrderLineParamSchema.parse(req.params);
+  return orders.recordReturn(actorOf(req, res), orderId, lineId, shopReturnBodySchema.parse(req.body));
+});
+export const postResolveReturn = wrap(async (req, res) => {
+  const { returnId } = shopReturnIdParamSchema.parse(req.params);
+  return orders.resolveReturn(actorOf(req, res), returnId, shopResolveReturnBodySchema.parse(req.body));
+});
+export const postRefundPaid = wrap(async (req, res) => {
+  const { returnId } = shopReturnIdParamSchema.parse(req.params);
+  return orders.markRefundPaid(actorOf(req, res), returnId, shopRefundPaidBodySchema.parse(req.body).method);
 });

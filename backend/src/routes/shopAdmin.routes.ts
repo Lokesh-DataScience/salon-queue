@@ -77,4 +77,10 @@ shop.get('/customers/:customerId', c.getCustomer);
 shop.post('/customers/:customerId/recovery-code', c.postRecoveryCode);
 shop.post('/customers/:customerId/keys/:keyId/revoke', c.postRevokeKey);
 
+// C6: stock decisions, returns, refunds
+shop.post('/orders/:orderId/lines/:lineId/disposition', c.postDisposition);
+shop.post('/orders/:orderId/lines/:lineId/returns', c.postReturn);
+shop.post('/returns/:returnId/resolve', c.postResolveReturn);
+shop.post('/returns/:returnId/refund-paid', c.postRefundPaid);
+
 export default shop;

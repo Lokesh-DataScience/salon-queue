@@ -173,7 +173,7 @@ export const shopOrderIdParamSchema = z.object({ orderId: z.string().uuid() });
 
 export const shopOrderListQuerySchema = z.object({
   // "open" = everything not finished; the default view
-  status: z.enum(['open', 'all', ...SHOP_ORDER_STATUSES]).default('open'),
+  status: z.enum(['open', 'all', 'attention', ...SHOP_ORDER_STATUSES]).default('open'),
   search: z.string().trim().max(20).optional(), // order number, e.g. 1042 or SQ-1042
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
@@ -238,3 +238,29 @@ export const shopReportQuerySchema = z.object({
 
 export const shopCustomerIdParamSchema = z.object({ customerId: z.string().uuid() });
 export const shopCustomerKeyParamSchema = z.object({ customerId: z.string().uuid(), keyId: z.string().uuid() });
+
+// ── Stock decisions, returns, refunds (Commerce C6) ──────────────────────
+
+export const shopOrderLineParamSchema = z.object({ orderId: z.string().uuid(), lineId: z.string().uuid() });
+export const shopReturnIdParamSchema = z.object({ returnId: z.string().uuid() });
+const units = z.number().int().min(0).max(20);
+
+export const shopDispositionBodySchema = z
+  .object({ backToSupplierQty: units, writeOffQty: units, note: z.string().trim().max(300).default('') })
+  .strict();
+
+export const shopReturnBodySchema = z
+  .object({ quantity: z.number().int().min(1).max(20), reason: z.string().trim().max(300) })
+  .strict();
+
+export const shopResolveReturnBodySchema = z
+  .object({
+    decision: z.enum(['RESOLVED', 'REJECTED']),
+    backToSupplierQty: units.default(0),
+    writeOffQty: units.default(0),
+    refundPaise: z.number().int().min(0).max(100_000_000).default(0),
+    note: z.string().trim().max(300).default(''),
+  })
+  .strict();
+
+export const shopRefundPaidBodySchema = z.object({ method: z.enum(['CASH', 'UPI', 'OTHER']) }).strict();

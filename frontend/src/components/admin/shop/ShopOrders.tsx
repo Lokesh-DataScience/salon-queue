@@ -9,6 +9,7 @@ import { ADMIN_STATUS, ADMIN_STATUS_TONE, fmtWhen } from './orderLabels';
 
 const FILTERS: { id: OrderListFilter; label: string }[] = [
   { id: 'open', label: 'Open' },
+  { id: 'attention', label: 'Needs you' },
   { id: 'PLACED', label: 'New' },
   { id: 'DELIVERED', label: 'Delivered' },
   { id: 'CANCELLED', label: 'Cancelled' },
@@ -39,12 +40,29 @@ export default function ShopOrders({ readOnly }: { readOnly: boolean }) {
 
   const counts = list.data?.counts ?? {};
   const newCount = counts.PLACED ?? 0;
+  const att = list.data?.attention;
 
   return (
     <div className="grid gap-3">
       {newCount > 0 && (
         <p role="status" className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 font-semibold text-amber-900">
           {newCount === 1 ? '1 new order is waiting for you.' : `${newCount} new orders are waiting for you.`}
+        </p>
+      )}
+      {att && att.total > 0 && filter !== 'attention' && (
+        <p role="note" className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-amber-900">
+          Finished orders need you:{' '}
+          {[
+            att.stockDecisions && `${att.stockDecisions} stock ${att.stockDecisions === 1 ? 'decision' : 'decisions'}`,
+            att.returns && `${att.returns} ${att.returns === 1 ? 'return' : 'returns'} to decide`,
+            att.refunds && `${att.refunds} ${att.refunds === 1 ? 'refund' : 'refunds'} to hand over`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+          .{' '}
+          <button type="button" className="font-semibold underline" onClick={() => setFilter('attention')}>
+            Show them
+          </button>
         </p>
       )}
       <label className="grid gap-1 text-sm font-medium">
@@ -60,7 +78,8 @@ export default function ShopOrders({ readOnly }: { readOnly: boolean }) {
       <div role="group" aria-label="Which orders" className="flex flex-wrap gap-2">
         {FILTERS.map((f) => {
           const on = f.id === filter;
-          const n = f.id === 'open' ? Object.values(counts).reduce((a, b) => a + (b ?? 0), 0) : f.id === 'PLACED' ? newCount : null;
+          const n =
+            f.id === 'open' ? Object.values(counts).reduce((a, b) => a + (b ?? 0), 0) : f.id === 'PLACED' ? newCount : f.id === 'attention' ? (att?.total ?? 0) : null;
           return (
             <button
               key={f.id}
@@ -91,6 +110,11 @@ export default function ShopOrders({ readOnly }: { readOnly: boolean }) {
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-bold">{o.orderNumber}</span>
                   <StatusPill status={o.status} />
+                  {o.needs && (
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-950">
+                      {{ STOCK_DECISION: 'Stock decision', RETURN: 'Return to decide', REFUND: 'Refund to pay' }[o.needs]}
+                    </span>
+                  )}
                   {(o.sameDayState === 'REQUESTED' || o.sameDayState === 'CONFIRMED') && (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-900">
                       {o.sameDayState === 'REQUESTED' ? 'Same day asked' : 'Same day'}

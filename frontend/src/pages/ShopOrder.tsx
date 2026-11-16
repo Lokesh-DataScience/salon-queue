@@ -44,6 +44,10 @@ const TEXT = {
       'same_day:CONFIRMED': 'आज ही डिलीवरी पक्की',
       'same_day:NOT_POSSIBLE': 'आज डिलीवरी नहीं हो पाएगी — जल्द पहुँचाएँगे',
       delivery_expectation: 'डिलीवरी की जानकारी अपडेट हुई',
+      return_received: 'लौटाया गया सामान मिला',
+      return_resolved: 'वापसी स्वीकार हुई',
+      return_rejected: 'वापसी स्वीकार नहीं हुई',
+      refund_paid: 'पैसे वापस दिए गए',
     } as Record<string, string>,
   },
   en: {
@@ -77,6 +81,10 @@ const TEXT = {
       'same_day:CONFIRMED': 'Same-day delivery confirmed',
       'same_day:NOT_POSSIBLE': "Same-day isn't possible — we'll deliver soon",
       delivery_expectation: 'Delivery details updated',
+      return_received: 'We received what you gave back',
+      return_resolved: 'Return accepted',
+      return_rejected: 'Return not accepted',
+      refund_paid: 'Refund paid to you',
     } as Record<string, string>,
   },
 };
@@ -84,6 +92,10 @@ const TEXT = {
 // 'status' events read as the status they moved to; same-day events by their decision.
 function eventText(events: Record<string, string>, lang: 'hi' | 'en', e: { type: string; to: string | null }) {
   if (e.type === 'same_day') return events[`same_day:${e.to}`] ?? events['same_day:REQUESTED'];
+  // money events carry the amount in paise
+  if ((e.type === 'refund_paid' || e.type === 'return_resolved') && e.to && Number(e.to) > 0) {
+    return `${events[e.type]} · ₹${(Number(e.to) / 100).toLocaleString('en-IN')}`;
+  }
   if (e.type === 'status' && e.to) return STATUS_TEXT[lang][e.to as keyof (typeof STATUS_TEXT)['en']] ?? e.to;
   return events[e.type] ?? (e.to ? STATUS_TEXT[lang][e.to as keyof (typeof STATUS_TEXT)['en']] ?? e.type : e.type);
 }

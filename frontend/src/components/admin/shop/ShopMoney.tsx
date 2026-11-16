@@ -100,14 +100,27 @@ function Report() {
             <Tile label="Cash collected" value={rupees(r.collectedPaise)} />
             <Tile label="Supplier cost" value={rupees(r.supplierCostPaise)} />
             <Tile label="Expenses" value={rupees(r.expensesPaise)} />
+            <Tile label="Refunds paid" value={rupees(r.refundsPaidPaise)} />
+            <Tile label="Written off" value={rupees(r.writeOffsPaise ?? 0)} hint="cancelled goods kept or damaged" />
             <Tile label="Gross margin" value={rupees(r.grossMarginPaise)} hint="prices − supplier cost" />
-            <Tile label="Net profit" value={rupees(r.netProfitPaise)} strong hint="cash − cost − expenses" />
+            <Tile label="Net profit" value={rupees(r.netProfitPaise)} strong hint="cash − cost − refunds − expenses − write-offs" />
             <Tile label="Cancelled" value={String(r.cancelledOrders)} />
             <Tile label="Still owed to supplier" value={rupees(r.owedToSupplierPaise)} hint={`${r.owedOrders} orders, all time`} />
           </dl>
+          {(r.supplierOwesBackPaise ?? 0) > 0 && (
+            <p role="note" className="rounded-xl border-2 border-blue-300 bg-blue-50 p-3 text-sm text-blue-950">
+              The supplier owes you {rupees(r.supplierOwesBackPaise ?? 0)} back: goods went back to him after you had already
+              paid for them. Ask for it, or pay that much less next time (write it in the note).
+            </p>
+          )}
+          {((r.returnsWaiting ?? 0) > 0 || (r.refundsPendingPaise ?? 0) > 0) && (
+            <p className="text-sm text-amber-900">
+              Waiting: {r.returnsWaiting ?? 0} returns to decide · {rupees(r.refundsPendingPaise ?? 0)} of refunds to hand over.
+            </p>
+          )}
           <p className="text-xs text-gray-600">
-            Orders count on the day they were delivered; expenses on the day you recorded them. Refunds and stock write-offs
-            are added in the next step.
+            Orders count on the day they were delivered; expenses on the day you recorded them; refunds on the day you paid
+            them; write-offs on the day you decided them.
           </p>
           {r.orders.length > 0 && (
             <div className="overflow-x-auto">
@@ -120,6 +133,7 @@ function Report() {
                     <th scope="col" className="py-2 pr-2 text-right">Cash</th>
                     <th scope="col" className="py-2 pr-2 text-right">Cost</th>
                     <th scope="col" className="py-2 pr-2 text-right">Expenses</th>
+                    <th scope="col" className="py-2 pr-2 text-right">Refunds</th>
                     <th scope="col" className="py-2 pr-2 text-right">Profit</th>
                     <th scope="col" className="py-2">Supplier</th>
                   </tr>
@@ -136,6 +150,7 @@ function Report() {
                       <td className="py-2 pr-2 text-right">{rupees(o.collectedPaise)}</td>
                       <td className="py-2 pr-2 text-right">{rupees(o.costPaise)}</td>
                       <td className="py-2 pr-2 text-right">{rupees(o.expensesPaise)}</td>
+                      <td className="py-2 pr-2 text-right">{rupees(o.refundedPaise ?? 0)}</td>
                       <td className={`py-2 pr-2 text-right font-semibold ${o.profitPaise < 0 ? 'text-red-700' : ''}`}>{rupees(o.profitPaise)}</td>
                       <td className="py-2">{o.settled ? 'Paid' : 'Owed'}</td>
                     </tr>
@@ -223,12 +238,14 @@ function PayForm({ orders, readOnly }: { orders: PendingSettlementOrder[]; readO
   return (
     <form className="grid gap-3" onSubmit={submit}>
       <fieldset className="grid gap-1">
-        <legend className="mb-1 text-sm font-medium">Delivered orders not paid for yet</legend>
+        <legend className="mb-1 text-sm font-medium">Orders not paid for yet (delivered, or cancelled with goods written off)</legend>
         {orders.map((o) => (
           <label key={o.id} className="flex min-h-11 items-center gap-3 border-b py-1 text-sm last:border-0">
             {!readOnly && <input type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)} />}
             <span className="font-semibold">{o.orderNumber}</span>
-            <span className="text-gray-600">delivered {fmtWhen(o.deliveredAt)}</span>
+            <span className="text-gray-600">
+              {o.status === 'CANCELLED' ? `cancelled, written off` : `delivered ${fmtWhen(o.deliveredAt)}`}
+            </span>
             <span className="ml-auto font-semibold">{rupees(o.payablePaise)}</span>
           </label>
         ))}
