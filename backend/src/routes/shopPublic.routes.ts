@@ -88,13 +88,15 @@ const checkoutBody = z
   .strict();
 const cancelBody = z.object({ reason: z.string().trim().max(300).default('') }).strict();
 const redeemBody = z.object({ code: z.string().trim().min(8).max(12) }).strict();
+// Saved details replace the whole record, so every field must be sent: a missing field is an error,
+// never "make it empty" (that would silently wipe a saved landmark or pincode).
 const detailsBody = z
   .object({
-    name: checkoutBody.shape.customer.shape.name,
-    addressLine1: checkoutBody.shape.customer.shape.addressLine1,
-    addressLine2: checkoutBody.shape.customer.shape.addressLine2,
-    landmark: checkoutBody.shape.customer.shape.landmark,
-    pincode: checkoutBody.shape.customer.shape.pincode,
+    name: z.string().trim().min(1, 'Enter your name.').max(80),
+    addressLine1: z.string().trim().min(3, 'Enter your house / street.').max(200),
+    addressLine2: z.string().trim().max(200),
+    landmark: z.string().trim().max(120),
+    pincode: z.string().trim().regex(/^([1-9][0-9]{5})?$/, 'Pincode must be 6 digits (or leave it empty).'),
   })
   .strict();
 const idempotencyHeader = z.string().uuid();

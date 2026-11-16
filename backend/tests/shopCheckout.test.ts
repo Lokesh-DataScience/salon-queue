@@ -368,7 +368,7 @@ describe('Saved details (C4b, §10)', () => {
     const p = await product();
     const d = await device();
     await order(d, p, 1, 22000);
-    const r = await post(d, '/details', { name: 'Changed', addressLine1: 'Changed street' });
+    const r = await post(d, '/details', { name: 'Changed', addressLine1: 'Changed street', addressLine2: '', landmark: '', pincode: '' });
     expect(r.status).toBe(403);
     expect((await d.agent.get('/api/shop/prefill')).body).toMatchObject({ verified: false, prefill: { source: 'last_order' } });
   }, 120_000);
@@ -388,7 +388,13 @@ describe('Saved details (C4b, §10)', () => {
     const pre = await d.agent.get('/api/shop/prefill');
     expect(pre.body).toMatchObject({ verified: true, prefill: { source: 'saved', name: 'Verified Person', addressLine1: 'Old street 1' } });
 
-    const r = await post(d, '/details', { name: 'Verified Person', addressLine1: 'New street 2', landmark: 'water tank' });
+    // A missing field is refused (it must never wipe the saved value)…
+    const partial = await post(d, '/details', { name: 'Verified Person', addressLine1: 'New street 2', landmark: 'water tank' });
+    expect(partial.status).toBe(400);
+    // …so the app always sends the whole record.
+    const r = await post(d, '/details', {
+      name: 'Verified Person', addressLine1: 'New street 2', addressLine2: cust.addressLine2, landmark: 'water tank', pincode: cust.pincode,
+    });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body.changed).toEqual(['address_line1', 'landmark']);
     const { data: after } = await supabase.from('shop_customers').select('address_line1, landmark').eq('id', c!.id).single();
