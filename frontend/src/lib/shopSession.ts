@@ -55,6 +55,11 @@ export async function shopWrite(path: string, body: unknown, headers: Record<str
   return isBlocked(first) ? send(true) : first;
 }
 
+// After device linking the server issues a new device key, and a CSRF token bound to it.
+export function adoptShopCsrf(token: string, expiresAt: string) {
+  csrf = { token, expiresAt: Date.parse(expiresAt) || Date.now() + 3600_000 };
+}
+
 // Tests only.
 export function resetShopSessionForTests() {
   csrf = null;

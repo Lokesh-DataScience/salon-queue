@@ -19,7 +19,7 @@ const TEXT = {
     empty: 'इस फ़ोन से अभी कोई ऑर्डर नहीं है।',
     shop: 'सामान देखें',
     items: (n: number) => `${n} सामान`,
-    otherPhone: 'दूसरे फ़ोन से ऑर्डर किया था? वह यहाँ जल्द दिखेगा।',
+    otherPhone: 'दूसरे फ़ोन पर भी देखें',
   },
   en: {
     title: 'My Orders',
@@ -29,7 +29,7 @@ const TEXT = {
     empty: 'No orders from this phone yet.',
     shop: 'Browse products',
     items: (n: number) => `${n} item${n === 1 ? '' : 's'}`,
-    otherPhone: 'Ordered from another phone? Linking phones is coming soon.',
+    otherPhone: 'See these orders on another phone',
   },
 };
 
@@ -67,7 +67,7 @@ export default function ShopOrders() {
           ))}
         </ul>
       )}
-      <p className="mt-4 text-center text-sm text-gray-600">{t.otherPhone}</p>
+      <Link to="/c/shop/link" className="btn-secondary mt-4 min-h-12 w-full">{t.otherPhone}</Link>
     </PageShell>
   );
 }

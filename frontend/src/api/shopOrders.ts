@@ -2,7 +2,7 @@
 // changes go through shopWrite (CSRF token in memory).
 import { apiFetch } from './client';
 import type { Quote } from './shop';
-import { shopWrite, ShopHttpError } from '../lib/shopSession';
+import { adoptShopCsrf, shopWrite, ShopHttpError } from '../lib/shopSession';
 
 export type OrderStatus =
   | 'PLACED' | 'SUPPLIER_PENDING' | 'SUPPLIER_CONFIRMED' | 'COLLECTED'
@@ -53,8 +53,30 @@ export interface CustomerDetails {
 export const fetchMyOrders = () => apiFetch<{ orders: OrderSummary[] }>('/api/shop/orders').then((r) => r.orders);
 export const fetchMyOrder = (id: string) =>
   apiFetch<{ order: OrderDetail }>(`/api/shop/orders/${encodeURIComponent(id)}`).then((r) => r.order);
+// source 'saved': this phone is verified for the customer (their saved details); 'last_order': this phone's last order.
 export const fetchPrefill = () =>
-  apiFetch<{ prefill: (CustomerDetails & { source: string }) | null }>('/api/shop/prefill').then((r) => r.prefill);
+  apiFetch<{ prefill: (CustomerDetails & { source: 'saved' | 'last_order' }) | null; verified: boolean }>('/api/shop/prefill');
+
+// C4b: a verified phone saves new default details (never the phone number).
+export async function saveDefaultDetails(d: Omit<CustomerDetails, 'phone'>) {
+  const r = await shopWrite('/api/shop/details', d);
+  if (!r.ok) throw new ShopHttpError(r.status, r.body);
+  return r.body as { changed: string[] };
+}
+
+// C4b: device linking (§9.4).
+export async function createLinkCode() {
+  const r = await shopWrite('/api/shop/device-link/code', {});
+  if (!r.ok) throw new ShopHttpError(r.status, r.body);
+  return r.body as { code: string; expiresAt: string };
+}
+
+export async function redeemLinkCode(code: string) {
+  const r = await shopWrite('/api/shop/device-link/redeem', { code });
+  if (!r.ok) throw new ShopHttpError(r.status, r.body);
+  adoptShopCsrf(String(r.body.csrfToken), String(r.body.expiresAt));
+  return true;
+}
 
 export async function cancelMyOrder(id: string, reason: string): Promise<OrderDetail> {
   const r = await shopWrite(`/api/shop/orders/${encodeURIComponent(id)}/cancel`, { reason });

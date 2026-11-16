@@ -250,6 +250,9 @@ export async function cancelMyOrder(access: ShopAccess, orderId: string, reason:
 // §10.2 (unverified device): prefill from THIS device's own most recent order. Never from a typed phone number.
 export async function prefillFor(access: ShopAccess | null) {
   if (!access) return null;
+  // A verified phone (§10.2) starts from the customer's saved details.
+  const saved = await verifiedCustomer(access);
+  if (saved) return { source: 'saved' as const, ...saved };
   const { data, error } = await supabase
     .from('orders')
     .select('customer_name, customer_phone, address_line1, address_line2, landmark, pincode')
@@ -260,7 +263,7 @@ export async function prefillFor(access: ShopAccess | null) {
   if (error) throw error;
   if (!data) return null;
   return {
-    source: 'last_order' as const,
+    source: 'last_order' as 'saved' | 'last_order',
     name: data.customer_name as string,
     phone: data.customer_phone as string,
     addressLine1: data.address_line1 as string,
@@ -268,4 +271,81 @@ export async function prefillFor(access: ShopAccess | null) {
     landmark: data.landmark as string,
     pincode: data.pincode as string,
   };
+}
+
+// ── C4b: device linking (§9.4) ───────────────────────────────────────────
+
+// 31 letters/digits that can't be confused when read aloud or typed (no 0/O, 1/I/L).
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const normaliseLinkCode = (code: string) => code.toUpperCase().replace(/[\s-]/g, '');
+const linkCodeHash = (code: string) => sha256(`device-link:${normaliseLinkCode(code)}`);
+
+export async function createLinkCode(access: ShopAccess) {
+  const { randomInt } = await import('crypto');
+  const code = Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
+  const { data, error } = await supabase.rpc('create_device_link_code', { p_profile_id: access.profileId, p_code_hash: linkCodeHash(code) });
+  if (error) shopDbError(error);
+  return { code: `${code.slice(0, 4)}-${code.slice(4)}`, expiresAt: data as string };
+}
+
+export type RedeemResult =
+  | { kind: 'LINKED'; access: ShopAccess; newCookie: string }
+  | { kind: 'INVALID_CODE' | 'SAME_PROFILE' | 'HAS_OWN_ORDERS' };
+
+export async function redeemLinkCode(access: ShopAccess, code: string): Promise<RedeemResult> {
+  const clean = normaliseLinkCode(code);
+  if (!/^[A-Z0-9]{8}$/.test(clean)) return { kind: 'INVALID_CODE' };
+  const raw = randomBytes(32).toString('base64url');
+  const { data, error } = await supabase.rpc('redeem_device_link', {
+    p_current_profile_id: access.profileId,
+    p_current_key_id: access.keyId,
+    p_code_hash: linkCodeHash(clean),
+    p_new_key_hash: sha256(raw),
+  });
+  if (error) shopDbError(error);
+  const r = data as { result: string; profile_id?: string; key_id?: string };
+  if (r.result === 'LINKED') return { kind: 'LINKED', access: { profileId: r.profile_id!, keyId: r.key_id! }, newCookie: raw };
+  return { kind: r.result as 'INVALID_CODE' | 'SAME_PROFILE' | 'HAS_OWN_ORDERS' };
+}
+
+// ── C4b: verified phones and saved details (§10) ─────────────────────────
+
+export async function verifiedCustomer(access: ShopAccess | null) {
+  if (!access) return null;
+  const { data, error } = await supabase
+    .from('shop_profile_customers')
+    .select('verified_at, shop_customers (display_name, phone_e164, address_line1, address_line2, landmark, pincode)')
+    .eq('profile_id', access.profileId)
+    .order('verified_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const c = (data as { shop_customers?: Record<string, string> | Record<string, string>[] } | null)?.shop_customers;
+  const row = Array.isArray(c) ? c[0] : c;
+  if (!row) return null;
+  return {
+    name: row.display_name,
+    phone: row.phone_e164,
+    addressLine1: row.address_line1,
+    addressLine2: row.address_line2,
+    landmark: row.landmark,
+    pincode: row.pincode,
+  };
+}
+
+export async function saveDetails(
+  access: ShopAccess,
+  d: { name: string; addressLine1: string; addressLine2: string; landmark: string; pincode: string },
+) {
+  const { data, error } = await supabase.rpc('save_customer_details', {
+    p_profile_id: access.profileId,
+    p_details: { name: d.name, address_line1: d.addressLine1, address_line2: d.addressLine2, landmark: d.landmark, pincode: d.pincode },
+  });
+  if (error) {
+    if (error.message === 'SHOP_NOT_VERIFIED') {
+      throw new AppError('Only a phone confirmed by the shop can change your saved details. Your order still uses what you typed.', 403);
+    }
+    shopDbError(error);
+  }
+  return { changed: (data as { changed: string[] }).changed };
 }

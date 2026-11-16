@@ -20,11 +20,15 @@ import {
   SHOP_ACCESS_COOKIE_OPTS,
   accessFromCookie,
   cancelMyOrder,
+  createLinkCode,
   ensureSession,
   getMyOrder,
   listMyOrders,
   placeOrder,
   prefillFor,
+  redeemLinkCode,
+  saveDetails,
+  verifiedCustomer,
   type ShopAccess,
 } from '../services/shopCustomer.service';
 import {
@@ -83,6 +87,16 @@ const checkoutBody = z
   })
   .strict();
 const cancelBody = z.object({ reason: z.string().trim().max(300).default('') }).strict();
+const redeemBody = z.object({ code: z.string().trim().min(8).max(12) }).strict();
+const detailsBody = z
+  .object({
+    name: checkoutBody.shape.customer.shape.name,
+    addressLine1: checkoutBody.shape.customer.shape.addressLine1,
+    addressLine2: checkoutBody.shape.customer.shape.addressLine2,
+    landmark: checkoutBody.shape.customer.shape.landmark,
+    pincode: checkoutBody.shape.customer.shape.pincode,
+  })
+  .strict();
 const idempotencyHeader = z.string().uuid();
 
 const access = (res: Response) => (res.locals.shopAccess as ShopAccess | null | undefined) ?? null;
@@ -121,6 +135,20 @@ const perProfileCheckout = rateLimit({
   skip: () => env.NODE_ENV === 'test',
   message: { message: 'Too many orders from this phone. Please try again later.' },
 });
+
+// Device linking (§9.5): codes 10/hour per phone; redeem 5 per 15 minutes per phone (IP ceiling in app.ts).
+const perProfile = (windowMs: number, limit: number, message: string) =>
+  rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    keyGenerator: (_req, res) => access(res)?.profileId ?? 'none',
+    skip: () => env.NODE_ENV === 'test',
+    message: { message },
+  });
+const linkCodeLimit = perProfile(60 * 60_000, 10, 'Too many codes. Please try again later.');
+const redeemLimit = perProfile(15 * 60_000, 5, 'Too many tries. Please wait 15 minutes and try again.');
 
 const router = Router();
 
@@ -205,7 +233,8 @@ router.post('/session', requireSameOrigin, requireContentType(), async (_req, re
 router.get('/prefill', async (_req, res, next) => {
   try {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ prefill: await prefillFor(access(res)) });
+    const prefill = await prefillFor(access(res));
+    res.json({ prefill, verified: prefill?.source === 'saved' });
   } catch (err) {
     next(err);
   }
@@ -270,6 +299,51 @@ router.post('/orders/:orderId/cancel', ...customerWrite, async (req, res, next) 
     const { reason } = cancelBody.parse(req.body);
     res.setHeader('Cache-Control', 'no-store');
     res.json({ order: await cancelMyOrder(access(res)!, orderId, reason) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── C4b: device linking + saved details ──────────────────────────────────
+
+router.post('/device-link/code', ...customerWrite, linkCodeLimit, async (_req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await createLinkCode(access(res)!));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/device-link/redeem', ...customerWrite, redeemLimit, async (req, res, next) => {
+  try {
+    const { code } = redeemBody.parse(req.body);
+    const r = await redeemLinkCode(access(res)!, code);
+    res.setHeader('Cache-Control', 'no-store');
+    if (r.kind === 'LINKED') {
+      res.cookie(SHOP_ACCESS_COOKIE, r.newCookie, SHOP_ACCESS_COOKIE_OPTS);
+      res.json({ linked: true, ...issueCustomerCsrfToken(r.access.keyId) });
+      return;
+    }
+    const message = {
+      INVALID_CODE: 'That code is wrong or has expired. Make a new code on your other phone.',
+      SAME_PROFILE: 'This phone is already linked.',
+      HAS_OWN_ORDERS: 'This phone already has its own orders. Make the code on THIS phone and enter it on the other one instead.',
+    }[r.kind];
+    res.status(r.kind === 'INVALID_CODE' ? 400 : 409).json({ code: r.kind, message });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/details', ...customerWrite, async (req, res, next) => {
+  try {
+    const body = detailsBody.parse(req.body);
+    if (!(await verifiedCustomer(access(res)))) {
+      throw new AppError('Only a phone confirmed by the shop can change your saved details. Your order still uses what you typed.', 403);
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await saveDetails(access(res)!, body));
   } catch (err) {
     next(err);
   }

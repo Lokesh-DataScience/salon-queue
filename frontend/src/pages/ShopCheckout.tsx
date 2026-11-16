@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PageShell from '../components/PageShell';
 import CustomerHeader from '../components/CustomerHeader';
 import { quoteCart, type Quote } from '../api/shop';
-import { fetchPrefill, placeOrder, type CustomerDetails } from '../api/shopOrders';
+import { fetchPrefill, placeOrder, saveDefaultDetails, type CustomerDetails } from '../api/shopOrders';
 import { ensureShopSession } from '../lib/shopSession';
 import { attemptKeyFor, clearAttempt } from '../lib/checkoutAttempt';
 import { acceptPrices, clearCart, useCart } from '../lib/cart';
@@ -30,6 +30,8 @@ const TEXT = {
     landmark: 'पास में कोई पहचान (ज़रूरी नहीं)',
     pincode: 'पिनकोड (ज़रूरी नहीं)',
     prefilled: 'पिछले ऑर्डर से भरा गया है। बदलना हो तो बदल दें।',
+    savedPrefill: 'आपकी सेव की हुई जानकारी भरी गई है।',
+    saveDefault: 'यह नई जानकारी आगे के ऑर्डर के लिए भी सेव करें',
     summary: 'आपका ऑर्डर',
     total: 'कुल — डिलीवरी पर नकद दें',
     delivery: 'डिलीवरी: मुफ़्त',
@@ -60,6 +62,8 @@ const TEXT = {
     landmark: 'Landmark (optional)',
     pincode: 'Pincode (optional)',
     prefilled: 'Filled in from your last order. Change anything that is different.',
+    savedPrefill: 'Filled in from your saved details.',
+    saveDefault: 'Also save these details for my future orders',
     summary: 'Your order',
     total: 'Total — pay cash on delivery',
     delivery: 'Delivery: free',
@@ -129,13 +133,19 @@ export default function ShopCheckout() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'warn' | 'error'; text: string; link?: 'cart' | 'orders' } | null>(null);
   const [overrideQuote, setOverrideQuote] = useState<Quote | null>(null);
+  const [saveDefault, setSaveDefault] = useState(true);
 
   if (items.length === 0) return <Navigate to="/c/shop/cart" replace />;
 
-  const fromPrefill = prefill.data ? { ...prefill.data, phone: tenDigits(prefill.data.phone) } : null;
+  const pre = prefill.data?.prefill ?? null;
+  const fromPrefill = pre ? { ...pre, phone: tenDigits(pre.phone) } : null;
   const form: CustomerDetails = edited ?? fromPrefill ?? EMPTY;
   const set = (k: keyof CustomerDetails) => (v: string) => setEdited({ ...form, [k]: v });
   const quote = overrideQuote ?? quoteQ.data;
+  // A verified phone that changed its saved name/address may keep the change as the new default (§10.3).
+  const differsFromSaved =
+    pre?.source === 'saved' &&
+    (['name', 'addressLine1', 'addressLine2', 'landmark', 'pincode'] as const).some((k) => form[k].trim() !== (pre[k] ?? '').trim());
 
   const header = <CustomerHeader title={t.title} backTo="/c/shop/cart" backLabel={t.back} />;
   if (session.isLoading || quoteQ.isLoading) {
@@ -176,6 +186,10 @@ export default function ShopCheckout() {
         case 'EXISTING':
           clearAttempt();
           clearCart();
+          if (differsFromSaved && saveDefault) {
+            const { name, addressLine1, addressLine2, landmark, pincode } = form;
+            await saveDefaultDetails({ name: name.trim(), addressLine1, addressLine2, landmark, pincode }).catch(() => undefined);
+          }
           await qc.invalidateQueries({ queryKey: ['shopMyOrders'] });
           navigate(`/c/shop/orders/${r.orderId}`, { replace: true, state: { justPlaced: true } });
           return;
@@ -216,7 +230,7 @@ export default function ShopCheckout() {
       <form onSubmit={submit} noValidate className="grid gap-4">
         <section className="card grid gap-3" aria-label={t.details}>
           <h2 className="text-lg font-semibold">{t.details}</h2>
-          {fromPrefill && !edited && <p className="text-sm text-gray-700">{t.prefilled}</p>}
+          {fromPrefill && !edited && <p className="text-sm text-gray-700">{pre?.source === 'saved' ? t.savedPrefill : t.prefilled}</p>}
           <Field id="co-name" label={t.name} value={form.name} onChange={set('name')} required autoComplete="name" maxLength={80} />
           <Field id="co-phone" label={t.phone} value={form.phone} onChange={set('phone')} required inputMode="tel"
             autoComplete="tel-national" maxLength={14} hint={t.phoneHint} />
@@ -251,6 +265,13 @@ export default function ShopCheckout() {
             </label>
           )}
         </section>
+
+        {differsFromSaved && (
+          <label className="flex min-h-11 items-start gap-3">
+            <input type="checkbox" className="mt-1 h-5 w-5" checked={saveDefault} onChange={(e) => setSaveDefault(e.target.checked)} />
+            <span className="text-base">{t.saveDefault}</span>
+          </label>
+        )}
 
         <label className="flex min-h-11 items-start gap-3">
           <input type="checkbox" className="mt-1 h-5 w-5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />

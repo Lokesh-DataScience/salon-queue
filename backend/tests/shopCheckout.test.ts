@@ -311,3 +311,91 @@ describe('Shop switched off', () => {
     }
   });
 });
+
+describe('Device linking (C4b, §9.4)', () => {
+  const post = (d: Device, path: string, body: object) =>
+    d.agent.post(`/api/shop${path}`).set('Origin', ORIGIN).set('X-Shop-CSRF', d.csrf).send(body);
+
+  it('a code from the old phone lets the new phone see the same orders; the code works once', async () => {
+    const p = await product();
+    const oldPhone = await device();
+    const placed = await order(oldPhone, p, 1, 22000);
+    const code = await post(oldPhone, '/device-link/code', {});
+    expect(code.status, JSON.stringify(code.body)).toBe(200);
+    expect(code.body.code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+
+    const newPhone = await device();
+    const r = await post(newPhone, '/device-link/redeem', { code: code.body.code.toLowerCase().replace('-', ' ') });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.linked).toBe(true);
+    newPhone.csrf = r.body.csrfToken; // bound to its new key
+
+    const list = await newPhone.agent.get('/api/shop/orders');
+    expect(list.body.orders.map((o: { id: string }) => o.id)).toContain(placed.body.order.id);
+    expect((await newPhone.agent.get(`/api/shop/orders/${placed.body.order.id}`)).status).toBe(200);
+
+    const third = await device();
+    const again = await post(third, '/device-link/redeem', { code: code.body.code });
+    expect(again.status).toBe(400);
+    expect(again.body.code).toBe('INVALID_CODE');
+    expect((await third.agent.get(`/api/shop/orders/${placed.body.order.id}`)).status).toBe(404);
+  }, 120_000);
+
+  it('a phone with its own orders is not linked over (none of its orders would disappear)', async () => {
+    const p = await product();
+    const a = await device();
+    const b = await device();
+    await order(b, p, 1, 22000);
+    const code = await post(a, '/device-link/code', {});
+    const r = await post(b, '/device-link/redeem', { code: code.body.code });
+    expect(r.status).toBe(409);
+    expect(r.body.code).toBe('HAS_OWN_ORDERS');
+  }, 120_000);
+
+  it('wrong codes and codes without CSRF are refused', async () => {
+    const d = await device();
+    expect((await post(d, '/device-link/redeem', { code: 'ABCD-EFGH' })).status).toBe(400);
+    const noCsrf = await d.agent.post('/api/shop/device-link/code').set('Origin', ORIGIN).send({});
+    expect(noCsrf.status).toBe(403);
+  });
+});
+
+describe('Saved details (C4b, §10)', () => {
+  const post = (d: Device, path: string, body: object) =>
+    d.agent.post(`/api/shop${path}`).set('Origin', ORIGIN).set('X-Shop-CSRF', d.csrf).send(body);
+
+  it('an unverified phone cannot change saved details', async () => {
+    const p = await product();
+    const d = await device();
+    await order(d, p, 1, 22000);
+    const r = await post(d, '/details', { name: 'Changed', addressLine1: 'Changed street' });
+    expect(r.status).toBe(403);
+    expect((await d.agent.get('/api/shop/prefill')).body).toMatchObject({ verified: false, prefill: { source: 'last_order' } });
+  }, 120_000);
+
+  it('a verified phone prefills from the saved record and can change it; an audit row lists the fields', async () => {
+    const p = await product();
+    const d = await device();
+    const cust = customer({ name: 'Verified Person', addressLine1: 'Old street 1' });
+    await order(d, p, 1, 22000, cust);
+    // Stand-in for the founder callback (C5): mark this phone verified for its customer.
+    const { data: c } = await supabase.from('shop_customers').select('id').eq('phone_e164', `+91${cust.phone}`).single();
+    const { data: key } = await supabase.from('orders').select('placed_by_profile_id').eq('id', d.orders[0]).single();
+    await supabase.from('shop_profile_customers').insert({
+      profile_id: key!.placed_by_profile_id, customer_id: c!.id, method: 'FOUNDER_CALLBACK', verified_by_staff_id: founder.staffId,
+    });
+
+    const pre = await d.agent.get('/api/shop/prefill');
+    expect(pre.body).toMatchObject({ verified: true, prefill: { source: 'saved', name: 'Verified Person', addressLine1: 'Old street 1' } });
+
+    const r = await post(d, '/details', { name: 'Verified Person', addressLine1: 'New street 2', landmark: 'water tank' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.changed).toEqual(['address_line1', 'landmark']);
+    const { data: after } = await supabase.from('shop_customers').select('address_line1, landmark').eq('id', c!.id).single();
+    expect(after).toEqual({ address_line1: 'New street 2', landmark: 'water tank' });
+    const { data: ev } = await supabase.from('shop_customer_events').select('fields').eq('customer_id', c!.id);
+    expect(ev).toEqual([{ fields: ['address_line1', 'landmark'] }]);
+    // the earlier order keeps the details it was placed with
+    expect((await d.agent.get(`/api/shop/orders/${d.orders[0]}`)).body.order.delivery.addressLine1).toBe('Old street 1');
+  }, 120_000);
+});

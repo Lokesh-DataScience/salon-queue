@@ -68,7 +68,7 @@ describe('Checkout', () => {
     const user = userEvent.setup();
     serve({
       'POST /api/shop/session': () => session(),
-      'GET /api/shop/prefill': () => reply(200, { prefill: null }),
+      'GET /api/shop/prefill': () => reply(200, { prefill: null, verified: false }),
       'POST /api/shop/orders': () => reply(201, { order: { id: 'o1', orderNumber: 'SQ-1001' } }),
     });
     renderCheckout();
@@ -92,7 +92,7 @@ describe('Checkout', () => {
 
   it('asks for consent first', async () => {
     const user = userEvent.setup();
-    serve({ 'POST /api/shop/session': () => session(), 'GET /api/shop/prefill': () => reply(200, { prefill: null }) });
+    serve({ 'POST /api/shop/session': () => session(), 'GET /api/shop/prefill': () => reply(200, { prefill: null, verified: false }) });
     renderCheckout();
     await user.type(await screen.findByLabelText('Your name'), 'Ravi');
     await user.click(screen.getByRole('button', { name: /Place order/ }));
@@ -105,7 +105,7 @@ describe('Checkout', () => {
     let n = 0;
     serve({
       'POST /api/shop/session': () => session(),
-      'GET /api/shop/prefill': () => reply(200, { prefill: null }),
+      'GET /api/shop/prefill': () => reply(200, { prefill: null, verified: false }),
       'POST /api/shop/orders': () => {
         n += 1;
         if (n === 1) throw new TypeError('Failed to fetch');
@@ -128,7 +128,7 @@ describe('Checkout', () => {
     const user = userEvent.setup();
     serve({
       'POST /api/shop/session': () => session(),
-      'GET /api/shop/prefill': () => reply(200, { prefill: null }),
+      'GET /api/shop/prefill': () => reply(200, { prefill: null, verified: false }),
       'POST /api/shop/orders': () =>
         reply(409, {
           code: 'PRICE_CHANGED',
@@ -147,7 +147,7 @@ describe('Checkout', () => {
     serve({
       'POST /api/shop/session': () => session(),
       'GET /api/shop/prefill': () =>
-        reply(200, { prefill: { source: 'last_order', name: 'Ravi', phone: '+919876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: 'temple', pincode: '' } }),
+        reply(200, { verified: false, prefill: { source: 'last_order', name: 'Ravi', phone: '+919876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: 'temple', pincode: '' } }),
     });
     renderCheckout();
     expect(await screen.findByDisplayValue('Ravi')).toBeInTheDocument();
@@ -159,7 +159,7 @@ describe('Checkout', () => {
     const user = userEvent.setup();
     serve({
       'POST /api/shop/session': () => session(),
-      'GET /api/shop/prefill': () => reply(200, { prefill: null }),
+      'GET /api/shop/prefill': () => reply(200, { prefill: null, verified: false }),
       'POST /api/shop/orders': () => reply(409, { code: 'TOO_MANY_OPEN_ORDERS', max: 2, message: 'You already have 2 orders on the way.' }),
     });
     renderCheckout();
@@ -228,5 +228,82 @@ describe('My Orders and the order page', () => {
     serve({ 'GET /api/shop/orders/o9': () => reply(404, { message: 'Order not found.' }) });
     renderPage(<ShopOrder />, { path: '/c/shop/orders/:orderId', route: '/c/shop/orders/o9' });
     expect(await screen.findByText("We couldn't find this order on this phone.")).toBeInTheDocument();
+  });
+});
+
+import ShopLink from './ShopLink';
+
+describe('C4b: saved details and device linking', () => {
+  it('a verified phone starts from its saved details and can keep a change as the new default', async () => {
+    const user = userEvent.setup();
+    serve({
+      'POST /api/shop/session': () => session(),
+      'GET /api/shop/prefill': () =>
+        reply(200, { verified: true, prefill: { source: 'saved', name: 'Ravi', phone: '+919876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: '', pincode: '' } }),
+      'POST /api/shop/orders': () => reply(201, { order: { id: 'o1', orderNumber: 'SQ-1001' } }),
+      'POST /api/shop/details': () => reply(200, { changed: ['address_line1'] }),
+    });
+    renderCheckout();
+    expect(await screen.findByText('Filled in from your saved details.')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Also save these details/ })).not.toBeInTheDocument();
+    const line1 = screen.getByLabelText('House number / street');
+    await user.clear(line1);
+    await user.type(line1, '5 New Road');
+    expect(screen.getByRole('checkbox', { name: /Also save these details/ })).toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: /Save my name, phone and address/ }));
+    await user.click(screen.getByRole('button', { name: /Place order/ }));
+    await waitFor(() => expect(screen.getByText('OTHER PAGE')).toBeInTheDocument());
+    const [, init] = calls('POST /api/shop/details')[0];
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({ name: 'Ravi', addressLine1: '5 New Road', addressLine2: '', landmark: '', pincode: '' });
+  });
+
+  it('an unverified phone never sends saved-detail changes', async () => {
+    const user = userEvent.setup();
+    serve({
+      'POST /api/shop/session': () => session(),
+      'GET /api/shop/prefill': () =>
+        reply(200, { verified: false, prefill: { source: 'last_order', name: 'Ravi', phone: '+919876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: '', pincode: '' } }),
+      'POST /api/shop/orders': () => reply(201, { order: { id: 'o1', orderNumber: 'SQ-1001' } }),
+    });
+    renderCheckout();
+    const line1 = await screen.findByLabelText('House number / street');
+    await user.clear(line1);
+    await user.type(line1, '5 New Road');
+    expect(screen.queryByRole('checkbox', { name: /Also save these details/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: /Save my name, phone and address/ }));
+    await user.click(screen.getByRole('button', { name: /Place order/ }));
+    await waitFor(() => expect(screen.getByText('OTHER PAGE')).toBeInTheDocument());
+    expect(calls('POST /api/shop/details')).toHaveLength(0);
+  });
+
+  it('shows a code on this phone, and links with a code from another phone', async () => {
+    const user = userEvent.setup();
+    serve({
+      'POST /api/shop/session': () => session(),
+      'POST /api/shop/device-link/code': () => reply(200, { code: 'ABCD-EF23', expiresAt: new Date(Date.now() + 600_000).toISOString() }),
+      'POST /api/shop/device-link/redeem': () => reply(200, { linked: true, csrfToken: 'csrf-new', expiresAt: new Date(Date.now() + 3600_000).toISOString() }),
+    });
+    renderPage(<ShopLink />, { path: '/c/shop/link', route: '/c/shop/link' });
+    await user.click(screen.getByRole('button', { name: 'Make a code' }));
+    expect(await screen.findByText('ABCD-EF23')).toBeInTheDocument();
+    expect(screen.getByText(/Expires in 10 min · works once/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('8-character code'), 'wxyz-2345');
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    expect(await screen.findByText('Done! This phone now sees the same orders.')).toBeInTheDocument();
+    const [, init] = calls('POST /api/shop/device-link/redeem')[0];
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({ code: 'wxyz-2345' });
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toMatch(/ABCD|csrf/);
+  });
+
+  it('a wrong or expired code shows the server message', async () => {
+    const user = userEvent.setup();
+    serve({
+      'POST /api/shop/session': () => session(),
+      'POST /api/shop/device-link/redeem': () => reply(400, { code: 'INVALID_CODE', message: 'That code is wrong or has expired.' }),
+    });
+    renderPage(<ShopLink />, { path: '/c/shop/link', route: '/c/shop/link' });
+    await user.type(screen.getByLabelText('8-character code'), 'AAAA-BBBB');
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('That code is wrong or has expired.');
   });
 });

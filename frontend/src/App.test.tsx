@@ -39,7 +39,10 @@ describe('customer routes with discovery switched off (default)', () => {
 
   it('the QR landing route exists', async () => {
     await renderApp('/q/87bcee043619');
-    expect(await screen.findByText(/Getting your token|QR code not recognised|couldn't open|Can't get a token/i)).toBeInTheDocument();
+    // The page loads lazily; under a full parallel test run that can take more than the default 1 s.
+    expect(
+      await screen.findByText(/Getting your token|QR code not recognised|couldn't open|Can't get a token/i, {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 });
 

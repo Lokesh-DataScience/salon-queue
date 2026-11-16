@@ -73,6 +73,12 @@ export function createRateLimiters() {
       limit: 30,
       message: 'Too many requests. Please try again later.',
     }),
+    shopLinkRedeem: limiter({
+      name: 'shop_link_redeem',
+      windowMs: 60 * 60_000,
+      limit: 20,
+      message: 'Too many tries from this network. Please try again later.',
+    }),
     shopCheckout: limiter({
       name: 'shop_checkout',
       windowMs: 60 * 60_000,
