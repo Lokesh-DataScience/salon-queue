@@ -138,7 +138,10 @@ export default function ShopCheckout() {
   if (items.length === 0) return <Navigate to="/c/shop/cart" replace />;
 
   const pre = prefill.data?.prefill ?? null;
-  const fromPrefill = pre ? { ...pre, phone: tenDigits(pre.phone) } : null;
+  // Only the six delivery fields: the prefill also says where it came from (source), which is not part of an order.
+  const fromPrefill: CustomerDetails | null = pre
+    ? { name: pre.name, phone: tenDigits(pre.phone), addressLine1: pre.addressLine1, addressLine2: pre.addressLine2 ?? '', landmark: pre.landmark ?? '', pincode: pre.pincode ?? '' }
+    : null;
   const form: CustomerDetails = edited ?? fromPrefill ?? EMPTY;
   const set = (k: keyof CustomerDetails) => (v: string) => setEdited({ ...form, [k]: v });
   const quote = overrideQuote ?? quoteQ.data;
@@ -177,7 +180,14 @@ export default function ShopCheckout() {
       const r = await placeOrder(key, {
         items,
         expectedTotalPaise: quote.totalPaise,
-        customer: { ...form, name: form.name.trim(), phone: form.phone.trim() },
+        customer: {
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          addressLine1: form.addressLine1,
+          addressLine2: form.addressLine2,
+          landmark: form.landmark,
+          pincode: form.pincode,
+        },
         consent: true,
         requestSameDay: sameDay && quote.sameDayRequestable,
       });

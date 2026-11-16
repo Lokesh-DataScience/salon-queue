@@ -36,7 +36,10 @@ export function errorHandler(
   if (err instanceof ZodError) {
     res.status(400).json({
       message: 'Invalid request.',
-      errors: err.flatten().fieldErrors,
+      // An extra or unknown field is our app's mistake, not the user's: never show Zod's wording for it.
+      errors: err.flatten((issue) =>
+        issue.code === 'unrecognized_keys' ? 'Something went wrong. Please refresh the page and try again.' : issue.message,
+      ).fieldErrors,
     });
     return;
   }

@@ -155,6 +155,25 @@ describe('Checkout', () => {
     expect(screen.getByText(/Filled in from your last order/)).toBeInTheDocument();
   });
 
+  it('a prefilled order sends only the delivery fields (not where the prefill came from)', async () => {
+    const user = userEvent.setup();
+    serve({
+      'POST /api/shop/session': () => session(),
+      'GET /api/shop/prefill': () =>
+        reply(200, { verified: false, prefill: { source: 'last_order', name: 'Ravi', phone: '+919876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: 'temple', pincode: '' } }),
+      'POST /api/shop/orders': () => reply(201, { result: 'CREATED', order: { id: 'o1', orderNumber: 'SQ-1001' } }),
+    });
+    renderCheckout();
+    await screen.findByDisplayValue('Ravi');
+    await user.click(screen.getByRole('checkbox', { name: /Save my name, phone and address/ }));
+    await user.click(screen.getByRole('button', { name: /Place order · ₹440/ }));
+    await vi.waitFor(() => expect(calls('POST /api/shop/orders')).toHaveLength(1));
+    const body = JSON.parse(String((calls('POST /api/shop/orders')[0][1] as RequestInit).body));
+    expect(body.customer).toEqual({
+      name: 'Ravi', phone: '9876543210', addressLine1: '12 Main Road', addressLine2: '', landmark: 'temple', pincode: '',
+    });
+  });
+
   it('too many open orders: explains and links to My Orders', async () => {
     const user = userEvent.setup();
     serve({
