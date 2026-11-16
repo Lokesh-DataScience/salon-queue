@@ -206,7 +206,19 @@ export async function deleteSalon(actor: Actor, salonId: string, confirmName: st
     throw new AppError("The name you typed doesn't match the salon's name.", 400);
   }
 
-  // Logged first, so the record survives even though the salon row is gone afterwards.
+  const { error: delError } = await supabase.from('salons').delete().eq('id', salonId);
+  if (delError) {
+    // 23503: a shop table (ON DELETE RESTRICT, D19) still references this salon's staff.
+    if ((delError as { code?: string }).code === '23503') {
+      throw new AppError(
+        "This salon can't be deleted: its staff have shop history (stock changes or orders), which must be kept. Suspend it instead.",
+        409,
+      );
+    }
+    throw delError;
+  }
+  // Logged only after the delete succeeded, so the log never claims a delete that was refused.
+  // (target_id is plain text, so the row stays valid with the salon gone.)
   await logAdminAction({
     actorStaffId: actor.staffId,
     actorRole: actor.role,
@@ -215,7 +227,5 @@ export async function deleteSalon(actor: Actor, salonId: string, confirmName: st
     targetId: salonId,
     details: { name: salon.name },
   });
-  const { error: delError } = await supabase.from('salons').delete().eq('id', salonId);
-  if (delError) throw delError;
   clearSessionCache();
 }

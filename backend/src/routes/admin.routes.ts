@@ -31,6 +31,7 @@ import {
   patchFlag,
 } from '../controllers/testTools.controller';
 import { getTeam, postTeam, deleteTeam, getAudit } from '../controllers/founderTeam.controller';
+import shopAdminRouter from './shopAdmin.routes';
 
 const router = Router();
 
@@ -99,5 +100,7 @@ tech.get('/commits', getCommits);
 router.use('/founder', founder);
 router.use('/sales', sales);
 router.use('/tech', tech);
+// Commerce Phase 1: Shop admin (FOUNDER + COFOUNDER read, FOUNDER writes). Guards live in shopAdmin.routes.ts.
+router.use('/shop', shopAdminRouter);
 
 export default router;

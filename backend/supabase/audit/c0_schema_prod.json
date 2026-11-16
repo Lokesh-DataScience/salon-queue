@@ -1,0 +1,3000 @@
+{
+    "rls": [
+        {
+            "table": "admin_audit_log",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "app_events",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "bug_reports",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "feature_flags",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "job_heartbeats",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "lanes",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "news_feeds",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "news_items",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "offer_daily_stock",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "places",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "push_daily",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "queue_entries",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "queue_entry_services",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "queues",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "revoked_tokens",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "sales_leads",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "salon_customers",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "salon_offers",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "salon_sales_info",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "salon_services",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "salon_staff",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "salons",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "staff_admin_roles",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "staff_push_subscriptions",
+            "rls_forced": false,
+            "rls_enabled": true
+        },
+        {
+            "table": "ticket_ratings",
+            "rls_forced": false,
+            "rls_enabled": true
+        }
+    ],
+    "enums": [
+        {
+            "type": "queue_entry_status",
+            "values": [
+                "WAITING",
+                "CALLED",
+                "SERVING",
+                "COMPLETED",
+                "SKIPPED",
+                "CANCELLED"
+            ]
+        },
+        {
+            "type": "queue_status",
+            "values": [
+                "ACTIVE",
+                "PAUSED",
+                "CLOSED"
+            ]
+        },
+        {
+            "type": "staff_role",
+            "values": [
+                "OWNER",
+                "BARBER",
+                "MANAGER"
+            ]
+        }
+    ],
+    "columns": [
+        {
+            "type": "int8",
+            "table": "admin_audit_log",
+            "column": "id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "admin_audit_log",
+            "column": "actor_staff_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "admin_audit_log",
+            "column": "actor_role",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "admin_audit_log",
+            "column": "action",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "admin_audit_log",
+            "column": "target_type",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "admin_audit_log",
+            "column": "target_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "jsonb",
+            "table": "admin_audit_log",
+            "column": "details",
+            "default": "'{}'::jsonb",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "admin_audit_log",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "int8",
+            "table": "app_events",
+            "column": "id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "app_events",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "app_events",
+            "column": "kind",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "app_events",
+            "column": "code",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "app_events",
+            "column": "route",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "int2",
+            "table": "app_events",
+            "column": "status",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "app_events",
+            "column": "staff_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "bug_reports",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "bug_reports",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "bug_reports",
+            "column": "staff_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "bug_reports",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "bug_reports",
+            "column": "kind",
+            "default": "'bug'::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "bug_reports",
+            "column": "message",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "bug_reports",
+            "column": "page",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "bug_reports",
+            "column": "device",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "bug_reports",
+            "column": "status",
+            "default": "'new'::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "bug_reports",
+            "column": "tech_note",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "bug_reports",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "bug_reports",
+            "column": "updated_by",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "feature_flags",
+            "column": "key",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "feature_flags",
+            "column": "enabled",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "feature_flags",
+            "column": "value",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "feature_flags",
+            "column": "description",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "feature_flags",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "feature_flags",
+            "column": "updated_by",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "job_heartbeats",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "job_heartbeats",
+            "column": "last_success_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "job_heartbeats",
+            "column": "last_failure_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "job_heartbeats",
+            "column": "last_failure_code",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "jsonb",
+            "table": "job_heartbeats",
+            "column": "last_detail",
+            "default": "'{}'::jsonb",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "job_heartbeats",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "lanes",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "lanes",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "lanes",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "lanes",
+            "column": "is_default",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "lanes",
+            "column": "is_active",
+            "default": "true",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "lanes",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "lanes",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "lanes",
+            "column": "is_paused",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "news_feeds",
+            "column": "feed_key",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "news_feeds",
+            "column": "query",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "news_feeds",
+            "column": "fetched_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "news_feeds",
+            "column": "last_attempt_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "news_items",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "news_items",
+            "column": "feed_key",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "news_items",
+            "column": "position",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "news_items",
+            "column": "title",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "news_items",
+            "column": "url",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "news_items",
+            "column": "source",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "news_items",
+            "column": "published_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "offer_daily_stock",
+            "column": "queue_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "offer_daily_stock",
+            "column": "offer_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "offer_daily_stock",
+            "column": "remaining",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "places",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "places",
+            "column": "place_key",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "places",
+            "column": "district",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "places",
+            "column": "state",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "places",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "date",
+            "table": "push_daily",
+            "column": "day",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "push_daily",
+            "column": "sent",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "push_daily",
+            "column": "expired",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "push_daily",
+            "column": "failed",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "push_daily",
+            "column": "last_failure_code",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "push_daily",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entries",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entries",
+            "column": "queue_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "queue_entries",
+            "column": "token_number",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "queue_entries",
+            "column": "customer_name",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "queue_entries",
+            "column": "customer_phone",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "queue_entries",
+            "column": "access_token",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "queue_entry_status",
+            "table": "queue_entries",
+            "column": "status",
+            "default": "'WAITING'::queue_entry_status",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "joined_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "called_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "started_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "completed_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "cancelled_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "skipped_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "int2",
+            "table": "queue_entries",
+            "column": "notified_stage",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "jsonb",
+            "table": "queue_entries",
+            "column": "push_subscription",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entries",
+            "column": "offer_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "queue_entries",
+            "column": "prize_code",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "prize_redeemed_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "bool",
+            "table": "queue_entries",
+            "column": "is_walk_in",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "queue_entries",
+            "column": "client_key",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "int4",
+            "table": "queue_entries",
+            "column": "duration_minutes",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "ends_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entries",
+            "column": "priority_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entries",
+            "column": "lane_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entries",
+            "column": "salon_customer_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "queue_entries",
+            "column": "join_source",
+            "default": "'qr'::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "queue_entries",
+            "column": "not_here_count",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "numeric",
+            "table": "queue_entries",
+            "column": "order_key",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entry_services",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entry_services",
+            "column": "queue_entry_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queue_entry_services",
+            "column": "service_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "queue_entry_services",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "queue_entry_services",
+            "column": "duration_minutes",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queue_entry_services",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queues",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "queues",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "date",
+            "table": "queues",
+            "column": "date",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "queues",
+            "column": "current_token",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "queues",
+            "column": "next_token",
+            "default": "1",
+            "nullable": "NO"
+        },
+        {
+            "type": "queue_status",
+            "table": "queues",
+            "column": "status",
+            "default": "'ACTIVE'::queue_status",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queues",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "queues",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "queues",
+            "column": "prize_expected",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "revoked_tokens",
+            "column": "jti",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "revoked_tokens",
+            "column": "expires_at",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "revoked_tokens",
+            "column": "revoked_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "sales_leads",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "owner_name",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "phone",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "area",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "address",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "status",
+            "default": "'new'::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "date",
+            "table": "sales_leads",
+            "column": "follow_up_on",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "sales_leads",
+            "column": "notes",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "sales_leads",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "sales_leads",
+            "column": "created_by",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "sales_leads",
+            "column": "updated_by",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "sales_leads",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "sales_leads",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_customers",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_customers",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_customers",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_customers",
+            "column": "phone",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_customers",
+            "column": "remember_token_hash",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_customers",
+            "column": "consented_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_customers",
+            "column": "first_visit_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_customers",
+            "column": "last_visit_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "salon_customers",
+            "column": "visit_count",
+            "default": "0",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_customers",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_customers",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_offers",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_offers",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_offers",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "salon_offers",
+            "column": "daily_count",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "salon_offers",
+            "column": "active",
+            "default": "true",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_offers",
+            "column": "deleted_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_offers",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_sales_info",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "salon_sales_info",
+            "column": "is_partner",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_sales_info",
+            "column": "notes",
+            "default": "''::text",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_sales_info",
+            "column": "updated_by",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_sales_info",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_services",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_services",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_services",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "salon_services",
+            "column": "duration_minutes",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_services",
+            "column": "deleted_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_services",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_services",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "salon_services",
+            "column": "price_rupees",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_staff",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_staff",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_staff",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_staff",
+            "column": "email",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "salon_staff",
+            "column": "password_hash",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "staff_role",
+            "table": "salon_staff",
+            "column": "role",
+            "default": "'BARBER'::staff_role",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_staff",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_staff",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salon_staff",
+            "column": "phone",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "salon_staff",
+            "column": "lane_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "bool",
+            "table": "salon_staff",
+            "column": "is_active",
+            "default": "true",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salon_staff",
+            "column": "sessions_valid_after",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "salons",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "name",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "description",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "phone",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "address",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "float8",
+            "table": "salons",
+            "column": "latitude",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "float8",
+            "table": "salons",
+            "column": "longitude",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "opening_time",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "closing_time",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "salons",
+            "column": "average_service_minutes",
+            "default": "15",
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "salons",
+            "column": "is_open",
+            "default": "true",
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "salons",
+            "column": "is_queue_active",
+            "default": "true",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salons",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salons",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "salons",
+            "column": "qr_code",
+            "default": "lower(substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 12))",
+            "nullable": "NO"
+        },
+        {
+            "type": "int4",
+            "table": "salons",
+            "column": "expected_daily_customers",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "salons",
+            "column": "place_id",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "bool",
+            "table": "salons",
+            "column": "is_internal",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "bool",
+            "table": "salons",
+            "column": "is_suspended",
+            "default": "false",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "salons",
+            "column": "suspended_at",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "bool",
+            "table": "salons",
+            "column": "allow_app_join",
+            "default": "true",
+            "nullable": "NO"
+        },
+        {
+            "type": "_int2",
+            "table": "salons",
+            "column": "weekly_off_days",
+            "default": "'{}'::smallint[]",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "staff_admin_roles",
+            "column": "staff_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "staff_admin_roles",
+            "column": "role",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "staff_admin_roles",
+            "column": "granted_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "staff_admin_roles",
+            "column": "note",
+            "default": null,
+            "nullable": "YES"
+        },
+        {
+            "type": "uuid",
+            "table": "staff_push_subscriptions",
+            "column": "id",
+            "default": "gen_random_uuid()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "staff_push_subscriptions",
+            "column": "staff_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "staff_push_subscriptions",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "text",
+            "table": "staff_push_subscriptions",
+            "column": "endpoint",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "jsonb",
+            "table": "staff_push_subscriptions",
+            "column": "subscription",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "staff_push_subscriptions",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "staff_push_subscriptions",
+            "column": "last_seen_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "ticket_ratings",
+            "column": "ticket_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "uuid",
+            "table": "ticket_ratings",
+            "column": "salon_id",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "int2",
+            "table": "ticket_ratings",
+            "column": "stars",
+            "default": null,
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "ticket_ratings",
+            "column": "created_at",
+            "default": "now()",
+            "nullable": "NO"
+        },
+        {
+            "type": "timestamptz",
+            "table": "ticket_ratings",
+            "column": "updated_at",
+            "default": "now()",
+            "nullable": "NO"
+        }
+    ],
+    "indexes": [
+        {
+            "def": "CREATE INDEX admin_audit_log_created_at_idx ON public.admin_audit_log USING btree (created_at DESC)",
+            "name": "admin_audit_log_created_at_idx",
+            "table": "admin_audit_log"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX admin_audit_log_pkey ON public.admin_audit_log USING btree (id)",
+            "name": "admin_audit_log_pkey",
+            "table": "admin_audit_log"
+        },
+        {
+            "def": "CREATE INDEX app_events_created_at_idx ON public.app_events USING btree (created_at DESC)",
+            "name": "app_events_created_at_idx",
+            "table": "app_events"
+        },
+        {
+            "def": "CREATE INDEX app_events_kind_created_idx ON public.app_events USING btree (kind, created_at DESC)",
+            "name": "app_events_kind_created_idx",
+            "table": "app_events"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX app_events_pkey ON public.app_events USING btree (id)",
+            "name": "app_events_pkey",
+            "table": "app_events"
+        },
+        {
+            "def": "CREATE INDEX bug_reports_created_idx ON public.bug_reports USING btree (created_at DESC)",
+            "name": "bug_reports_created_idx",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX bug_reports_pkey ON public.bug_reports USING btree (id)",
+            "name": "bug_reports_pkey",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CREATE INDEX bug_reports_staff_idx ON public.bug_reports USING btree (staff_id, created_at DESC)",
+            "name": "bug_reports_staff_idx",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX feature_flags_pkey ON public.feature_flags USING btree (key)",
+            "name": "feature_flags_pkey",
+            "table": "feature_flags"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX job_heartbeats_pkey ON public.job_heartbeats USING btree (name)",
+            "name": "job_heartbeats_pkey",
+            "table": "job_heartbeats"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX lanes_one_default_per_salon ON public.lanes USING btree (salon_id) WHERE is_default",
+            "name": "lanes_one_default_per_salon",
+            "table": "lanes"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX lanes_pkey ON public.lanes USING btree (id)",
+            "name": "lanes_pkey",
+            "table": "lanes"
+        },
+        {
+            "def": "CREATE INDEX lanes_salon_id_idx ON public.lanes USING btree (salon_id)",
+            "name": "lanes_salon_id_idx",
+            "table": "lanes"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX news_feeds_pkey ON public.news_feeds USING btree (feed_key)",
+            "name": "news_feeds_pkey",
+            "table": "news_feeds"
+        },
+        {
+            "def": "CREATE INDEX news_items_feed_idx ON public.news_items USING btree (feed_key, \"position\")",
+            "name": "news_items_feed_idx",
+            "table": "news_items"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX news_items_pkey ON public.news_items USING btree (id)",
+            "name": "news_items_pkey",
+            "table": "news_items"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX offer_daily_stock_pkey ON public.offer_daily_stock USING btree (queue_id, offer_id)",
+            "name": "offer_daily_stock_pkey",
+            "table": "offer_daily_stock"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX places_pkey ON public.places USING btree (id)",
+            "name": "places_pkey",
+            "table": "places"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX places_place_key_key ON public.places USING btree (place_key)",
+            "name": "places_place_key_key",
+            "table": "places"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX push_daily_pkey ON public.push_daily USING btree (day)",
+            "name": "push_daily_pkey",
+            "table": "push_daily"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_access_token_idx ON public.queue_entries USING btree (access_token)",
+            "name": "queue_entries_access_token_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entries_access_token_key ON public.queue_entries USING btree (access_token)",
+            "name": "queue_entries_access_token_key",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entries_client_key_key ON public.queue_entries USING btree (queue_id, client_key) WHERE (client_key IS NOT NULL)",
+            "name": "queue_entries_client_key_key",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_lane_status_idx ON public.queue_entries USING btree (lane_id, status)",
+            "name": "queue_entries_lane_status_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_pending_cleanup_idx ON public.queue_entries USING btree (status) WHERE ((customer_name IS NOT NULL) OR (customer_phone IS NOT NULL))",
+            "name": "queue_entries_pending_cleanup_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entries_pkey ON public.queue_entries USING btree (id)",
+            "name": "queue_entries_pkey",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entries_prize_code_key ON public.queue_entries USING btree (queue_id, prize_code) WHERE (prize_code IS NOT NULL)",
+            "name": "queue_entries_prize_code_key",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_push_idx ON public.queue_entries USING btree (status) WHERE (push_subscription IS NOT NULL)",
+            "name": "queue_entries_push_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_queue_id_status_idx ON public.queue_entries USING btree (queue_id, status)",
+            "name": "queue_entries_queue_id_status_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entries_queue_id_token_number_key ON public.queue_entries USING btree (queue_id, token_number)",
+            "name": "queue_entries_queue_id_token_number_key",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_salon_customer_idx ON public.queue_entries USING btree (salon_customer_id) WHERE (salon_customer_id IS NOT NULL)",
+            "name": "queue_entries_salon_customer_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_serving_due_idx ON public.queue_entries USING btree (ends_at) WHERE (status = 'SERVING'::queue_entry_status)",
+            "name": "queue_entries_serving_due_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entries_waiting_order_idx ON public.queue_entries USING btree (queue_id, priority_at, token_number) WHERE (status = 'WAITING'::queue_entry_status)",
+            "name": "queue_entries_waiting_order_idx",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE INDEX queue_entry_services_entry_idx ON public.queue_entry_services USING btree (queue_entry_id)",
+            "name": "queue_entry_services_entry_idx",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entry_services_pkey ON public.queue_entry_services USING btree (id)",
+            "name": "queue_entry_services_pkey",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queue_entry_services_uq ON public.queue_entry_services USING btree (queue_entry_id, service_id) WHERE (service_id IS NOT NULL)",
+            "name": "queue_entry_services_uq",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queues_pkey ON public.queues USING btree (id)",
+            "name": "queues_pkey",
+            "table": "queues"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX queues_salon_id_date_key ON public.queues USING btree (salon_id, date)",
+            "name": "queues_salon_id_date_key",
+            "table": "queues"
+        },
+        {
+            "def": "CREATE INDEX queues_salon_id_idx ON public.queues USING btree (salon_id)",
+            "name": "queues_salon_id_idx",
+            "table": "queues"
+        },
+        {
+            "def": "CREATE INDEX revoked_tokens_expires_at_idx ON public.revoked_tokens USING btree (expires_at)",
+            "name": "revoked_tokens_expires_at_idx",
+            "table": "revoked_tokens"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX revoked_tokens_pkey ON public.revoked_tokens USING btree (jti)",
+            "name": "revoked_tokens_pkey",
+            "table": "revoked_tokens"
+        },
+        {
+            "def": "CREATE INDEX sales_leads_follow_up_idx ON public.sales_leads USING btree (follow_up_on)",
+            "name": "sales_leads_follow_up_idx",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CREATE INDEX sales_leads_phone_idx ON public.sales_leads USING btree (phone) WHERE (phone <> ''::text)",
+            "name": "sales_leads_phone_idx",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX sales_leads_pkey ON public.sales_leads USING btree (id)",
+            "name": "sales_leads_pkey",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_customers_pkey ON public.salon_customers USING btree (id)",
+            "name": "salon_customers_pkey",
+            "table": "salon_customers"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_customers_salon_id_phone_key ON public.salon_customers USING btree (salon_id, phone)",
+            "name": "salon_customers_salon_id_phone_key",
+            "table": "salon_customers"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_customers_token_idx ON public.salon_customers USING btree (salon_id, remember_token_hash) WHERE (remember_token_hash IS NOT NULL)",
+            "name": "salon_customers_token_idx",
+            "table": "salon_customers"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_offers_pkey ON public.salon_offers USING btree (id)",
+            "name": "salon_offers_pkey",
+            "table": "salon_offers"
+        },
+        {
+            "def": "CREATE INDEX salon_offers_salon_idx ON public.salon_offers USING btree (salon_id) WHERE (deleted_at IS NULL)",
+            "name": "salon_offers_salon_idx",
+            "table": "salon_offers"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_sales_info_pkey ON public.salon_sales_info USING btree (salon_id)",
+            "name": "salon_sales_info_pkey",
+            "table": "salon_sales_info"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_services_active_name_uq ON public.salon_services USING btree (salon_id, lower(btrim(name))) WHERE (deleted_at IS NULL)",
+            "name": "salon_services_active_name_uq",
+            "table": "salon_services"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_services_pkey ON public.salon_services USING btree (id)",
+            "name": "salon_services_pkey",
+            "table": "salon_services"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_staff_email_key ON public.salon_staff USING btree (email)",
+            "name": "salon_staff_email_key",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_staff_phone_key ON public.salon_staff USING btree (phone) WHERE (phone IS NOT NULL)",
+            "name": "salon_staff_phone_key",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salon_staff_pkey ON public.salon_staff USING btree (id)",
+            "name": "salon_staff_pkey",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CREATE INDEX salon_staff_salon_id_idx ON public.salon_staff USING btree (salon_id)",
+            "name": "salon_staff_salon_id_idx",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CREATE INDEX salons_lat_lng_idx ON public.salons USING btree (latitude, longitude)",
+            "name": "salons_lat_lng_idx",
+            "table": "salons"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salons_pkey ON public.salons USING btree (id)",
+            "name": "salons_pkey",
+            "table": "salons"
+        },
+        {
+            "def": "CREATE INDEX salons_place_id_idx ON public.salons USING btree (place_id)",
+            "name": "salons_place_id_idx",
+            "table": "salons"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX salons_qr_code_key ON public.salons USING btree (qr_code)",
+            "name": "salons_qr_code_key",
+            "table": "salons"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX staff_admin_roles_pkey ON public.staff_admin_roles USING btree (staff_id)",
+            "name": "staff_admin_roles_pkey",
+            "table": "staff_admin_roles"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX staff_push_subscriptions_endpoint_key ON public.staff_push_subscriptions USING btree (endpoint)",
+            "name": "staff_push_subscriptions_endpoint_key",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX staff_push_subscriptions_pkey ON public.staff_push_subscriptions USING btree (id)",
+            "name": "staff_push_subscriptions_pkey",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "CREATE INDEX staff_push_subscriptions_salon_idx ON public.staff_push_subscriptions USING btree (salon_id)",
+            "name": "staff_push_subscriptions_salon_idx",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "CREATE INDEX staff_push_subscriptions_staff_idx ON public.staff_push_subscriptions USING btree (staff_id)",
+            "name": "staff_push_subscriptions_staff_idx",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "CREATE UNIQUE INDEX ticket_ratings_pkey ON public.ticket_ratings USING btree (ticket_id)",
+            "name": "ticket_ratings_pkey",
+            "table": "ticket_ratings"
+        },
+        {
+            "def": "CREATE INDEX ticket_ratings_salon_id_idx ON public.ticket_ratings USING btree (salon_id)",
+            "name": "ticket_ratings_salon_id_idx",
+            "table": "ticket_ratings"
+        }
+    ],
+    "policies": [
+    ],
+    "triggers": [
+        {
+            "def": "CREATE TRIGGER lanes_reset_pause BEFORE UPDATE OF is_active ON public.lanes FOR EACH ROW EXECUTE FUNCTION lanes_reset_pause_on_activate()",
+            "name": "lanes_reset_pause",
+            "table": "lanes"
+        },
+        {
+            "def": "CREATE TRIGGER lanes_set_updated_at BEFORE UPDATE ON public.lanes FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "name": "lanes_set_updated_at",
+            "table": "lanes"
+        },
+        {
+            "def": "CREATE TRIGGER queue_entries_fill_lane BEFORE INSERT ON public.queue_entries FOR EACH ROW EXECUTE FUNCTION fill_entry_lane()",
+            "name": "queue_entries_fill_lane",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE TRIGGER trg_block_suspended_entries BEFORE INSERT ON public.queue_entries FOR EACH ROW EXECUTE FUNCTION block_entries_for_suspended_salon()",
+            "name": "trg_block_suspended_entries",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CREATE TRIGGER queues_set_updated_at BEFORE UPDATE ON public.queues FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "name": "queues_set_updated_at",
+            "table": "queues"
+        },
+        {
+            "def": "CREATE TRIGGER salon_staff_fill_lane BEFORE INSERT ON public.salon_staff FOR EACH ROW EXECUTE FUNCTION fill_staff_lane()",
+            "name": "salon_staff_fill_lane",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CREATE TRIGGER salon_staff_set_updated_at BEFORE UPDATE ON public.salon_staff FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "name": "salon_staff_set_updated_at",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CREATE TRIGGER salons_create_default_lane AFTER INSERT ON public.salons FOR EACH ROW EXECUTE FUNCTION create_default_lane()",
+            "name": "salons_create_default_lane",
+            "table": "salons"
+        },
+        {
+            "def": "CREATE TRIGGER salons_set_updated_at BEFORE UPDATE ON public.salons FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "name": "salons_set_updated_at",
+            "table": "salons"
+        },
+        {
+            "def": "CREATE TRIGGER ticket_ratings_set_updated_at BEFORE UPDATE ON public.ticket_ratings FOR EACH ROW EXECUTE FUNCTION set_updated_at()",
+            "name": "ticket_ratings_set_updated_at",
+            "table": "ticket_ratings"
+        }
+    ],
+    "functions": [
+        {
+            "args": "p_salon_id uuid, p_name text, p_phone text, p_password_hash text",
+            "name": "add_staff_with_lane",
+            "returns": "TABLE(o_staff_id uuid, o_lane_id uuid)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_lane_id uuid",
+            "name": "add_walk_in",
+            "returns": "TABLE(entry_id uuid, token_number integer)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_queue_id uuid",
+            "name": "advance_queue",
+            "returns": "TABLE(completed_id uuid, started_id uuid)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_key text, p_district text, p_state text",
+            "name": "assign_salon_place",
+            "returns": "uuid",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_entry_id uuid, p_customer_id uuid",
+            "name": "attach_customer_to_entry",
+            "returns": "void",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_lane_id uuid",
+            "name": "barber_next",
+            "returns": "TABLE(completed_entry_id uuid, called_entry_id uuid, called_token_number integer)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid",
+            "name": "barber_stats",
+            "returns": "jsonb",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "block_entries_for_suspended_salon",
+            "returns": "trigger",
+            "anon_can_execute": true,
+            "security_definer": false,
+            "authenticated_can_execute": true
+        },
+        {
+            "args": "p_kind text, p_code text",
+            "name": "bump_push_stat",
+            "returns": "void",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_retention_hours integer",
+            "name": "cleanup_customer_data",
+            "returns": "TABLE(cancelled_stale integer, anonymized integer)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "create_default_lane",
+            "returns": "trigger",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_customer_id uuid",
+            "name": "delete_salon_customer",
+            "returns": "boolean",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_entry_id uuid, p_minutes integer",
+            "name": "extend_entry",
+            "returns": "timestamp with time zone",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "fill_entry_lane",
+            "returns": "trigger",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "fill_staff_lane",
+            "returns": "trigger",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_ticket_id uuid, p_access_token text",
+            "name": "forget_my_details",
+            "returns": "uuid",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "founder_overview",
+            "returns": "jsonb",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_days smallint[]",
+            "name": "is_off_day",
+            "returns": "boolean",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_opening text, p_closing text",
+            "name": "is_within_hours",
+            "returns": "boolean",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_client_key text, p_lane_id uuid",
+            "name": "join_queue",
+            "returns": "TABLE(entry_id uuid, queue_id uuid, token_number integer, access_token text, status text, joined_at timestamp with time zone)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_service_ids uuid[], p_client_key text, p_lane_id uuid, p_name text, p_phone text, p_consent boolean, p_remember_token text, p_source text",
+            "name": "join_queue_for_customer",
+            "returns": "TABLE(entry_id uuid, queue_id uuid, token_number integer, access_token text, status text, joined_at timestamp with time zone, remember_token text, existing boolean)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_service_ids uuid[], p_client_key text, p_lane_id uuid",
+            "name": "join_queue_with_services",
+            "returns": "TABLE(entry_id uuid, queue_id uuid, token_number integer, access_token text, status text, joined_at timestamp with time zone)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid",
+            "name": "lane_waits",
+            "returns": "TABLE(lane_id uuid, name text, is_default boolean, created_at timestamp with time zone, waiting_count integer, wait_minutes integer, is_paused boolean)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "lanes_reset_pause_on_activate",
+            "returns": "trigger",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_entry_id uuid",
+            "name": "mark_not_here",
+            "returns": "TABLE(action text, token_number integer)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_entry_id uuid",
+            "name": "move_to_front",
+            "returns": "integer",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_lat double precision, p_lng double precision, p_radius_km double precision",
+            "name": "nearby_salons",
+            "returns": "TABLE(id uuid, name text, description text, phone text, address text, latitude double precision, longitude double precision, opening_time text, closing_time text, average_service_minutes integer, is_open boolean, is_queue_active boolean, distance_km double precision, queue_size bigint, current_token integer, estimated_wait_minutes integer)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_name text, p_phone text, p_address text, p_latitude double precision, p_longitude double precision, p_opening text, p_closing text, p_avg integer, p_owner_name text, p_email text, p_password_hash text",
+            "name": "register_salon",
+            "returns": "TABLE(o_salon_id uuid, o_staff_id uuid, o_qr_code text)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_name text, p_salon_phone text, p_login_phone text, p_address text, p_latitude double precision, p_longitude double precision, p_opening text, p_closing text, p_avg integer, p_owner_name text, p_password_hash text",
+            "name": "register_salon_by_phone",
+            "returns": "TABLE(o_salon_id uuid, o_staff_id uuid, o_qr_code text)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_feed_key text, p_query text, p_items jsonb",
+            "name": "replace_news_items",
+            "returns": "void",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_name text, p_phone text, p_consent boolean, p_remember_token text",
+            "name": "resolve_salon_customer",
+            "returns": "TABLE(customer_id uuid, remember_token text)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "rls_auto_enable",
+            "returns": "event_trigger",
+            "anon_can_execute": false,
+            "security_definer": true,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_since timestamp with time zone",
+            "name": "sales_onboarding",
+            "returns": "jsonb",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "sales_salon_activity",
+            "returns": "jsonb",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid",
+            "name": "salon_is_multi_lane",
+            "returns": "boolean",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid",
+            "name": "salon_rating_stats",
+            "returns": "TABLE(stars integer, n integer)",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_lane_id uuid, p_paused boolean",
+            "name": "set_lane_paused",
+            "returns": "void",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "p_salon_id uuid, p_staff_id uuid, p_active boolean",
+            "name": "set_staff_active",
+            "returns": "integer",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "set_updated_at",
+            "returns": "trigger",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        },
+        {
+            "args": "",
+            "name": "tech_queue_health",
+            "returns": "jsonb",
+            "anon_can_execute": false,
+            "security_definer": false,
+            "authenticated_can_execute": false
+        }
+    ],
+    "extensions": [
+        {
+            "name": "pg_stat_statements",
+            "version": "1.11"
+        },
+        {
+            "name": "pgcrypto",
+            "version": "1.3"
+        },
+        {
+            "name": "plpgsql",
+            "version": "1.0"
+        },
+        {
+            "name": "supabase_vault",
+            "version": "0.3.1"
+        },
+        {
+            "name": "uuid-ossp",
+            "version": "1.1"
+        }
+    ],
+    "pg_version": "PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+    "captured_at": "2026-11-16T07:20:38.136292+00:00",
+    "constraints": [
+        {
+            "def": "FOREIGN KEY (actor_staff_id) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "admin_audit_log_actor_staff_id_fkey",
+            "table": "admin_audit_log"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "admin_audit_log_pkey",
+            "table": "admin_audit_log"
+        },
+        {
+            "def": "CHECK ((char_length(code) <= 60))",
+            "kind": "c",
+            "name": "app_events_code_check",
+            "table": "app_events"
+        },
+        {
+            "def": "CHECK ((kind = ANY (ARRAY['error'::text, 'auth'::text, 'rate_limit'::text])))",
+            "kind": "c",
+            "name": "app_events_kind_check",
+            "table": "app_events"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "app_events_pkey",
+            "table": "app_events"
+        },
+        {
+            "def": "CHECK ((char_length(route) <= 200))",
+            "kind": "c",
+            "name": "app_events_route_check",
+            "table": "app_events"
+        },
+        {
+            "def": "CHECK ((char_length(device) <= 300))",
+            "kind": "c",
+            "name": "bug_reports_device_check",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CHECK ((kind = ANY (ARRAY['bug'::text, 'idea'::text, 'question'::text])))",
+            "kind": "c",
+            "name": "bug_reports_kind_check",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CHECK (((char_length(message) >= 5) AND (char_length(message) <= 2000)))",
+            "kind": "c",
+            "name": "bug_reports_message_check",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CHECK ((char_length(page) <= 200))",
+            "kind": "c",
+            "name": "bug_reports_page_check",
+            "table": "bug_reports"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "bug_reports_pkey",
+            "table": "bug_reports"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "bug_reports_salon_id_fkey",
+            "table": "bug_reports"
+        },
+        {
+            "def": "FOREIGN KEY (staff_id) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "bug_reports_staff_id_fkey",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CHECK ((status = ANY (ARRAY['new'::text, 'investigating'::text, 'fixed'::text, 'wont_fix'::text])))",
+            "kind": "c",
+            "name": "bug_reports_status_check",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CHECK ((char_length(tech_note) <= 1000))",
+            "kind": "c",
+            "name": "bug_reports_tech_note_check",
+            "table": "bug_reports"
+        },
+        {
+            "def": "FOREIGN KEY (updated_by) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "bug_reports_updated_by_fkey",
+            "table": "bug_reports"
+        },
+        {
+            "def": "CHECK ((key ~ '^[a-z][a-z0-9_]{1,40}$'::text))",
+            "kind": "c",
+            "name": "feature_flags_key_check",
+            "table": "feature_flags"
+        },
+        {
+            "def": "PRIMARY KEY (key)",
+            "kind": "p",
+            "name": "feature_flags_pkey",
+            "table": "feature_flags"
+        },
+        {
+            "def": "FOREIGN KEY (updated_by) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "feature_flags_updated_by_fkey",
+            "table": "feature_flags"
+        },
+        {
+            "def": "CHECK ((char_length(value) <= 200))",
+            "kind": "c",
+            "name": "feature_flags_value_check",
+            "table": "feature_flags"
+        },
+        {
+            "def": "PRIMARY KEY (name)",
+            "kind": "p",
+            "name": "job_heartbeats_pkey",
+            "table": "job_heartbeats"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "lanes_pkey",
+            "table": "lanes"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "lanes_salon_id_fkey",
+            "table": "lanes"
+        },
+        {
+            "def": "PRIMARY KEY (feed_key)",
+            "kind": "p",
+            "name": "news_feeds_pkey",
+            "table": "news_feeds"
+        },
+        {
+            "def": "FOREIGN KEY (feed_key) REFERENCES news_feeds(feed_key) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "news_items_feed_key_fkey",
+            "table": "news_items"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "news_items_pkey",
+            "table": "news_items"
+        },
+        {
+            "def": "FOREIGN KEY (offer_id) REFERENCES salon_offers(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "offer_daily_stock_offer_id_fkey",
+            "table": "offer_daily_stock"
+        },
+        {
+            "def": "PRIMARY KEY (queue_id, offer_id)",
+            "kind": "p",
+            "name": "offer_daily_stock_pkey",
+            "table": "offer_daily_stock"
+        },
+        {
+            "def": "FOREIGN KEY (queue_id) REFERENCES queues(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "offer_daily_stock_queue_id_fkey",
+            "table": "offer_daily_stock"
+        },
+        {
+            "def": "CHECK ((remaining >= 0))",
+            "kind": "c",
+            "name": "offer_daily_stock_remaining_check",
+            "table": "offer_daily_stock"
+        },
+        {
+            "def": "CHECK (((district IS NOT NULL) OR (state IS NOT NULL)))",
+            "kind": "c",
+            "name": "places_has_region",
+            "table": "places"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "places_pkey",
+            "table": "places"
+        },
+        {
+            "def": "UNIQUE (place_key)",
+            "kind": "u",
+            "name": "places_place_key_key",
+            "table": "places"
+        },
+        {
+            "def": "PRIMARY KEY (day)",
+            "kind": "p",
+            "name": "push_daily_pkey",
+            "table": "push_daily"
+        },
+        {
+            "def": "UNIQUE (access_token)",
+            "kind": "u",
+            "name": "queue_entries_access_token_key",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CHECK ((duration_minutes > 0))",
+            "kind": "c",
+            "name": "queue_entries_duration_minutes_check",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CHECK ((join_source = ANY (ARRAY['qr'::text, 'app'::text])))",
+            "kind": "c",
+            "name": "queue_entries_join_source_chk",
+            "table": "queue_entries"
+        },
+        {
+            "def": "FOREIGN KEY (lane_id) REFERENCES lanes(id)",
+            "kind": "f",
+            "name": "queue_entries_lane_id_fkey",
+            "table": "queue_entries"
+        },
+        {
+            "def": "FOREIGN KEY (offer_id) REFERENCES salon_offers(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "queue_entries_offer_id_fkey",
+            "table": "queue_entries"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "queue_entries_pkey",
+            "table": "queue_entries"
+        },
+        {
+            "def": "FOREIGN KEY (queue_id) REFERENCES queues(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "queue_entries_queue_id_fkey",
+            "table": "queue_entries"
+        },
+        {
+            "def": "UNIQUE (queue_id, token_number)",
+            "kind": "u",
+            "name": "queue_entries_queue_id_token_number_key",
+            "table": "queue_entries"
+        },
+        {
+            "def": "FOREIGN KEY (salon_customer_id) REFERENCES salon_customers(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "queue_entries_salon_customer_id_fkey",
+            "table": "queue_entries"
+        },
+        {
+            "def": "CHECK (((duration_minutes >= 1) AND (duration_minutes <= 240)))",
+            "kind": "c",
+            "name": "queue_entry_services_duration_minutes_check",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "queue_entry_services_pkey",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "FOREIGN KEY (queue_entry_id) REFERENCES queue_entries(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "queue_entry_services_queue_entry_id_fkey",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "FOREIGN KEY (service_id) REFERENCES salon_services(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "queue_entry_services_service_id_fkey",
+            "table": "queue_entry_services"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "queues_pkey",
+            "table": "queues"
+        },
+        {
+            "def": "UNIQUE (salon_id, date)",
+            "kind": "u",
+            "name": "queues_salon_id_date_key",
+            "table": "queues"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "queues_salon_id_fkey",
+            "table": "queues"
+        },
+        {
+            "def": "PRIMARY KEY (jti)",
+            "kind": "p",
+            "name": "revoked_tokens_pkey",
+            "table": "revoked_tokens"
+        },
+        {
+            "def": "CHECK ((char_length(address) <= 300))",
+            "kind": "c",
+            "name": "sales_leads_address_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK ((char_length(area) <= 120))",
+            "kind": "c",
+            "name": "sales_leads_area_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "FOREIGN KEY (created_by) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "sales_leads_created_by_fkey",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK (((char_length(name) >= 1) AND (char_length(name) <= 120)))",
+            "kind": "c",
+            "name": "sales_leads_name_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK ((char_length(notes) <= 2000))",
+            "kind": "c",
+            "name": "sales_leads_notes_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK ((char_length(owner_name) <= 120))",
+            "kind": "c",
+            "name": "sales_leads_owner_name_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK ((char_length(phone) <= 20))",
+            "kind": "c",
+            "name": "sales_leads_phone_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "sales_leads_pkey",
+            "table": "sales_leads"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "sales_leads_salon_id_fkey",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK ((status = ANY (ARRAY['new'::text, 'contacted'::text, 'demo'::text, 'interested'::text, 'not_interested'::text, 'converted'::text])))",
+            "kind": "c",
+            "name": "sales_leads_status_check",
+            "table": "sales_leads"
+        },
+        {
+            "def": "FOREIGN KEY (updated_by) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "sales_leads_updated_by_fkey",
+            "table": "sales_leads"
+        },
+        {
+            "def": "CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 80)))",
+            "kind": "c",
+            "name": "salon_customers_name_check",
+            "table": "salon_customers"
+        },
+        {
+            "def": "CHECK (((char_length(phone) >= 7) AND (char_length(phone) <= 15)))",
+            "kind": "c",
+            "name": "salon_customers_phone_check",
+            "table": "salon_customers"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "salon_customers_pkey",
+            "table": "salon_customers"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "salon_customers_salon_id_fkey",
+            "table": "salon_customers"
+        },
+        {
+            "def": "UNIQUE (salon_id, phone)",
+            "kind": "u",
+            "name": "salon_customers_salon_id_phone_key",
+            "table": "salon_customers"
+        },
+        {
+            "def": "CHECK (((daily_count >= 1) AND (daily_count <= 50)))",
+            "kind": "c",
+            "name": "salon_offers_daily_count_check",
+            "table": "salon_offers"
+        },
+        {
+            "def": "CHECK (((char_length(name) >= 2) AND (char_length(name) <= 40)))",
+            "kind": "c",
+            "name": "salon_offers_name_check",
+            "table": "salon_offers"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "salon_offers_pkey",
+            "table": "salon_offers"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "salon_offers_salon_id_fkey",
+            "table": "salon_offers"
+        },
+        {
+            "def": "CHECK ((char_length(notes) <= 2000))",
+            "kind": "c",
+            "name": "salon_sales_info_notes_check",
+            "table": "salon_sales_info"
+        },
+        {
+            "def": "PRIMARY KEY (salon_id)",
+            "kind": "p",
+            "name": "salon_sales_info_pkey",
+            "table": "salon_sales_info"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "salon_sales_info_salon_id_fkey",
+            "table": "salon_sales_info"
+        },
+        {
+            "def": "FOREIGN KEY (updated_by) REFERENCES salon_staff(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "salon_sales_info_updated_by_fkey",
+            "table": "salon_sales_info"
+        },
+        {
+            "def": "CHECK (((duration_minutes >= 1) AND (duration_minutes <= 240)))",
+            "kind": "c",
+            "name": "salon_services_duration_minutes_check",
+            "table": "salon_services"
+        },
+        {
+            "def": "CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 60)))",
+            "kind": "c",
+            "name": "salon_services_name_check",
+            "table": "salon_services"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "salon_services_pkey",
+            "table": "salon_services"
+        },
+        {
+            "def": "CHECK (((price_rupees IS NULL) OR ((price_rupees >= 0) AND (price_rupees <= 100000))))",
+            "kind": "c",
+            "name": "salon_services_price_rupees_range",
+            "table": "salon_services"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "salon_services_salon_id_fkey",
+            "table": "salon_services"
+        },
+        {
+            "def": "UNIQUE (email)",
+            "kind": "u",
+            "name": "salon_staff_email_key",
+            "table": "salon_staff"
+        },
+        {
+            "def": "FOREIGN KEY (lane_id) REFERENCES lanes(id)",
+            "kind": "f",
+            "name": "salon_staff_lane_id_fkey",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CHECK (((email IS NOT NULL) OR (phone IS NOT NULL)))",
+            "kind": "c",
+            "name": "salon_staff_login_id",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CHECK (((phone IS NULL) OR (phone ~ '^\\+?[0-9]{7,15}$'::text)))",
+            "kind": "c",
+            "name": "salon_staff_phone_format",
+            "table": "salon_staff"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "salon_staff_pkey",
+            "table": "salon_staff"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "salon_staff_salon_id_fkey",
+            "table": "salon_staff"
+        },
+        {
+            "def": "CHECK (((expected_daily_customers >= 1) AND (expected_daily_customers <= 500)))",
+            "kind": "c",
+            "name": "salons_expected_daily_customers_check",
+            "table": "salons"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "salons_pkey",
+            "table": "salons"
+        },
+        {
+            "def": "FOREIGN KEY (place_id) REFERENCES places(id) ON DELETE SET NULL",
+            "kind": "f",
+            "name": "salons_place_id_fkey",
+            "table": "salons"
+        },
+        {
+            "def": "CHECK (((weekly_off_days <@ ARRAY[(0)::smallint, (1)::smallint, (2)::smallint, (3)::smallint, (4)::smallint, (5)::smallint, (6)::smallint]) AND (cardinality(weekly_off_days) <= 6)))",
+            "kind": "c",
+            "name": "salons_weekly_off_days_check",
+            "table": "salons"
+        },
+        {
+            "def": "PRIMARY KEY (staff_id)",
+            "kind": "p",
+            "name": "staff_admin_roles_pkey",
+            "table": "staff_admin_roles"
+        },
+        {
+            "def": "CHECK ((role = ANY (ARRAY['FOUNDER'::text, 'COFOUNDER'::text, 'SALES'::text, 'TECH'::text])))",
+            "kind": "c",
+            "name": "staff_admin_roles_role_check",
+            "table": "staff_admin_roles"
+        },
+        {
+            "def": "FOREIGN KEY (staff_id) REFERENCES salon_staff(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "staff_admin_roles_staff_id_fkey",
+            "table": "staff_admin_roles"
+        },
+        {
+            "def": "UNIQUE (endpoint)",
+            "kind": "u",
+            "name": "staff_push_subscriptions_endpoint_key",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "PRIMARY KEY (id)",
+            "kind": "p",
+            "name": "staff_push_subscriptions_pkey",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "staff_push_subscriptions_salon_id_fkey",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "FOREIGN KEY (staff_id) REFERENCES salon_staff(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "staff_push_subscriptions_staff_id_fkey",
+            "table": "staff_push_subscriptions"
+        },
+        {
+            "def": "PRIMARY KEY (ticket_id)",
+            "kind": "p",
+            "name": "ticket_ratings_pkey",
+            "table": "ticket_ratings"
+        },
+        {
+            "def": "FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "ticket_ratings_salon_id_fkey",
+            "table": "ticket_ratings"
+        },
+        {
+            "def": "CHECK (((stars >= 1) AND (stars <= 5)))",
+            "kind": "c",
+            "name": "ticket_ratings_stars_check",
+            "table": "ticket_ratings"
+        },
+        {
+            "def": "FOREIGN KEY (ticket_id) REFERENCES queue_entries(id) ON DELETE CASCADE",
+            "kind": "f",
+            "name": "ticket_ratings_ticket_id_fkey",
+            "table": "ticket_ratings"
+        }
+    ],
+    "storage_buckets": [
+    ],
+    "table_grants_anon_authenticated": [
+    ]
+}

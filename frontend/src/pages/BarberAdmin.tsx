@@ -8,11 +8,17 @@ import { fetchAdminMe, fetchAdminSection, type AdminSection } from '../api/admin
 import FounderSection from '../components/admin/FounderSection';
 import SalesSection from '../components/admin/SalesSection';
 import TechSection from '../components/admin/TechSection';
+import ShopSection from '../components/admin/shop/ShopSection';
 
-const LABELS: Record<AdminSection, string> = {
+// 'shop' is a tab, not a server section: it shows for FOUNDER and COFOUNDER (who have 'founder'),
+// and /api/admin/shop checks the role itself on every request.
+type Tab = AdminSection | 'shop';
+
+const LABELS: Record<Tab, string> = {
   founder: 'Founder',
   sales: 'Sales',
   tech: 'Tech',
+  shop: 'Shop',
 };
 
 function BackToSettings() {
@@ -71,9 +77,10 @@ export default function BarberAdmin() {
     );
   }
 
-  const requested = params.get('tab') as AdminSection | null;
-  const active: AdminSection = requested && admin.sections.includes(requested) ? requested : admin.sections[0];
-  const hasTabs = admin.sections.length > 1;
+  const tabs: Tab[] = admin.sections.includes('founder') ? [...admin.sections, 'shop'] : admin.sections;
+  const requested = params.get('tab') as Tab | null;
+  const active: Tab = requested && tabs.includes(requested) ? requested : tabs[0];
+  const hasTabs = tabs.length > 1;
 
   return (
     <PageShell title="Admin" width="wide">
@@ -81,8 +88,8 @@ export default function BarberAdmin() {
       <h1 className="mb-5 text-2xl font-bold">Admin</h1>
 
       {hasTabs && (
-        <div role="tablist" aria-label="Admin sections" className="mb-5 grid grid-cols-3 gap-2">
-          {admin.sections.map((s) => {
+        <div role="tablist" aria-label="Admin sections" className={`mb-5 grid gap-2 ${tabs.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+          {tabs.map((s) => {
             const selected = s === active;
             return (
               <button
@@ -110,7 +117,17 @@ export default function BarberAdmin() {
         aria-labelledby={hasTabs ? `admin-tab-${active}` : undefined}
       >
         <h2 className="mb-3 text-lg font-semibold">{LABELS[active]}</h2>
-        {active === 'founder' ? <FounderSection /> : active === 'sales' ? <SalesSection /> : active === 'tech' ? <TechSection /> : <SectionPanel section={active} />}
+        {active === 'founder' ? (
+          <FounderSection />
+        ) : active === 'sales' ? (
+          <SalesSection />
+        ) : active === 'tech' ? (
+          <TechSection />
+        ) : active === 'shop' ? (
+          <ShopSection />
+        ) : (
+          <SectionPanel section={active} />
+        )}
       </section>
     </PageShell>
   );

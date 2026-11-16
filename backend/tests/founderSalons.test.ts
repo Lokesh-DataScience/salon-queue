@@ -4,7 +4,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
-import { app, makeSalon, cleanupSalons, joinViaApi } from './helpers';
+import { app, makeSalon, cleanupSalons, joinViaApi, randomMobile } from './helpers';
 import { supabase } from '../src/config/supabase';
 
 const PASSWORD = 'testpass123';
@@ -74,15 +74,16 @@ describe('Founder salon management (Slice 2)', () => {
   it('creates a salon (optionally internal), finds it by search, and its owner can sign in', async () => {
     const f = await admin('FOUNDER');
     const name = `Admin Created ${randomUUID().slice(0, 8)}`;
-    const email = `created-${randomUUID()}@example.test`;
+    // Since step18, sign-up has no email: the salon's mobile number is the owner's login (+91…).
+    // A random number, because staff phone numbers are unique.
+    const mobile = randomMobile();
     const res = await api(f.cookie).post('/salons', {
       salonName: name,
-      phone: '98765 43210',
+      phone: `${mobile.slice(0, 5)} ${mobile.slice(5)}`,
       address: '12 Main Road, Korba',
       latitude: 22.35,
       longitude: 82.68,
       ownerName: 'New Owner',
-      email,
       password: 'a-long-enough-pass',
       openingTime: '09:00',
       closingTime: '21:00',
@@ -96,9 +97,9 @@ describe('Founder salon management (Slice 2)', () => {
     expect(list.status).toBe(200);
     expect(list.body.salons).toHaveLength(1);
     expect(list.body.salons[0]).toMatchObject({ name, isInternal: true, isSuspended: false });
-    expect(list.body.salons[0].owner.email).toBe(email);
+    expect(list.body.salons[0].owner.phone).toBe(`+91${mobile}`);
 
-    expect(await loginStatus(email, 'a-long-enough-pass')).toBe(200);
+    expect(await loginStatus(mobile, 'a-long-enough-pass')).toBe(200);
     expect(await auditCount('salon.create', res.body.salonId)).toBe(1);
   }, 120_000);
 

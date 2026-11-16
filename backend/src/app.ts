@@ -40,6 +40,8 @@ export function createApp(opts: { rateLimits?: boolean; clientDir?: string } = {
           ...helmet.contentSecurityPolicy.getDefaultDirectives(),
           // the app opens a websocket back to its own address
           'connect-src': ["'self'", 'wss:'],
+          // Shop product photos are served from Supabase Storage (public bucket); blob: = local preview before upload
+          'img-src': ["'self'", 'data:', 'blob:', new URL(env.SUPABASE_URL).origin],
         },
       },
     }),
