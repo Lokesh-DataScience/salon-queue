@@ -404,10 +404,23 @@ export default function QueueTracking() {
       {header}
       <TurnAlert ticketId={ticket.ticketId} tokenNumber={ticket.tokenNumber} status={ticket.status} />
 
+      {/* Shop first while waiting (Option A): slim token bar + "Shop while you wait". Renders nothing when the
+          shop is off for this salon, so the page is then exactly as before. */}
+      {ticket.status === 'WAITING' && (
+        <Suspense fallback={null}>
+          <ShopStrip
+            salonId={ticket.salonId}
+            variant="hero"
+            token={{ number: ticket.tokenNumber, peopleAhead: ticket.peopleAhead, waitMinutes: ticket.estimatedWaitMinutes }}
+          />
+        </Suspense>
+      )}
+
       {/* Token */}
       <section
+        id="token"
         aria-label={t.yourToken}
-        className="flex flex-col items-center rounded-3xl border-2 border-ink bg-white px-6 pb-6 pt-5 text-center text-ink shadow-[0_6px_0_0_var(--color-ink)]"
+        className="scroll-mt-4 flex flex-col items-center rounded-3xl border-2 border-ink bg-white px-6 pb-6 pt-5 text-center text-ink shadow-[0_6px_0_0_var(--color-ink)]"
       >
         <p className="text-base font-semibold text-gray-700">{t.yourToken}</p>
         <p className="my-1 text-8xl font-extrabold leading-none tabular-nums">#{ticket.tokenNumber}</p>
@@ -544,11 +557,6 @@ export default function QueueTracking() {
         <ForgetMe ticketId={ticket.ticketId} accessToken={accessToken} salonId={ticket.salonId} />
       </div>
       {ticket.status === 'WAITING' && <LocalNews salonId={ticket.salonId} />}
-      {ticket.status === 'WAITING' && (
-        <Suspense fallback={null}>
-          <ShopStrip salonId={ticket.salonId} />
-        </Suspense>
-      )}
     </PageShell>
   );
 }

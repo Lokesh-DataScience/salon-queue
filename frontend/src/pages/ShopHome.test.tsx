@@ -123,3 +123,46 @@ describe('5th bottom tab', () => {
     expect(showsBottomNav('/c/shop/', true)).toBe(true);
   });
 });
+
+describe('Shop first on waiting tickets (Option A hero)', () => {
+  const token = { number: 12, peopleAhead: 3, waitMinutes: 25 };
+
+  it('shows the token bar, then "Shop while you wait" with links to each product and the shop', async () => {
+    renderPage(<ShopStrip salonId="s1" variant="hero" token={token} />);
+    expect(await screen.findByRole('region', { name: 'Shop while you wait' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Your token #12')).toBeInTheDocument();
+    expect(screen.getByText('3 people ahead of you')).toBeInTheDocument();
+    expect(screen.getByText('Estimated wait ~25 min · updates live')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Details' })).toHaveAttribute('href', '#token');
+    expect(screen.getByRole('link', { name: /Beard Oil 50 ml/ })).toHaveAttribute('href', '/c/shop/p/p1');
+    expect(screen.getByRole('link', { name: 'See all' })).toHaveAttribute('href', '/c/shop');
+    expect(screen.queryByText('Hair Wax')).not.toBeInTheDocument(); // out of stock left out
+  });
+
+  it("says \"You're next\" when nobody is ahead", async () => {
+    renderPage(<ShopStrip salonId="s1" variant="hero" token={{ ...token, peopleAhead: 0 }} />);
+    expect(await screen.findByText("You're next")).toBeInTheDocument();
+  });
+
+  it('shop off for this salon: nothing at all, not even the token bar', async () => {
+    vi.mocked(shop.fetchShopStatus).mockResolvedValue({ enabled: true, showStrip: false });
+    const { container } = renderPage(<ShopStrip salonId="s1" variant="hero" token={token} />);
+    await waitFor(() => expect(shop.fetchShopStatus).toHaveBeenCalled());
+    expect(container.textContent).toBe('');
+    expect(shop.fetchCatalog).not.toHaveBeenCalled();
+  });
+
+  it('nothing in stock: nothing at all', async () => {
+    vi.mocked(shop.fetchCatalog).mockResolvedValue([gone]);
+    const { container } = renderPage(<ShopStrip salonId="s1" variant="hero" token={token} />);
+    await waitFor(() => expect(shop.fetchCatalog).toHaveBeenCalled());
+    expect(container.textContent).toBe('');
+  });
+
+  it('in Hindi', async () => {
+    setLang('hi');
+    renderPage(<ShopStrip salonId="s1" variant="hero" token={token} />);
+    expect(await screen.findByRole('region', { name: 'इंतज़ार करते हुए खरीदें' })).toBeInTheDocument();
+    expect(screen.getByText('आपसे पहले 3 लोग')).toBeInTheDocument();
+  });
+});
