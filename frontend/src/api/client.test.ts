@@ -97,6 +97,30 @@ describe('apiFetch', () => {
     expect(onExpired).not.toHaveBeenCalled();
   });
 
+  it('refresh denied and retry still 401 (other tab/app cookies late): refreshes again and stays signed in', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(401, { message: 'Not authenticated.' })) // request
+      .mockResolvedValueOnce(reply(401, { message: 'Session expired.' })) // refresh lost the race
+      .mockResolvedValueOnce(reply(401, { message: 'Not authenticated.' })) // retry before new cookies landed
+      .mockResolvedValueOnce(reply(200, { ok: true })) // second refresh with the winner's cookie
+      .mockResolvedValueOnce(reply(200, { waiting: [] }));
+
+    await expect(apiFetch('/api/barber/queue')).resolves.toEqual({ waiting: [] });
+    expect(urls().filter((u) => u.endsWith('/api/auth/barber/refresh'))).toHaveLength(2);
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it('refresh denied twice: the session really ended', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply(401, { message: 'Not authenticated.' }))
+      .mockResolvedValueOnce(reply(401, { message: 'Session expired.' }))
+      .mockResolvedValueOnce(reply(401, { message: 'Not authenticated.' }))
+      .mockResolvedValueOnce(reply(401, { message: 'Session expired.' }));
+
+    await expect(apiFetch('/api/barber/queue')).rejects.toMatchObject({ status: 401 });
+    expect(onExpired).toHaveBeenCalledTimes(1);
+  });
+
   it('refresh server error: no retry, no forced logout', async () => {
     fetchMock
       .mockResolvedValueOnce(reply(401, { message: 'Not authenticated.' }))

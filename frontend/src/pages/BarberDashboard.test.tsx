@@ -4,8 +4,8 @@ import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BarberDashboard from './BarberDashboard';
 import { renderPage } from '../test/utils';
-import { socket, resetSocket } from '../test/fakeSocket';
-import { SESSION_EXPIRED_EVENT } from '../api/client';
+import { socket, resetSocket, fireSocket } from '../test/fakeSocket';
+import { ApiError, SESSION_EXPIRED_EVENT } from '../api/client';
 import * as barber from '../api/barber';
 import type { BarberQueueEntry, BarberQueueSnapshot } from '../api/barber';
 
@@ -357,5 +357,38 @@ describe('BarberDashboard (one-button)', () => {
     await user.click(await screen.findByRole('button', { name: '+5 min for #4' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('no longer at the chair');
     expect(screen.queryByText(/\+5 min added/)).not.toBeInTheDocument();
+  });
+
+  it('a failed load that is not a 401 offers a retry, never "session expired"', async () => {
+    vi.mocked(barber.fetchBarberQueue).mockRejectedValue(new TypeError('Failed to fetch'));
+    const user = userEvent.setup();
+    renderDashboard();
+
+    const retry = await screen.findByRole('button', { name: 'Try again' }, { timeout: 8000 });
+    expect(screen.queryByText(/session expired/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /go to login/i })).not.toBeInTheDocument();
+
+    given();
+    await user.click(retry);
+    expect(await screen.findByText('Waiting (2)')).toBeInTheDocument();
+  }, 15000);
+
+  it('a failed background refresh keeps the last queue on screen', async () => {
+    given();
+    renderDashboard();
+    expect(await screen.findByText('Waiting (2)')).toBeInTheDocument();
+
+    vi.mocked(barber.fetchBarberQueue).mockRejectedValue(new ApiError('Something went wrong.', 500));
+    act(() => fireSocket('queue:updated'));
+
+    expect(await screen.findByText(/connection problem/i, {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.getByText('Waiting (2)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /go to login/i })).not.toBeInTheDocument();
+  }, 15000);
+
+  it('a real 401 still shows the signed-out screen', async () => {
+    vi.mocked(barber.fetchBarberQueue).mockRejectedValue(new ApiError('Not authenticated.', 401));
+    renderDashboard();
+    expect(await screen.findByRole('button', { name: /go to login/i })).toBeInTheDocument();
   });
 });

@@ -275,7 +275,11 @@ export default function BarberDashboard() {
     );
   }
 
-  if (error || !queue) {
+  // Only a real 401 means the session ended (BarberLayout and the expiry event handle that).
+  // Any other failure — weak network, server waking up, a 409/500 — must never look like a logout:
+  // keep showing the last queue if we have one, otherwise offer a retry.
+  const sessionEnded = error instanceof ApiError && error.status === 401;
+  if (sessionEnded) {
     return (
       <main className="mx-auto max-w-md p-6">
         <div className="card p-6 text-center">
@@ -287,6 +291,24 @@ export default function BarberDashboard() {
       </main>
     );
   }
+  if (!queue) {
+    return (
+      <main className="mx-auto max-w-md p-6">
+        <div className="card p-6 text-center">
+          <p role="alert" className="mb-4 text-red-700">
+            {error instanceof ApiError
+              ? error.message
+              : "Couldn't load the queue. Check your internet and try again."}
+          </p>
+          <button onClick={() => void refetch()} className="btn-primary">
+            Try again
+          </button>
+        </div>
+      </main>
+    );
+  }
+  // A background refresh failed but we still have the last queue: keep it on screen.
+  const refreshFailed = !!error;
 
   const isPaused = queue.queueStatus === 'PAUSED';
   const multi = !!queue.lane; // several barbers: this screen is about one line
@@ -370,6 +392,12 @@ export default function BarberDashboard() {
           <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-base text-amber-900">
             <strong>Today is your weekly off.</strong> Customers can't take a token from the QR or the app. You can
             still add walk-ins with +1.
+          </p>
+        )}
+
+        {refreshFailed && (
+          <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Connection problem — showing the last update. It will refresh automatically.
           </p>
         )}
 
