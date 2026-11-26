@@ -93,7 +93,18 @@ export default function BarberOffers() {
       </main>
     );
   }
-  if (error || !data) {
+  // Only a 401 is a lost session; anything else (network, server waking up) gets a retry.
+  if (!data && !(error instanceof ApiError && error.status === 401)) {
+    return (
+      <main className="mx-auto max-w-md p-6">
+        <div className="card p-6 text-center">
+          <p role="alert" className="mb-4 text-red-700">Couldn't load offers. Check your internet and try again.</p>
+          <button onClick={() => void refresh()} className="btn-primary">Try again</button>
+        </div>
+      </main>
+    );
+  }
+  if (!data) {
     return (
       <main className="mx-auto max-w-md p-6">
         <div className="card p-6 text-center">

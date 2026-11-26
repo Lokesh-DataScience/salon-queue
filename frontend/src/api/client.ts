@@ -18,6 +18,7 @@ export class ApiError extends Error {
 }
 
 type RefreshOutcome = 'ok' | 'denied' | 'error';
+const RACE_WAIT_MS = import.meta.env.MODE === 'test' ? 0 : 1500;
 let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 // Single-flight: ten requests failing at once trigger one refresh, not ten.
@@ -49,12 +50,18 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   // and retry once. (A 401 means the handler never ran, so retrying a POST cannot double-apply it.)
   if (res.status === 401 && (path.startsWith('/api/barber/') || path.startsWith('/api/admin/'))) {
     const outcome = await refreshSession();
-    // 'denied' can simply mean another tab rotated the token first. Its new cookies are
-    // already in the shared cookie jar, so retry once for 'ok' and 'denied' alike.
-    if (outcome !== 'error') {
+    if (outcome === 'ok') {
       res = await send();
-      if (res.status === 401) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    } else if (outcome === 'denied') {
+      // 'denied' usually means another tab, or the installed app sharing this browser's cookies,
+      // rotated the token a moment earlier. Its new cookies may still be on their way, so give
+      // them a moment, then retry; if still refused, refresh once more with whatever cookie is now in the jar.
+      await new Promise((r) => setTimeout(r, RACE_WAIT_MS));
+      res = await send();
+      if (res.status === 401 && (await refreshSession()) === 'ok') res = await send();
     }
+    // Only a 401 after all of that means the session really ended.
+    if (outcome !== 'error' && res.status === 401) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
   }
 
   if (!res.ok) {
