@@ -149,6 +149,14 @@ export function completeEntry(entryId: string) {
   });
 }
 
+// Gives the customer in the chair more time (the auto-complete timer moves later).
+export function extendEntry(entryId: string, minutes = 5) {
+  return apiFetch<unknown>(`/api/barber/queue/${entryId}/extend`, {
+    method: 'POST',
+    body: JSON.stringify({ minutes }),
+  });
+}
+
 export function skipEntry(entryId: string) {
   return apiFetch<{ entry: { id: string; status: string } }>(`/api/barber/queue/${entryId}/skip`, {
     method: 'POST',

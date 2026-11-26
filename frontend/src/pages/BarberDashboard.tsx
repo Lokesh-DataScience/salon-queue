@@ -7,6 +7,7 @@ import {
   callNextCustomer,
   startEntry,
   completeEntry,
+  extendEntry,
   skipEntry,
   pauseQueue,
   resumeQueue,
@@ -177,6 +178,19 @@ export default function BarberDashboard() {
       }),
   });
   const skipMutation = useMutation({ mutationFn: (id: string) => runAction(() => skipEntry(id)) });
+  const [extendMsg, setExtendMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!extendMsg) return;
+    const t = setTimeout(() => setExtendMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [extendMsg]);
+  const extendMutation = useMutation({
+    mutationFn: (entry: { id: string; token_number: number }) =>
+      runAction(async () => {
+        await extendEntry(entry.id, 5);
+        setExtendMsg(`+5 min added for #${entry.token_number}.`);
+      }),
+  });
   const pauseMutation = useMutation({
     mutationFn: () => runAction(() => (lane ? pauseQueue(lane) : pauseQueue())),
   });
@@ -283,6 +297,7 @@ export default function BarberDashboard() {
     walkInMutation.isPending ||
     bumpMutation.isPending ||
     notHereMutation.isPending;
+    extendMutation.isPending;
   const nextWaiting = queue.waiting[0] ?? null;
   const active = queue.serving ?? queue.called; // whoever is at the chair / being called
   // Only app customers can be "not here": a wall-QR scan means they were standing in the shop.
@@ -371,6 +386,22 @@ export default function BarberDashboard() {
           <p className="text-sm font-bold uppercase tracking-wide text-gray-700">{statusLine}</p>
           <p className="my-2 text-8xl font-extrabold tabular-nums text-ink">{active ? `#${active.token_number}` : '—'}</p>
           {active && <CustomerLine name={active.customer_name} phone={active.customer_phone} center />}
+          {queue.serving && (
+            <div className="mt-3 grid gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                aria-busy={extendMutation.isPending}
+                onClick={() => extendMutation.mutate(queue.serving!)}
+                className="min-h-12 w-full rounded-xl border-2 border-ink bg-white px-4 text-lg font-bold text-ink hover:bg-brand-soft disabled:opacity-40"
+              >
+                {extendMutation.isPending ? 'Adding...' : `+5 min for #${queue.serving.token_number}`}
+              </button>
+              {extendMsg && (
+                <p role="status" className="text-sm font-medium text-green-800">{extendMsg}</p>
+              )}
+            </div>
+          )}
           {active?.join_source === 'app' && (
             <div className="mt-3 grid justify-items-center gap-3">
               <AppBadge />

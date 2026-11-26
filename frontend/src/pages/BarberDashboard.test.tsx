@@ -16,6 +16,7 @@ vi.mock('../api/barber', () => ({
   addWalkIn: vi.fn(),
   startEntry: vi.fn(),
   completeEntry: vi.fn(),
+  extendEntry: vi.fn(),
   skipEntry: vi.fn(),
   pauseQueue: vi.fn(),
   resumeQueue: vi.fn(),
@@ -325,5 +326,36 @@ describe('BarberDashboard (one-button)', () => {
     await user.click(await screen.findByRole('button', { name: /Not here/ }));
     await user.click(screen.getByRole('button', { name: 'Yes, move back' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('no longer at the chair');
+  });
+    // ── +5 min (extend the serving customer's time) ──
+  it('+5 min: shown while serving, extends that customer by 5 minutes', async () => {
+    given({ serving: entry(4, 'SERVING'), waiting: [entry(5)] });
+    vi.mocked(barber.extendEntry).mockResolvedValue({});
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: '+5 min for #4' }));
+    await waitFor(() => expect(barber.extendEntry).toHaveBeenCalledWith('entry-4', 5));
+    expect(await screen.findByText('+5 min added for #4.')).toBeInTheDocument();
+    expect(barber.completeEntry).not.toHaveBeenCalled(); // extending never completes anyone
+  });
+
+  it('+5 min: not offered when no one is being served', async () => {
+    given({ called: entry(4, 'CALLED'), waiting: [entry(5)] });
+    renderDashboard();
+
+    await screen.findByRole('button', { name: 'START #4' });
+    expect(screen.queryByRole('button', { name: /\+5 min/ })).not.toBeInTheDocument();
+  });
+
+  it('+5 min: a server refusal is shown and no success message appears', async () => {
+    given({ serving: entry(4, 'SERVING'), waiting: [] });
+    vi.mocked(barber.extendEntry).mockRejectedValue(new Error('This customer is no longer at the chair.'));
+    const user = userEvent.setup();
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: '+5 min for #4' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('no longer at the chair');
+    expect(screen.queryByText(/\+5 min added/)).not.toBeInTheDocument();
   });
 });
